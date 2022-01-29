@@ -236,6 +236,9 @@ struct OS_State
     void (*RefreshScreen)(void);
     void *(*LoadOpenGLProcedure)(char *name);
     
+    // TODO(fakhri): do we put this here or move it as a global variable?
+    // NOTE(fakhri): game state
+    Game_State *game_state;
     f32 dtime;
     
     // NOTE(fakhri): shader hotreload
@@ -266,6 +269,6 @@ typedef void ApplicationHotUnloadCallback(void);
 internal void ApplicationHotUnloadStub(void) {}
 
 /* Loaded as "Update" */
-#define APP_UPDATE APP_ENTRY_POINT void Update(Game_State *game_state)
-typedef void ApplicationUpdateCallback(Game_State *game_state);
-internal void ApplicationUpdateStub(Game_State *game_state) {}
+#define APP_UPDATE APP_ENTRY_POINT void Update(void)
+typedef void ApplicationUpdateCallback(void);
+internal void ApplicationUpdateStub(void) {}

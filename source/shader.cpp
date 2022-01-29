@@ -1,10 +1,4 @@
 
-struct Compile_Shader_Result
-{
-    b32 is_valid;
-    GLuint program;
-};
-
 internal
 Compile_Shader_Result CompileShader(M_Arena *arena, s8 shader_path)
 {
@@ -51,6 +45,7 @@ Compile_Shader_Result CompileShader(M_Arena *arena, s8 shader_path)
                 char infoLog[512];
                 glGetProgramInfoLog(result.program, sizeof(infoLog), 0, infoLog);
                 LogError("Couldn't link shader program\n");
+                LogError("shader error :\n%s", infoLog);
                 glDeleteProgram(result.program);
             }
         }
@@ -59,6 +54,7 @@ Compile_Shader_Result CompileShader(M_Arena *arena, s8 shader_path)
             char infoLog[512];
             glGetShaderInfoLog(fragment_shader_id, sizeof(infoLog), 0, infoLog);
             LogError("Couldn't compile fragment shader program\n");
+            LogError("shader error :\n%s", infoLog);
             glDeleteShader(fragment_shader_id);
         }
     }
@@ -67,7 +63,12 @@ Compile_Shader_Result CompileShader(M_Arena *arena, s8 shader_path)
         char infoLog[512];
         glGetShaderInfoLog(vertex_shader_id, sizeof(infoLog), 0, infoLog);
         LogError("Couldn't compile vertex shader program\n");
+        LogError("shader error :\n%s", infoLog);
         glDeleteShader(vertex_shader_id);
+    }
+    if (result.is_valid)
+    {
+        Log("Shader %s compiled successfully\n", shader_path.str); 
     }
     return result;
 }
@@ -105,4 +106,20 @@ b32 ShaderFileHotreload(M_Arena *arena, s8 changed_shader_path)
         }
     }
     return result;
+}
+
+internal
+void InitShaderProgram(GLuint *shader_address, s8 shader_path)
+{
+    auto shader_result = CompileShader(&os->frame_arena, shader_path);
+    if (shader_result.is_valid)
+    {
+        *shader_address = shader_result.program;
+    }
+    
+    // NOTE(fakhri): always watch shader even if it didn't compile
+    Shader_Metadata shader_metadata = {};
+    shader_metadata.shader_path = StringCopy(&os->permanent_arena, shader_path); 
+    shader_metadata.shader_id_address = shader_address;
+    AddElementToShaderArray(&os->shaders_array, shader_metadata);
 }

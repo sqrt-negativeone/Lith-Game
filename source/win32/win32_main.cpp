@@ -10,8 +10,8 @@
 
 extern "C"
 {
-    _declspec(dllexport) DWORD NvOptimusEnablement = 1;
-    _declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+    _declspec(dllexport) DWORD NvOptimusEnablement = 0;
+    _declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 0;
 }
 
 // NOTE(rjf): OpenGL
@@ -555,9 +555,10 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         global_os.permanent_arena = M_ArenaInitialize();
         global_os.frame_arena = M_ArenaInitialize();
         
+        // NOTE(fakhri): allocate memory for game state
+        global_os.game_state = (Game_State *)M_ArenaPushZero(&global_os.permanent_arena, sizeof(Game_State));
+        
     }
-    
-    Game_State *game_state = (Game_State *)M_ArenaPushZero(&global_os.permanent_arena, sizeof(Game_State));
     
     // NOTE(rjf): OpenGL initialization
     {
@@ -660,7 +661,9 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         {
             b32 last_fullscreen = global_os.fullscreen;
             
-            win32_app_code.Update(game_state);
+            win32_app_code.Update();
+            
+            W32_OpenGLRefreshScreen();
             
             // NOTE(rjf): Update fullscreen if necessary
             if(last_fullscreen != global_os.fullscreen)

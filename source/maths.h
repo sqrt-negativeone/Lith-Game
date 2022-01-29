@@ -143,6 +143,13 @@ v2 vec2i(i32 x, i32 y)
 }
 
 internal
+v2 vec2iv(iv2 v)
+{
+    v2 result = vec2i(v.x, v.y);
+    return result;
+}
+
+internal
 v3 vec3(f32 x, f32 y, f32 z)
 {
     v3 result = HMM_Vec3(x, y ,z);
