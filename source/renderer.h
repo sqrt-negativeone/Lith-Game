@@ -3,20 +3,40 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-struct Renderer
+struct Character
+{
+    GLuint texture_id;  // ID handle of the glyph texture
+    iv2    size;       // Size of glyph
+    iv2    bearing;    // Offset from baseline to left/top of glyph
+    u32    advance;    // Offset to advance to next glyph
+};
+
+struct Font
+{
+#define CHARACTERS_COUNT 128
+    Character characters[CHARACTERS_COUNT];
+};
+
+struct Rendering_Context
 {
     GLuint quad_shader;
     GLuint texture_shader;
+    GLuint text_shader;
     
     GLuint quad_vao;
-    GLuint quad_vbo;
-    
     GLuint texture_vao;
+    GLuint text_vao;
+    
+    GLuint quad_vbo;
     GLuint texture_vbo;
+    GLuint text_vbo;
     
     v2 screen;
     
     GLuint test_2d_texture;
+    
+    Font arial_font;
+    Font *active_font;
 };
 
 #endif //RENDERER_H

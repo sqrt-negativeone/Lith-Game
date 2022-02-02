@@ -108,6 +108,15 @@ b32 ShaderFileHotreload(M_Arena *arena, s8 changed_shader_path)
     return result;
 }
 
+
+internal
+void AddElementToShaderArray(Shader_Array *array, Shader_Metadata element)
+{
+    HardAssert(array->shaders_count < SHADER_ARRAY_CAPACITY);
+    
+    array->data[array->shaders_count++] = element;
+}
+
 internal
 void InitShaderProgram(GLuint *shader_address, s8 shader_path)
 {

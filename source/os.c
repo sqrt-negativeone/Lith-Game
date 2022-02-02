@@ -144,10 +144,9 @@ OS_PushEvent(OS_Event event)
     }
 }
 
-internal
-void AddElementToShaderArray(Shader_Array *array, Shader_Metadata element)
+internal void
+OS_ClearEvents()
 {
-    HardAssert(array->shaders_count < SHADER_ARRAY_CAPACITY);
-    
-    array->data[array->shaders_count++] = element;
+    HardAssert(os != 0);
+    os->event_count = 0;
 }

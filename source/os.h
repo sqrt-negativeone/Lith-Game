@@ -234,15 +234,17 @@ struct OS_State
     void (*SetCursorToVerticalResize)(void);
     void (*SetCursorToIBar)(void);
     void (*RefreshScreen)(void);
-    void *(*LoadOpenGLProcedure)(char *name);
     
-    // TODO(fakhri): do we put this here or move it as a global variable?
     // NOTE(fakhri): game state
     Game_State *game_state;
     f32 dtime;
+    f32 time;
     
     // NOTE(fakhri): shader hotreload
     Shader_Array shaders_array;
+    
+    // NOTE(fakhri): inputs
+    Controller controller;
 };
 
 global OS_State *os = 0;
@@ -269,6 +271,6 @@ typedef void ApplicationHotUnloadCallback(void);
 internal void ApplicationHotUnloadStub(void) {}
 
 /* Loaded as "Update" */
-#define APP_UPDATE APP_ENTRY_POINT void Update(void)
+#define APP_UPDATE APP_ENTRY_POINT void UpdateAndRender(void)
 typedef void ApplicationUpdateCallback(void);
 internal void ApplicationUpdateStub(void) {}

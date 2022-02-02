@@ -55,4 +55,5 @@ W32_TimerEndFrame(W32_Timer *timer, f64 milliseconds_per_frame)
     QueryPerformanceCounter(&end_frame);
     elapsed_counts = end_frame.QuadPart - timer->begin_frame.QuadPart;
     os->dtime = elapsed_counts  / (f32)timer->counts_per_second.QuadPart;
+    os->time += os->dtime;
 }

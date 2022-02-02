@@ -352,6 +352,40 @@ W32_WindowProc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param)
             }
         }
         
+        switch(key_input)
+        {
+            case Key_Left:
+            {
+                os->controller.move_left.pressed = is_down;
+                os->controller.move_left.released = was_down;
+            } break;
+            case Key_Right:
+            {
+                os->controller.move_right.pressed = is_down;
+                os->controller.move_right.released = was_down;
+            } break;
+            case Key_Up:
+            {
+                os->controller.move_up.pressed = is_down;
+                os->controller.move_up.released = was_down;
+            } break;
+            case Key_Down:
+            {
+                os->controller.move_down.pressed = is_down;
+                os->controller.move_down.released = was_down;
+            } break;
+            case Key_Enter:
+            {
+                os->controller.confirm.pressed = is_down;
+                os->controller.confirm.released = was_down;
+            } break;
+            case Key_Esc:
+            {
+                os->controller.escape_key.pressed = is_down;
+                os->controller.escape_key.released = was_down;
+            } break;
+        }
+        
         if(is_down)
         {
             OS_PushEvent(OS_KeyPressEvent((Key)key_input, modifiers));
@@ -524,6 +558,8 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         global_os.window_size.x             = DEFAULT_WINDOW_WIDTH;
         global_os.window_size.y             = DEFAULT_WINDOW_HEIGHT;
         global_os.current_time              = 0.f;
+        // TODO(fakhri): we can just target 30fps because we don't need 60fps for a cards game
+        // and use the extra time for server processing and stuff
         global_os.target_frames_per_second  = refresh_rate;
         
         global_os.sample_out = (f32 *)W32_HeapAlloc(win32_sound_output.samples_per_second * sizeof(f32) * 2);
@@ -549,7 +585,6 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         global_os.ResetCursor                    = W32_ResetCursor;
         global_os.SetCursorToHorizontalResize    = W32_SetCursorToHorizontalResize;
         global_os.SetCursorToVerticalResize      = W32_SetCursorToVerticalResize;
-        global_os.LoadOpenGLProcedure            = W32_LoadOpenGLProcedure;
         global_os.RefreshScreen                  = W32_OpenGLRefreshScreen;
         
         global_os.permanent_arena = M_ArenaInitialize();
@@ -584,6 +619,11 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     
     // NOTE(fakhri): setup directory watcher to see if any shader changed
     W32_BeginWatchDirectory( &global_shaders_watcher, &global_os.permanent_arena, S8Lit("shaders/"));
+    
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    // TODO(fakhri): create a networking thread
     
     while(!global_os.quit)
     {
@@ -661,7 +701,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         {
             b32 last_fullscreen = global_os.fullscreen;
             
-            win32_app_code.Update();
+            win32_app_code.UpdateAndRender();
             
             W32_OpenGLRefreshScreen();
             

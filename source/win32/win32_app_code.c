@@ -5,10 +5,21 @@ struct W32_AppCode
     ApplicationPermanentLoadCallback  *PermanentLoad;
     ApplicationHotLoadCallback        *HotLoad;
     ApplicationHotUnloadCallback      *HotUnload;
-    ApplicationUpdateCallback         *Update;
+    ApplicationUpdateCallback         *UpdateAndRender;
+    
     HMODULE dll;
     FILETIME last_dll_write_time;
 };
+
+internal void
+W32_AppCodeSetStubs(W32_AppCode *app_code)
+{
+    app_code->PermanentLoad = ApplicationPermanentLoadStub;
+    app_code->HotLoad = ApplicationHotLoadStub;
+    app_code->HotUnload = ApplicationHotUnloadStub;
+    app_code->UpdateAndRender = ApplicationUpdateStub;
+    
+}
 
 internal b32
 W32_AppCodeLoad(W32_AppCode *app_code)
@@ -33,14 +44,12 @@ W32_AppCodeLoad(W32_AppCode *app_code)
     app_code->PermanentLoad    = (ApplicationPermanentLoadCallback *)GetProcAddress(app_code->dll, "PermanentLoad");
     app_code->HotLoad          = (ApplicationHotLoadCallback *)GetProcAddress(app_code->dll, "HotLoad");
     app_code->HotUnload        = (ApplicationHotUnloadCallback *)GetProcAddress(app_code->dll, "HotUnload");
-    app_code->Update           = (ApplicationUpdateCallback *)GetProcAddress(app_code->dll, "Update");
+    app_code->UpdateAndRender           = (ApplicationUpdateCallback *)GetProcAddress(app_code->dll, "UpdateAndRender");
     
-    if(!app_code->PermanentLoad || !app_code->HotLoad || !app_code->HotUnload || !app_code->Update)
+    
+    if(!app_code->PermanentLoad || !app_code->HotLoad || !app_code->HotUnload || !app_code->UpdateAndRender)
     {
-        app_code->PermanentLoad = ApplicationPermanentLoadStub;
-        app_code->HotLoad = ApplicationHotLoadStub;
-        app_code->HotUnload = ApplicationHotUnloadStub;
-        app_code->Update = ApplicationUpdateStub;
+        W32_AppCodeSetStubs(app_code);
         result = 0;
         goto end;
     }
@@ -57,10 +66,7 @@ W32_AppCodeUnload(W32_AppCode *app_code)
         FreeLibrary(app_code->dll);
     }
     app_code->dll = 0;
-    app_code->PermanentLoad = ApplicationPermanentLoadStub;
-    app_code->HotLoad = ApplicationHotLoadStub;
-    app_code->HotUnload = ApplicationHotUnloadStub;
-    app_code->Update = ApplicationUpdateStub;
+    W32_AppCodeSetStubs(app_code);
 }
 
 internal void
