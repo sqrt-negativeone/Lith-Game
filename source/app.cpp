@@ -7,6 +7,7 @@
 #include "memory.h"
 #include "strings.h"
 #include "perlin.h"
+#include "network_message.h"
 #include "app.h"
 #include "os.h"
 #define STB_IMAGE_IMPLEMENTATION
@@ -21,214 +22,201 @@
 #include "renderer.cpp"
 #include "buffer.cpp"
 #include "ui.cpp"
-
-
-internal
-void PostNetworkMessage(MessagesType message_type)
-{
-    // TODO(fakhri): implement this
-}
-
-internal 
-u32 ChangeSelectedItem(u32 item_index, i32 delta, u32 items_count)
-{
-    u32 result = (item_index + delta + items_count) % items_count;
-    return result;
-}
+#include "network_message.cpp"
 
 internal void
-ChangeMenuSelectedItem(UI_Context *ui_context, i32 delta)
+HandleAvailableNetworkMessages(Game_State *game_state)
 {
-    Assert(ui_context);
-    ui_context->last_time = os->time;
-    ui_context->selected_item = ChangeSelectedItem(ui_context->selected_item, delta, ui_context->items_count);
-}
-
-internal
-void PlayCard(Game_State *game_state, u32 claimed_value)
-{
-    // TODO(fakhri): implement this
-    // TODO(fakhri): this function should tell the server about our move?
-}
-
-
-internal
-void QuestionLastPlayerCredibility(Game_State *game_state)
-{
-    // TODO(fakhri): implement this
-}
-
-internal void
-UI_ClearContext(UI_Context *ui_context)
-{
-    Assert(ui_context);
-    ui_context->selected_item = 0;
-    for (u32 field_buffer_index = 0;
-         field_buffer_index < ArrayCount(ui_context->input_field_buffers);
-         ++field_buffer_index)
+    Game_Session *game_session = &game_state->game_session;
+    NetworkMessage message = {};
+    os->GetNextNetworkMessageIfAvailable(&message);
+    // TODO(fakhri): we can limit the nombre of messages handled per frame if it slowed things down
+    for(;
+        message.is_available;
+        os->GetNextNetworkMessageIfAvailable(&message)
+        )
     {
-        EmptyBuffer(ui_context->input_field_buffers + field_buffer_index);
+        switch(message.type)
+        {
+            case NetworkMessageType_From_Server_PLAYER_TURN:
+            {
+                // TODO(fakhri): change the turn
+            } break;
+            case NetworkMessageType_From_Server_PLAYER_JOINED_GAME:
+            {
+                u32 player_index = message.player_index;
+                game_session->players[player_index] = message.player_username;
+                ++game_session->players_joined_sofar;
+            } break;
+            case NetworkMessageType_From_Server_INVALIDE_USERNAME:
+            {
+            } break;
+            default:
+            {
+                // NOTE(fakhri): unhandled message
+                BreakDebugger();
+            } break;
+        }
     }
 }
 
-internal void
+inline void
 OpenMenu(Game_State *game_state, Game_Mode menu_mode)
 {
-    Assert(Game_Mode_BEGIN_MENU < menu_mode && menu_mode < Game_Mode_END_MENU);
+    Assert(Game_Mode_MENU_BEGIN < menu_mode && menu_mode < Game_Mode_MENU_END);
     UI_ClearContext(&game_state->ui_context);
     game_state->game_mode = menu_mode;
 }
 
 internal void
+MoveEntity(Entity *entity, f32 k, f32 c, f32 mass)
+{
+    v2 acceleration = -k * (entity->center_pos - entity->target_pos) - c * entity->velocity;
+    acceleration *= 1.0f / mass;
+    entity->velocity += os->dtime * acceleration;
+    entity->center_pos += os->dtime * entity->velocity + 0.5f * square_f(os->dtime) * acceleration;
+}
+
+internal void
+UpdateCursorEntity(Game_State *game_state, Entity *entity)
+{
+    v2 half_screen = 0.5f * game_state->rendering_context.screen;
+    entity->center_pos = vec2(os->mouse_position.x - half_screen.x,
+                              -os->mouse_position.y + half_screen.y);
+}
+
+internal void
+UpdateCardEntity(Game_State *game_state, Entity *entity)
+{
+    Entity *cursor_entity = game_state->entities + (u32)Entity_Type_Cursor_Entity;
+    Assert(cursor_entity->type == Entity_Type_Cursor_Entity);
+    
+    b32 should_be_under_cursor = IsInsideRect(RectCentDim(entity->center_pos, entity->current_dimension), cursor_entity->center_pos);
+    
+    if (!entity->is_under_cursor && should_be_under_cursor)
+    {
+        entity->is_under_cursor = true;
+        entity->target_dimension = 1.1f * entity->original_dimension;
+    }
+    
+    if (entity->is_under_cursor && !should_be_under_cursor)
+    {
+        entity->is_under_cursor = false;
+        entity->target_dimension = entity->original_dimension;
+    }
+    
+    if (entity->is_under_cursor)
+    {
+        if (!entity->is_pressed && os->controller.left_mouse.pressed)
+        {
+            entity->is_pressed = true;
+            entity->followed_entity_index = Entity_Type_Cursor_Entity;
+        }
+    }
+    
+    if (entity->is_pressed)
+    {
+        if (os->controller.left_mouse.released)
+        {
+            entity->is_pressed = false;
+            entity->target_pos = entity->original_pos;
+            entity->followed_entity_index = 0;
+        }
+    }
+    
+    // NOTE(fakhri): update dimension
+    entity->current_dimension = Vec2MoveTowards(entity->current_dimension,
+                                                entity->target_dimension,
+                                                os->dtime * entity->dDimension);
+    
+    if (entity->followed_entity_index)
+    {
+        Entity *followed_entity = game_state->entities + entity->followed_entity_index;
+        if (LengthSquaredVec2(followed_entity->center_pos - entity->center_pos) > entity->following_trigger_distance)
+        {
+            entity->target_pos = followed_entity->center_pos;
+        }
+    }
+    
+    f32 k = 9000.f;
+    f32 c = 500.f;
+    f32 mass = 10.f;
+    MoveEntity(entity, k, c, mass);
+}
+
+internal void
+UpdateCardNumberEntity(Game_State *game_state, Entity *entity)
+{
+    Assert(entity->followed_entity_index);
+    
+    Entity *followed_entity = game_state->entities + entity->followed_entity_index;
+    if (LengthSquaredVec2(followed_entity->center_pos - entity->center_pos) > entity->following_trigger_distance)
+    {
+        entity->target_pos = followed_entity->center_pos;
+    }
+    
+    f32 k = 10000.f;
+    f32 c = 150.f;
+    f32 mass = 10.f;
+    MoveEntity(entity, k, c, mass);
+    entity->center_pos = ClampInsideRect(RectCentDim(followed_entity->center_pos, followed_entity->current_dimension), entity->center_pos);
+}
+
+// TODO(fakhri): come up with a client-server protocol for the game
+internal void
 UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context, Controller *controller)
 {
-    Game_Session *game_session = &game_state->game_session;
-    f32 dtime = os->dtime;
-    
-    // NOTE(fakhri): see if the game started
-    if (game_session->game_started)
-    {
-        // NOTE(fakhri): always allow player to change selected card
-        if (controller->move_left.released)
-        {
-            controller->move_left.released = 0;
-            u32 card_index = game_state->selected_card_index;
-            game_state->selected_card_index = ChangeSelectedItem(card_index, -1, DECK_CARDS_COUNT);
-        }
-        if (controller->move_right.released)
-        {
-            controller->move_right.released = 0;
-            u32 card_index = game_state->selected_card_index;
-            game_state->selected_card_index = ChangeSelectedItem(card_index, +1, DECK_CARDS_COUNT);
-        }
-        
-        // NOTE(fakhri): is it my turn ?
-        if (game_session->index_of_current_player == game_state->my_index)
-        {
-            if (!game_state->played_my_turn && game_state->choosing_a_move)
-            {
-                if (controller->confirm.pressed)
-                {
-                    if (game_state->is_table_empty)
-                    {
-                        // NOTE(fakhri): prompt player to claim a number
-                        game_state->should_claim_number = 1;
-                    }
-                    else
-                    {
-                        PlayCard(game_state, game_state->card_number_to_play);
-                    }
-                    game_state->choosing_a_move = 0;
-                }
-                if (controller->deceit.pressed)
-                {
-                    game_state->choosing_a_move = 0;
-                    QuestionLastPlayerCredibility(game_state);
-                }
-            }
-        }
-        else
-        {
-            // NOTE(fakhri): it's not my turn, other players probably played something?
-            // TODO(fakhri): did the other player finished his turn?
-            // TODO(fakhri): is it now my turn ?
-            // TODO(fakhri): should I take the cards in the pool? if yes what are they?
-            // TODO(fakhri): did any cards got burnt? if yes which ones? and by any player?
-        }
-    }
-    else
-    {
-        // TODO(fakhri): did the game started yet? if yes what are the cards in my hand? and who is
-        // the  current player
-    }
-    
-    // TODO(fakhri): draw the background
     glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
     glClear(GL_COLOR_BUFFER_BIT);
+    v3 white = vec3(1, 1, 1);
+    v3 red = vec3(1, 0, 0);
     
-    // TODO(fakhri): do this properly
-    // NOTE(fakhri): draw the cards of players clockwise
-    // player 0 to the left, 1 to the up, 2 right, and 3 down
-    for (u32 player_index = 0;
-         player_index < PLAYERS_COUNT;
-         ++player_index)
+    // NOTE(fakhri): draw the cards
+    // TODO(fakhri): choose a font for card number
+    ChangeActiveFont(rendering_context, &rendering_context->arial_font);
+    for (u32 entity_index = 1;
+         entity_index < game_state->entity_count;
+         ++entity_index)
     {
-        v2 card_size = vec2(50, 100);
-        v2 card_position = {};
-        
-        if (player_index == 0)
+        Entity *entity = game_state->entities + entity_index;
+        switch(entity->type)
         {
-            card_position = vec2(-0.9f * 0.5f *rendering_context->screen.width, 0.6f * 0.5f * rendering_context->screen.height);
-        }
-        if (player_index == 1)
-        {
-            card_position = vec2(-0.4f * 0.5f * rendering_context->screen.width, 0.5f * card_size.height + 0.5f * 0.5f * rendering_context->screen.height);
-        }
-        else if (player_index == 2)
-        {
-            card_position = vec2(0.9f * 0.5f * rendering_context->screen.width - card_size.width, 0.6f * 0.5f * rendering_context->screen.height);
-        }
-        else if (player_index == 3)
-        {
-            card_position = vec2(-0.4f * 0.5f * rendering_context->screen.width, -0.5f * 0.5f * rendering_context->screen.height);
-        }
-        f32 rotate = 0.f;
-        if (player_index % 2 == 0)
-        {
-            rotate = PI / 2;
-        }
-        
-        for (u32 my_card_index = 0;
-             my_card_index < game_state->hand_cards_count[player_index];
-             ++my_card_index)
-        {
-            v3 card_color = vec3(1.0f, 1.0f, 1.0f);
-            if (player_index == game_state->my_index &&
-                my_card_index == game_state->selected_card_index)
+            case Entity_Type_Cursor_Entity:
             {
-                DebugDrawQuad(rendering_context, card_position, 1.15f * card_size, v3{1.f, 0.f, 0.f}, rotate);
-            }
+                UpdateCursorEntity(game_state, entity);
+                // TODO(fakhri): render the cursor here?
+            } break;
+            case Entity_Type_Entity_Card:
+            {
+                UpdateCardEntity(game_state, entity);
+                if (entity->is_pressed)
+                {
+                    DebugDrawQuad(rendering_context, entity->center_pos, 1.05f * entity->current_dimension, red);
+                }
+                
+                DebugDrawQuad(rendering_context, entity->center_pos, entity->current_dimension, white);
+            } break;
             
-            DebugDrawQuad(rendering_context, card_position, card_size, card_color, rotate);
-            if (player_index % 2)
+            case Entity_Type_Entity_Card_Number:
             {
-                // NOTE(fakhri): odd index player drawn horizonatly
-                card_position.x += card_size.width + 10;
-            }
-            else
+                UpdateCardNumberEntity(game_state, entity);
+                char text[2] = {'0' + (char)entity->card_number,};
+                s8 number = S8Lit(text);
+                ChangeActiveFont(rendering_context, &rendering_context->arial_font);
+                DebugDrawTextWorldCoord(rendering_context, number, entity->center_pos, red);
+            } break;
+            default:
             {
-                // NOTE(fakhri): even index drawn vertically
-                card_position.y -= card_size.width + 10;
-            }
-        }
-    }
-    
-    if (game_state->should_claim_number)
-    {
-        u32 claimed_value = 0;
-        // TODO(fakhri): prompt the player with a menu to choose a number from to claim his card is
-        v2 menu_size = 0.55f * rendering_context->screen;
-        DebugDrawQuad(rendering_context, vec2(0, 0), menu_size, vec3(0.4f, 0.4f, 0.5f));
-        
-        if (controller->escape_key.released)
-        {
-            controller->escape_key.released = 0;
-            game_state->should_claim_number = 0;
-            game_state->choosing_a_move = 1;
-        }
-        
-        if (claimed_value)
-        {
-            // NOTE(fakhri): play the turn
-            PlayCard(game_state, claimed_value);
-            game_state->played_my_turn = 1;
-            game_state->should_claim_number = 0;
+                BreakDebugger();
+            } break;
         }
     }
 }
 
+internal
 void UpdateAndRenderMainMenu(Game_State *game_state, Rendering_Context *rendering_context, UI_Context *ui_context, Controller *controller)
 {
+    Game_Session *game_session = &game_state->game_session;
     v2 half_screen = 0.5f * rendering_context->screen;
     v2 screen = rendering_context->screen;
     
@@ -237,48 +225,164 @@ void UpdateAndRenderMainMenu(Game_State *game_state, Rendering_Context *renderin
     glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
     glClear(GL_COLOR_BUFFER_BIT);
     
-    v2 item_pos = vec2(half_screen.x, 0.1f * screen.height);
+    UI_PositionItem(ui_context, vec2(half_screen.x, 0.1f * screen.height));
+    UI_SetVerticalSpacing(ui_context, 0.3f * screen.y);
     
     // NOTE(fakhri): render menu title
     // TODO(fakhri): use title fonts
     ChangeActiveFont(rendering_context, &rendering_context->arial_font);
-    MenuItemLabel(game_state, S8Lit("Truth Or Lies?"), item_pos);
+    UI_MenuItemLabel(game_state, S8Lit("Truth Or Lies?"));
     
     // TODO(fakhri): use item fonts
     ChangeActiveFont(rendering_context, &rendering_context->arial_font);
-    item_pos.y = 0.4f * screen.height;
+    UI_VerticalAdvanceItemPosition(ui_context);
+    
+    UI_SetVerticalSpacing(ui_context, 0.15f * screen.y);
+    
     // NOTE(fakhri): join session button
-    if (MenuItemButton(game_state, S8Lit("Join Game"), item_pos))
+    if (UI_MenuItemButton(game_state, S8Lit("Join Game Room")))
     {
-        // NOTE(fakhri): join session was selected
+        // NOTE(fakhri): join session was clicked
         OpenMenu(game_state, Game_Mode_MENU_JOIN_GAME);
     }
     
-    item_pos.y = 0.6f * screen.height;
-    
+    UI_VerticalAdvanceItemPosition(ui_context);
     // NOTE(fakhri): host session button
-    if (MenuItemButton(game_state, S8Lit("Host Game"), item_pos))
+    if (UI_MenuItemButton(game_state, S8Lit("Create Game Room")))
     {
-        // NOTE(fakhri): host session was selected
+        // NOTE(fakhri): host session was clicked
         OpenMenu(game_state, Game_Mode_MENU_WAITING_PLAYERS);
-        // TODO(fakhri): create a server thread
+        os->PushNetworkMessage(CreateNewGameSessionMessage());
+        SetFlag(game_session->session_state_flags, SESSION_FLAG_HOSTING_GAME);
     }
     
-    if (controller->move_down.pressed)
-    {
-        controller->move_down.pressed = 0;
-        ChangeMenuSelectedItem(ui_context, -1);
-    }
-    if (controller->move_up.pressed)
-    {
-        controller->move_up.pressed = 0;
-        ChangeMenuSelectedItem(ui_context, +1);
-    }
+    UI_EndFrame(ui_context, controller);
 }
 
+void UpdateAndRenderJoinSessionMenu(Game_State *game_state,  Rendering_Context *rendering_context, UI_Context *ui_context, Controller *controller)
+{
+    Game_Session *game_session = &game_state->game_session;
+    
+    UI_BeginFrame(ui_context);
+    v2 half_screen = 0.5f * rendering_context->screen;
+    v2 screen = rendering_context->screen;
+    
+    glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
+    glClear(GL_COLOR_BUFFER_BIT);
+    
+    ChangeActiveFont(rendering_context, &rendering_context->arial_font);
+    UI_PositionItem(ui_context, vec2(half_screen.x, 0.05f * screen.height));
+    
+    UI_SetVerticalSpacing(ui_context, 0.2f * screen.y);
+    
+    UI_MenuItemLabel(game_state, S8Lit("Connect to game"));
+    
+    u32 host_address_index;
+    
+    // NOTE(fakhri): host address input field
+    {
+        UI_VerticalAdvanceItemPosition(ui_context);
+        UI_MenuItemLabel(game_state, S8Lit("host address"));
+        v2 item_size = {600, 50};
+        host_address_index = ui_context->items_count;
+        UI_VerticalAdvanceItemPosition(ui_context);
+        UI_MenuItemInputField(game_state, item_size);
+    }
+    
+    UI_VerticalAdvanceItemPosition(ui_context);
+    
+    if (!IsFlagSet(game_session->session_state_flags, SESSION_FLAG_TRYING_CONNECT_GAME))
+    {
+        // TODO(fakhri): just for debug while we don't have a working server
+        SetFlag(game_session->session_state_flags, SESSION_FLAG_CONNECTED_TO_GAME);
+        
+        if (UI_MenuItemButton(game_state, S8Lit("Connect")))
+        {
+            SetFlag(game_session->session_state_flags, SESSION_FLAG_TRYING_CONNECT_GAME);
+            s8 input =  ui_context->input_field_buffers[host_address_index].buffer;
+            os->PushNetworkMessage(CreateConnectToServerMessage(&os->permanent_arena, input));
+        }
+        if (controller->escape_key.pressed)
+        {
+            OpenMenu(game_state, Game_Mode_MENU_MAIN);
+        }
+    }
+    else
+    {
+        // NOTE(fakhri): trying to connect to game
+        UI_MenuItemLabel(game_state, S8Lit("Connecting to Game"));
+        if (IsFlagSet(game_session->session_state_flags, SESSION_FLAG_CONNECTED_TO_GAME))
+        {
+            // NOTE(fakhri): good, we should now enter our username and see if it's valid
+            OpenMenu(game_state, Game_Mode_MENU_USERNAME);
+            ClearFlag(game_session->session_state_flags, SESSION_FLAG_TRYING_CONNECT_GAME);
+        }
+        else if (IsFlagSet(game_session->session_state_flags, SESSION_FLAG_FAILED_CONNECT_GAME))
+        {
+            // TODO(fakhri): show some message indicating that we couldn't connect to server
+        }
+    }
+    
+    UI_EndFrame(ui_context, controller);
+}
+
+void UpdateAndRenderUserNameMenu(Game_State *game_state,  Rendering_Context *rendering_context, UI_Context *ui_context, Controller *controller)
+{
+    Game_Session *game_session = &game_state->game_session;
+    UI_BeginFrame(ui_context);
+    
+    v2 half_screen = 0.5f * rendering_context->screen;
+    v2 screen = rendering_context->screen;
+    
+    glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
+    glClear(GL_COLOR_BUFFER_BIT);
+    
+    ChangeActiveFont(rendering_context, &rendering_context->arial_font);
+    
+    UI_PositionItem(ui_context, vec2(half_screen.x, 0.3f * screen.height));
+    UI_MenuItemLabel(game_state, S8Lit("Please Enter a username"));
+    
+    u32 username_index = ui_context->items_count;
+    
+    v2 item_size = {600, 50};
+    UI_VerticalAdvanceItemPosition(ui_context);
+    UI_MenuItemInputField(game_state, item_size);
+    
+    UI_VerticalAdvanceItemPosition(ui_context);
+    if (!IsFlagSet(game_session->session_state_flags, SESSION_FLAG_TRYING_JOIN_GAME))
+    {
+        // TODO(fakhri): just for debug while we don't have a working server
+        SetFlag(game_session->session_state_flags, SESSION_FLAG_JOINED_GAME);
+        
+        if (UI_MenuItemButton(game_state, S8Lit("Join")))
+        {
+            s8 username =  ui_context->input_field_buffers[username_index].buffer;
+            
+            os->PushNetworkMessage(CreateUsernameRequest(username));
+            // TODO(fakhri): make sure the username isn't empty
+            SetFlag(game_session->session_state_flags, SESSION_FLAG_TRYING_JOIN_GAME);
+        }
+    }
+    else
+    {
+        if (IsFlagSet(game_session->session_state_flags, SESSION_FLAG_JOINED_GAME))
+        {
+            // NOTE(fakhri): good, we wait for all players to join and then we start the game
+            OpenMenu(game_state, Game_Mode_MENU_WAITING_PLAYERS);
+            ClearFlag(game_session->session_state_flags, SESSION_FLAG_TRYING_JOIN_GAME);
+        }
+        if (IsFlagSet(game_session->session_state_flags, SESSION_FLAG_FAILED_JOIN_GAME))
+        {
+            // TODO(fakhri): display message indicating that we couldn't join the game and the reason
+        }
+    }
+    UI_EndFrame(ui_context, controller);
+}
+
+internal
 void UpdateAndRenderWaitingPlayersMenu(Game_State *game_state,  Rendering_Context *rendering_context, UI_Context *ui_context, Controller *controller)
 {
-    
+    Game_Session *game_session = &game_state->game_session;
     v2 half_screen = 0.5f * rendering_context->screen;
     v2 screen = rendering_context->screen;
     
@@ -294,111 +398,113 @@ void UpdateAndRenderWaitingPlayersMenu(Game_State *game_state,  Rendering_Contex
     // NOTE(fakhri): render menu title
     // TODO(fakhri): use title fonts
     ChangeActiveFont(rendering_context, &rendering_context->arial_font);
-    v2 item_pos = vec2(half_screen.x, 0.05f * screen.height);
-    MenuItemLabel(game_state, S8Lit("Joined Players"), item_pos);
     
+    UI_PositionItem(ui_context, vec2(half_screen.x, 0.05f * screen.height));
+    UI_SetVerticalSpacing(ui_context, 0.2f * screen.y);
+    UI_MenuItemLabel(game_state, S8Lit("Joined Players"));
     
-    if (1 || game_state->game_session.is_hosting_game)
+    // TODO(fakhri): remove the 1 from here
+    if (IsFlagSet(game_session->session_state_flags, SESSION_FLAG_HOSTING_GAME))
     {
-        item_pos = vec2(half_screen.x, 0.12f * screen.height);
-        MenuItemLabel(game_state, S8Lit("You are hosting the game"), item_pos);
+        UI_VerticalAdvanceItemPosition(ui_context);
+        UI_MenuItemLabel(game_state, S8Lit("You are hosting the game"));
+        
+        // TODO(fakhri): format this text
+        UI_VerticalAdvanceItemPosition(ui_context);
+        s8 server_addres_message = S8Lit("the game session address is 127.0.0.1");
+        UI_MenuItemLabel(game_state, server_addres_message);
+        
+        UI_VerticalAdvanceItemPosition(ui_context);
+        if (UI_MenuItemButton(game_state, S8Lit("Copy to Clipboard")))
+        {
+            // TODO(fakhri): copy server address to clipboard
+        }
     }
-    
-    
-    item_pos.y = 0.9f * screen.height;
-    
-    MenuItemLabel(game_state, S8Lit("Waiting Players to Join"), item_pos, true);
     
     // TODO(fakhri): change font
     ChangeActiveFont(rendering_context, &rendering_context->arial_font);
-    v2 background_size = 0.6f * screen;
-    DebugDrawQuadScreenCoord(rendering_context, half_screen, background_size, 0.2f * white);
     
     // NOTE(fakhri): draw usernames of the connected players 
     // TODO(fakhri): use usernames font
     ChangeActiveFont(rendering_context, &rendering_context->arial_font);
     
-#define PERCENTAGE 0.35f
-    v2 coef[4] = {
-        v2{    PERCENTAGE,     PERCENTAGE},
-        v2{1 - PERCENTAGE,     PERCENTAGE},
-        v2{    PERCENTAGE, 1 - PERCENTAGE},
-        v2{1 - PERCENTAGE, 1 - PERCENTAGE},
-    };
-    
+    UI_VerticalAdvanceItemPosition(ui_context);
+    UI_SetVerticalSpacing(ui_context, 0.1f * screen.height);
     for (u32 players_index = 0;
-         players_index < game_state->game_session.players_joined_sofar;
+         players_index < PLAYERS_COUNT;
          ++players_index)
     {
-        item_pos = vec2(screen.x * coef[players_index].x,
-                        screen.y * coef[players_index].y); 
-        MenuItemLabel(game_state, S8Lit("user_name"), item_pos);
+        UI_VerticalAdvanceItemPosition(ui_context);
+        UI_MenuItemLabel(game_state, game_session->players[players_index]);
     }
     
-    if (game_state->game_session.players_joined_sofar == PLAYERS_COUNT)
+    UI_SetVerticalSpacing(ui_context, 0.2f * screen.height);
+    UI_VerticalAdvanceItemPosition(ui_context);
+    UI_MenuItemLabel(game_state, S8Lit("Waiting Players to Join"), true);
+    
+    if (game_session->players_joined_sofar == PLAYERS_COUNT)
     {
         // NOTE(fakhri): enough players here
         game_state->game_mode = Game_Mode_GAME;
     }
 }
 
-void UpdateAndRenderJoinSessionMenu(Game_State *game_state,  Rendering_Context *rendering_context, UI_Context *ui_context, Controller *controller)
+internal u32
+AddEntity(Game_State *game_state)
 {
-    
-    UI_BeginFrame(ui_context);
-    
-    v2 half_screen = 0.5f * rendering_context->screen;
-    v2 screen = rendering_context->screen;
-    
-    v3 white = vec3(1.0f, 1.0f, 1.0f);
-    v3 none_white = 0.3f * white;
-    
-    glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
-    glClear(GL_COLOR_BUFFER_BIT);
-    
-    ChangeActiveFont(rendering_context, &rendering_context->arial_font);
-    v2 item_pos = vec2(half_screen.x, 0.05f * screen.height);
-    MenuItemLabel(game_state, S8Lit("Joining a game"), item_pos);
-    
-    item_pos.y = 0.39f * screen.height;
-    MenuItemLabel(game_state, S8Lit("host address"), item_pos);
-    v2 item_size = {600, 50};
-    item_pos.y = 0.5f * screen.height;
-    MenuItemInputField(game_state, item_pos, item_size);
-    
-    item_pos.y = 0.7f * screen.height;
-    if (!game_state->game_session.attempt_joining_session)
-    {
-        if (MenuItemButton(game_state, S8Lit("Join"), item_pos))
-        {
-            game_state->game_session.attempt_joining_session = 1;
-            // TODO(fakhri): try to connect to the server
-        }
-        
-        if (controller->escape_key.pressed)
-        {
-            controller->escape_key.pressed = 0;
-            OpenMenu(game_state, Game_Mode_MENU_MAIN);
-        }
-    }
-    else
-    {
-        f32 change = square_f(cos_f(0.5f * PI * os->time));
-        v3 text_color = (0.4f  + 0.6f * change) * white;
-        MenuItemLabel(game_state, S8Lit("Joining Game"), item_pos);
-    }
-    
-    // NOTE(fakhri): process input
-    if (controller->move_down.pressed)
-    {
-        controller->move_down.pressed = 0;
-        ChangeMenuSelectedItem(ui_context, -1);
-    }
-    if (controller->move_up.pressed)
-    {
-        controller->move_up.pressed = 0;
-        ChangeMenuSelectedItem(ui_context, +1);
-    }
+    Assert(game_state->entity_count < ArrayCount(game_state->entities));
+    u32 entity_index = game_state->entity_count++;
+    return entity_index;
+}
+
+internal void
+AddNullEntity(Game_State *game_state)
+{
+    u32 entity_index = AddEntity(game_state);
+    Entity *entity = game_state->entities + entity_index;
+    entity->type = Entity_Type_Null_Entity;
+}
+
+internal void
+AddCursorEntity(Game_State *game_state)
+{
+    u32 entity_index = AddEntity(game_state);
+    Entity *entity = game_state->entities + entity_index;
+    entity->type = Entity_Type_Cursor_Entity;
+}
+
+internal void
+AddCardNumberEntity(Game_State *game_state, u32 card_number, u32 card_entity_index)
+{
+    u32 number_entity_index = AddEntity(game_state);
+    Entity *number_entity = game_state->entities + number_entity_index;
+    Entity *card_entitiy = game_state->entities + card_entity_index;
+    *number_entity = {};
+    number_entity->type = Entity_Type_Entity_Card_Number;
+    number_entity->center_pos = card_entitiy->center_pos;
+    number_entity->target_pos = card_entitiy->center_pos;
+    number_entity->current_dimension = vec2(20, 20);
+    number_entity->card_number = card_number;
+    number_entity->followed_entity_index = card_entity_index;
+    number_entity->following_trigger_distance = 100.f;
+}
+
+internal void
+AddCardEntity(Game_State *game_state, v2 starting_pos, u32 card_number)
+{
+    u32 card_entity_index = AddEntity(game_state);
+    Entity *card = game_state->entities + card_entity_index;
+    *card = {};
+    card->type = Entity_Type_Entity_Card;
+    card->original_pos = starting_pos;
+    card->center_pos = starting_pos;
+    card->target_pos = starting_pos;
+    card->original_dimension   = vec2(90, 180);
+    card->target_dimension   = vec2(90, 180);
+    card->current_dimension   = vec2(90, 180);
+    card->dDimension = 500.f;
+    card->following_trigger_distance = 100.f;
+    AddCardNumberEntity(game_state, card_number, card_entity_index);
 }
 
 extern "C"
@@ -412,24 +518,29 @@ extern "C"
         *game_state = {};
         
         InitRenderer(&game_state->rendering_context);
-        
         UI_Init(&game_state->ui_context, &os->permanent_arena);
         
-        // TODO(fakhri): this is just for debug
-        game_state->game_session = {
-            1,
-            3,
-        };
-        game_state->choosing_a_move = 1;
-        game_state->game_mode = Game_Mode_MENU_MAIN;
         
-        for (u32 player_index = 0;
-             player_index < PLAYERS_COUNT;
-             ++player_index)
+        // TODO(fakhri): this is just for debug
+        game_state->game_mode = Game_Mode_GAME;
+        game_state->game_session = {};
+        game_state->game_session.players_joined_sofar = PLAYERS_COUNT;
+        game_state->game_session.players[0] = S8Lit("0");
+        game_state->game_session.players[1] = S8Lit("1");
+        game_state->game_session.players[2] = S8Lit("2");
+        game_state->game_session.players[3] = S8Lit("3");
+        
+        // TODO(fakhri): add some bounce for the numbers when the cards moves, that should look cool lol
+        AddNullEntity(game_state);
+        AddCursorEntity(game_state);
+        
+        for (u32 card_index = 0;
+             card_index < 10;
+             ++card_index)
         {
-            game_state->hand_cards_count[player_index] = 10;
+            v2 card_pos = vec2(-500 + card_index * 100.0f, -200.0f);
+            AddCardEntity(game_state, card_pos, card_index);
         }
-        game_state->my_index = 3;
     }
     
     APP_HOT_LOAD
@@ -454,11 +565,18 @@ extern "C"
         UI_Context *ui_context = &game_state->ui_context;
         Controller *controller = &os->controller;
         
+        HandleAvailableNetworkMessages(game_state);
+        UpdateScreenSize(rendering_context);
+        
         switch(game_state->game_mode)
         {
             case Game_Mode_GAME:
             {
                 UpdateAndRenderGame(game_state, rendering_context, controller);
+            } break;
+            case Game_Mode_MENU_USERNAME:
+            {
+                UpdateAndRenderUserNameMenu(game_state, rendering_context, ui_context, controller);
             } break;
             case Game_Mode_MENU_MAIN:
             {
@@ -473,7 +591,24 @@ extern "C"
                 UpdateAndRenderJoinSessionMenu(game_state, rendering_context, ui_context, controller); 
             } break;
         }
+        
+        DebugDrawQuadScreenCoord(rendering_context, os->mouse_position, vec2(10, 10), vec3(1, .3f, .5f));
+        
+#if 0
+        char buffer[64];
+        sprintf(buffer, "frame time : %f", os->dtime);
+        s8 frame_time = s8{buffer, CalculateCStringLength(buffer)};
+        DebugDrawText(rendering_context, frame_time, vec2(400, 20), vec3(1,1,1));
+        sprintf(buffer, "frame fps : %f", 1.0f / os->dtime);
+        s8 frame_fps = s8{buffer, CalculateCStringLength(buffer)};
+        DebugDrawText(rendering_context, frame_time, vec2(400, 60), vec3(1,1,1));
+#endif
+        
         // NOTE(fakhri): ignore any input i didn't handle this frame
-        OS_ClearEvents();
+        if (os->controller.toggle_fullscreen.pressed)
+        {
+            os->fullscreen ^= 1;
+        }
+        os->controller = {};
     }
 }

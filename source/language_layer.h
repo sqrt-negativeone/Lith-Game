@@ -22,19 +22,6 @@
 #define CStringToI16(s)            ((i16)atoi(s))
 #define CStringToF32(s)            ((f32)atof(s))
 
-//~ NOTE(rjf): Helper Macros
-
-#define global         static
-#define internal       static
-#define local_persist  static
-#define ArrayCount(a) (sizeof(a) / sizeof((a)[0]))
-#define Bytes(n)      (n)
-#define Kilobytes(n)  (n << 10)
-#define Megabytes(n)  (n << 20)
-#define Gigabytes(n)  (((u64)n) << 30)
-#define Terabytes(n)  (((u64)n) << 40)
-#define PI (3.1415926535897f)
-
 //~ NOTE(rjf): Base Types
 
 typedef int8_t   i8;
@@ -52,6 +39,26 @@ typedef i32      b32;
 typedef i64      b64;
 typedef float    f32;
 typedef double   f64;
+
+//~ NOTE(rjf): Helper Macros
+
+#define global         static
+#define internal       static
+#define local_persist  static
+#define ArrayCount(a) (sizeof(a) / sizeof((a)[0]))
+#define Bytes(n)      (n)
+#define Kilobytes(n)  (n << 10)
+#define Megabytes(n)  (n << 20)
+#define Gigabytes(n)  (((u64)n) << 30)
+#define Terabytes(n)  (((u64)n) << 40)
+#define PI (3.1415926535897f)
+#define SetFlag(flags, flag) ((flags) |= (flag))
+#define ClearFlag(flags, flag) ((flags) &= !(flag))
+#define IsFlagSet(flags, flag) ((flags) & (flag))
+#define Min(a,b) (((a) < (b))? (a):(b))
+#define Max(a,b) (((a) > (b))? (a):(b))
+
+#define USE_VSYNC_FOR_FPS_LIMIT 1
 
 //~ NOTE(rjf): Random Number Generation
 

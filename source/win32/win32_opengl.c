@@ -111,7 +111,7 @@ W32_InitOpenGL(HDC *device_context, HINSTANCE h_instance)
                 wglMakeCurrent(*device_context, 0);
                 wglDeleteContext(gl_dummy_render_context);
                 wglMakeCurrent(*device_context, global_opengl_render_context);
-                wglSwapIntervalEXT(0);
+                wglSwapIntervalEXT(1);
                 result = 1;
             }
         }

@@ -62,44 +62,45 @@ LoadGlyphsFromFont(FT_Library ft, Font *font, s8 font_path, u32 font_size)
 }
 
 internal void
+UpdateScreenSize(Rendering_Context *rendering_context)
+{
+    v2 current_screen = vec2iv(os->window_size);
+    
+    if (rendering_context->screen != current_screen)
+    {
+        rendering_context->screen = current_screen;
+        m4 ortho_projection = m4_orthographic(0.0f, rendering_context->screen.width, 
+                                              rendering_context->screen.height, 0.0f,
+                                              0.f, 100.f);
+        
+        // NOTE(fakhri): update projection matrices for all the shader that user it
+        GLint projection_location;
+        
+        glUseProgram(rendering_context->quad_shader);
+        projection_location = glGetUniformLocation(rendering_context->quad_shader, "projection");
+        glUniformMatrix4fv(projection_location, 1, GL_FALSE, (f32*)&ortho_projection);
+        
+        glUseProgram(rendering_context->texture_shader);
+        projection_location = glGetUniformLocation(rendering_context->texture_shader, "projection");
+        glUniformMatrix4fv(projection_location, 1, GL_FALSE, (f32*)&ortho_projection);
+        
+        glUseProgram(rendering_context->text_shader);
+        projection_location = glGetUniformLocation(rendering_context->text_shader, "projection");
+        glUniformMatrix4fv(projection_location, 1, GL_FALSE, (f32*)&ortho_projection);
+        glUseProgram(0);
+        
+        // NOTE(fakhri): adjust view port
+        glViewport(0, 0, os->window_size.width, os->window_size.height);
+    }
+}
+
+internal void
 InitRenderer(Rendering_Context *rendering_context)
 {
     // NOTE(fakhri): load shaders
     InitShaderProgram(&rendering_context->quad_shader, S8Lit("shaders/quad_shader.glsl"));
     InitShaderProgram(&rendering_context->texture_shader, S8Lit("shaders/texture_shader.glsl"));
     InitShaderProgram(&rendering_context->text_shader, S8Lit("shaders/text_shader.glsl"));
-    
-    // NOTE(fakhri): setup shaders uniforms
-    {
-        rendering_context->screen = vec2iv(os->window_size);
-        
-        m4 ortho_projection = m4_orthographic(0.0f, rendering_context->screen.width, 
-                                              rendering_context->screen.height, 0.0f,
-                                              0.f, 100.f);
-        
-        // NOTE(fakhri): quad_shader uniforms
-        {
-            glUseProgram(rendering_context->quad_shader);
-            GLint projection_location = glGetUniformLocation(rendering_context->quad_shader, "projection");
-            glUniformMatrix4fv(projection_location, 1, GL_FALSE, (f32*)&ortho_projection);
-        }
-        
-        // NOTE(fakhri): texture_shader uniforms
-        {
-            glUseProgram(rendering_context->texture_shader);
-            GLint projection_location = glGetUniformLocation(rendering_context->texture_shader, "projection");
-            glUniformMatrix4fv(projection_location, 1, GL_FALSE, (f32*)&ortho_projection);
-        }
-        
-        // NOTE(fakhri): text_shader uniforms
-        {
-            glUseProgram(rendering_context->text_shader);
-            GLint projection_location = glGetUniformLocation(rendering_context->text_shader, "projection");
-            glUniformMatrix4fv(projection_location, 1, GL_FALSE, (f32*)&ortho_projection);
-        }
-        
-        glUseProgram(0);
-    }
     
     // NOTE(fakhri): quad vertex buffers
     {
@@ -376,4 +377,20 @@ void DebugDrawText(Rendering_Context *rendering_context, s8 text, v2 pos, v3 tex
         LogError("active font is null");
         BreakDebugger();
     }
+}
+
+internal
+void DebugDrawTextWorldCoord(Rendering_Context *rendering_context, s8 text, v2 pos, v3 text_color, f32 scale = 1.0f)
+{
+    v2 half_screen = 0.5f * rendering_context->screen;
+    v2 screen_pos = vec2(pos.x + half_screen.x,
+                         -pos.y + half_screen.y);
+    //v2 screen_pos = pos + 0.5f * rendering_context->screen;
+    DebugDrawText(rendering_context, text, screen_pos, text_color, scale);
+}
+
+internal void
+DebugDrawRectangle(Rendering_Context *rendering_context, Rectangle2D rectange, v3 color)
+{
+    // TODO(fakhri): render rectangle
 }

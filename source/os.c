@@ -138,6 +138,7 @@ internal void
 OS_PushEvent(OS_Event event)
 {
     HardAssert(os != 0);
+    
     if(os->event_count < ArrayCount(os->events))
     {
         os->events[os->event_count++] = event;
@@ -145,7 +146,7 @@ OS_PushEvent(OS_Event event)
 }
 
 internal void
-OS_ClearEvents()
+OS_EmptyEvents()
 {
     HardAssert(os != 0);
     os->event_count = 0;

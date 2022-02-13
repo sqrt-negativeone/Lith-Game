@@ -14,6 +14,7 @@ struct UI_ColorScheme
     v3 button_text_color;
     v3 button_text_active_color1;
     v3 button_text_active_color2;
+    v3 button_text_clicked_color;
     v3 button_text_shadow_color;
     
     // NOTE(fakhri): input field color
@@ -24,7 +25,7 @@ struct UI_ColorScheme
     v3 input_field_text_active_color;
 };
 
-#define MAX_INPUT_FIELDS_PER_MENU 1
+#define MAX_INPUT_FIELDS_PER_MENU 2
 #define SERVER_ADDRESS_BUFFER_SIZE 16
 
 struct UI_Context
@@ -36,7 +37,10 @@ struct UI_Context
     u32 buffer_index;
     Buffer input_field_buffers[MAX_INPUT_FIELDS_PER_MENU];
     
-    f32 last_time;
+    f32 prev_time;
+    
+    v2 item_position;
+    v3 spacing;
     
     UI_ColorScheme color_scheme;
 };

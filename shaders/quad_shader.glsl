@@ -9,7 +9,6 @@ void main()
 }
 #endif
 
-
 #ifdef FRAGMENT_SHADER
 out vec4 frag_color;
 uniform vec4 color;

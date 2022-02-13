@@ -10,8 +10,8 @@
 
 extern "C"
 {
-    _declspec(dllexport) DWORD NvOptimusEnablement = 0;
-    _declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 0;
+    _declspec(dllexport) DWORD NvOptimusEnablement = 1;
+    _declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 }
 
 // NOTE(rjf): OpenGL
@@ -28,14 +28,18 @@ extern "C"
 #include "maths.h"
 #include "memory.h"
 #include "strings.h"
+#include "network_message.h"
 #include "app.h"
 #include "os.h"
 #include "win32_timer.h"
+
 #include "language_layer.c"
 #include "memory.c"
 #include "strings.c"
+#include "win32_game_server.cpp"
 #include "os.c"
 #include "shader.cpp"
+
 
 // NOTE(rjf): Globals
 global char global_executable_path[256];
@@ -111,9 +115,7 @@ internal LRESULT
 W32_WindowProc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param)
 {
     LRESULT result = 0;
-    
     local_persist b32 mouse_hover_active_because_windows_makes_me_cry = 0;
-    
     KeyModifiers modifiers = 0;
     if(GetKeyState(VK_CONTROL) & 0x8000)
     {
@@ -127,290 +129,274 @@ W32_WindowProc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param)
     {
         modifiers |= KeyModifier_Alt;
     }
-    
-    if(message == WM_CLOSE || message == WM_DESTROY || message == WM_QUIT)
+    switch(message)
     {
-        global_os.quit = 1;
-        result = 0;
-    }
-    else if(message == WM_LBUTTONDOWN)
-    {
-        OS_PushEvent(OS_MousePressEvent(MouseButton_Left, global_os.mouse_position));
-    }
-    else if(message == WM_LBUTTONUP)
-    {
-        OS_PushEvent(OS_MouseReleaseEvent(MouseButton_Left, global_os.mouse_position));
-    }
-    else if(message == WM_RBUTTONDOWN)
-    {
-        OS_PushEvent(OS_MousePressEvent(MouseButton_Right, global_os.mouse_position));
-    }
-    else if(message == WM_RBUTTONUP)
-    {
-        OS_PushEvent(OS_MouseReleaseEvent(MouseButton_Right, global_os.mouse_position));
-    }
-    else if(message == WM_MOUSEMOVE)
-    {
-        i16 x_position = LOWORD(l_param);
-        i16 y_position = HIWORD(l_param);
-        v2 last_mouse = global_os.mouse_position;
-        global_os.mouse_position = W32_GetMousePosition(window_handle);
-        OS_PushEvent(OS_MouseMoveEvent(global_os.mouse_position,
-                                       v2{global_os.mouse_position.x - last_mouse.x,
-                                           global_os.mouse_position.y - last_mouse.y}));
-        
-        if(mouse_hover_active_because_windows_makes_me_cry == 0)
+        case WM_QUIT:
+        case WM_DESTROY:
+        case WM_CLOSE:
         {
-            mouse_hover_active_because_windows_makes_me_cry = 1;
-            TRACKMOUSEEVENT track_mouse_event = {0};
-            {
-                track_mouse_event.cbSize = sizeof(track_mouse_event);
-                track_mouse_event.dwFlags = TME_LEAVE;
-                track_mouse_event.hwndTrack = window_handle;
-                track_mouse_event.dwHoverTime = HOVER_DEFAULT;
-            }
-            TrackMouseEvent(&track_mouse_event);
-        }
-    }
-    else if(message == WM_MOUSELEAVE)
-    {
-        mouse_hover_active_because_windows_makes_me_cry = 0;
-    }
-    else if(message == WM_MOUSEWHEEL)
-    {
-        i16 wheel_delta = HIWORD(w_param);
-        OS_PushEvent(OS_MouseScrollEvent(v2{0, (f32)wheel_delta}, modifiers));
-    }
-    else if(message == WM_MOUSEHWHEEL)
-    {
-        i16 wheel_delta = HIWORD(w_param);
-        OS_PushEvent(OS_MouseScrollEvent(v2{(f32)wheel_delta, 0}, modifiers));
-    }
-    else if(message == WM_SETCURSOR)
-    {
-        
-        if(global_os.mouse_position.x >= 1 && global_os.mouse_position.x <= global_os.window_size.x-1 &&
-           global_os.mouse_position.y >= 1 && global_os.mouse_position.y <= global_os.window_size.y-1 && mouse_hover_active_because_windows_makes_me_cry)
+            global_os.quit = 1;
+        } break;
+        case WM_LBUTTONDOWN:
         {
-            switch(global_cursor_style)
+            global_os.controller.left_mouse.pressed = 1;
+            OS_PushEvent(OS_MousePressEvent(MouseButton_Left, global_os.mouse_position));
+            result = DefWindowProc(window_handle, message, w_param, l_param);
+        } break;
+        case WM_LBUTTONUP:
+        {
+            global_os.controller.left_mouse.released = 1;
+            OS_PushEvent(OS_MouseReleaseEvent(MouseButton_Left, global_os.mouse_position));
+            result = DefWindowProc(window_handle, message, w_param, l_param);
+        } break;
+        case WM_RBUTTONDOWN:
+        {
+            global_os.controller.right_mouse.pressed = 1;
+            OS_PushEvent(OS_MousePressEvent(MouseButton_Right, global_os.mouse_position));
+            result = DefWindowProc(window_handle, message, w_param, l_param);
+        } break;
+        case WM_RBUTTONUP:
+        {
+            global_os.controller.right_mouse.released = 1;
+            OS_PushEvent(OS_MouseReleaseEvent(MouseButton_Right, global_os.mouse_position));
+            result = DefWindowProc(window_handle, message, w_param, l_param);
+        } break;
+        case WM_MOUSEMOVE:
+        {
+            i16 x_position = LOWORD(l_param);
+            i16 y_position = HIWORD(l_param);
+            v2 last_mouse = global_os.mouse_position;
+            global_os.mouse_position = W32_GetMousePosition(window_handle);
+            result = DefWindowProc(window_handle, message, w_param, l_param);
+            OS_PushEvent(OS_MouseMoveEvent(global_os.mouse_position,
+                                           v2{global_os.mouse_position.x - last_mouse.x,
+                                               global_os.mouse_position.y - last_mouse.y}));
+            if(mouse_hover_active_because_windows_makes_me_cry == 0)
             {
-                case W32_CursorStyle_HorizontalResize:
+                mouse_hover_active_because_windows_makes_me_cry = 1;
+                TRACKMOUSEEVENT track_mouse_event = {0};
                 {
-                    SetCursor(LoadCursorA(0, IDC_SIZEWE));
-                    break;
+                    track_mouse_event.cbSize = sizeof(track_mouse_event);
+                    track_mouse_event.dwFlags = TME_LEAVE;
+                    track_mouse_event.hwndTrack = window_handle;
+                    track_mouse_event.dwHoverTime = HOVER_DEFAULT;
                 }
-                case W32_CursorStyle_VerticalResize:
-                {
-                    SetCursor(LoadCursorA(0, IDC_SIZENS));
-                    break;
-                }
-                case W32_CursorStyle_IBar:
-                {
-                    SetCursor(LoadCursorA(0, IDC_IBEAM));
-                    break;
-                }
-                case W32_CursorStyle_Normal:
-                {
-                    SetCursor(LoadCursorA(0, IDC_ARROW));
-                    break;
-                }
-                default: break;
+                TrackMouseEvent(&track_mouse_event);
             }
-        }
-        else
+        } break;
+        case WM_MOUSELEAVE:
+        {
+            mouse_hover_active_because_windows_makes_me_cry = 0;
+        } break;
+        case WM_MOUSEWHEEL:
+        {
+            i16 wheel_delta = HIWORD(w_param);
+            OS_PushEvent(OS_MouseScrollEvent(v2{0, (f32)wheel_delta}, modifiers));
+        } break;
+        case WM_MOUSEHWHEEL:
+        {
+            i16 wheel_delta = HIWORD(w_param);
+            OS_PushEvent(OS_MouseScrollEvent(v2{(f32)wheel_delta, 0}, modifiers));
+        } break;
+        case WM_SETCURSOR:
+        {
+#if 1
+            if (LOWORD(l_param) == HTCLIENT)
+            {
+                SetCursor(NULL);
+                result = TRUE;
+            }
+#else
+            if(global_os.mouse_position.x >= 1 && global_os.mouse_position.x <= global_os.window_size.x-1 &&
+               global_os.mouse_position.y >= 1 && global_os.mouse_position.y <= global_os.window_size.y-1 && mouse_hover_active_because_windows_makes_me_cry)
+            {
+                switch(global_cursor_style)
+                {
+                    case W32_CursorStyle_HorizontalResize:
+                    {
+                        SetCursor(LoadCursorA(0, IDC_SIZEWE));
+                        break;
+                    }
+                    case W32_CursorStyle_VerticalResize:
+                    {
+                        SetCursor(LoadCursorA(0, IDC_SIZENS));
+                        break;
+                    }
+                    case W32_CursorStyle_IBar:
+                    {
+                        SetCursor(LoadCursorA(0, IDC_IBEAM));
+                        break;
+                    }
+                    case W32_CursorStyle_Normal:
+                    {
+                        SetCursor(LoadCursorA(0, IDC_ARROW));
+                        break;
+                    }
+                    default: break;
+                }
+            }
+#endif
+            else
+            {
+                result = DefWindowProc(window_handle, message, w_param, l_param);
+            }
+            
+        } break;
+        case WM_SYSKEYDOWN:
+        case WM_SYSKEYUP:
+        case WM_KEYDOWN:
+        case WM_KEYUP:
+        {
+            u64 vkey_code = w_param;
+            i8 was_down = !!(l_param & (1 << 30));
+            i8 is_down =   !(l_param & (1 << 31));
+            u64 key_input = 0;
+            if((vkey_code >= 'A' && vkey_code <= 'Z') ||
+               (vkey_code >= '0' && vkey_code <= '9'))
+            {
+                // NOTE(rjf): Letter/number buttons
+                key_input = (vkey_code >= 'A' && vkey_code <= 'Z') ? Key_A + (vkey_code-'A') : Key_0 + (vkey_code-'0');
+            }
+            else
+            {
+                switch (vkey_code)
+                {
+                    case VK_ESCAPE:
+                    {
+                        key_input = Key_Esc;
+                    } break;
+                    case VK_OEM_3:
+                    {
+                        key_input = Key_GraveAccent;
+                    } break;
+                    case VK_OEM_MINUS:
+                    {
+                        key_input = Key_Minus;
+                    } break;
+                    case VK_OEM_PLUS:
+                    {
+                        key_input = Key_Equal;
+                    } break;
+                    case VK_BACK:
+                    {
+                        key_input = Key_Backspace;
+                    } break;
+                    case VK_TAB:
+                    {
+                        key_input = Key_Tab;
+                    } break;
+                    case VK_SPACE:
+                    {
+                        key_input = Key_Space;
+                    } break;
+                    case VK_RETURN:
+                    {
+                        key_input = Key_Enter;
+                    } break;
+                    case VK_CONTROL:
+                    {
+                        key_input = Key_Ctrl;
+                        modifiers &= ~KeyModifier_Ctrl;
+                    } break;
+                    case VK_SHIFT:
+                    {
+                        key_input = Key_Shift;
+                        modifiers &= ~KeyModifier_Shift;
+                    } break;
+                    case VK_MENU:
+                    {
+                        key_input = Key_Alt;
+                        modifiers &= ~KeyModifier_Alt;
+                    } break;
+                    case VK_UP:
+                    {
+                        key_input = Key_Up;
+                    } break;
+                    case VK_LEFT:
+                    {
+                        key_input = Key_Left;
+                    } break;
+                    case VK_DOWN:
+                    {
+                        key_input = Key_Down;
+                    } break;
+                    case VK_RIGHT:
+                    {
+                        key_input = Key_Right;
+                    } break;
+                    case VK_DELETE:
+                    {
+                        key_input = Key_Delete;
+                    } break;
+                    case VK_PRIOR:
+                    {
+                        key_input = Key_PageUp;
+                    } break;
+                    case VK_NEXT:
+                    {
+                        key_input = Key_PageDown;
+                    } break;
+                    case VK_HOME:
+                    {
+                        key_input = Key_Home;
+                    } break;
+                    case VK_END:
+                    {
+                        key_input = Key_End;
+                    } break;
+                    case VK_OEM_2:
+                    {
+                        key_input = Key_ForwardSlash;
+                    } break;
+                    case VK_OEM_PERIOD:
+                    {
+                        key_input = Key_Period;
+                    } break;
+                    case VK_OEM_COMMA:
+                    {
+                        key_input = Key_Comma;
+                    } break;
+                    case VK_OEM_7:
+                    {
+                        key_input = Key_Quote;
+                    } break;
+                    case VK_OEM_4:
+                    {
+                        key_input = Key_LeftBracket;
+                    } break;
+                    case VK_OEM_6:
+                    {
+                        key_input = Key_RightBracket;
+                    } break;
+                    case VK_F1:
+                    {
+                        os->controller.toggle_fullscreen.pressed = is_down;
+                        os->controller.toggle_fullscreen.released = was_down;
+                    } break;
+                    default:
+                    {
+                        if(vkey_code >= VK_F1 && vkey_code <= VK_F12)
+                        {
+                            key_input = Key_F1 + vkey_code - VK_F1;
+                        }
+                    } break;
+                }
+            }
+        } break;
+        case WM_CHAR:
+        {
+            u64 char_input = w_param;
+            if(char_input >= 32 && char_input != VK_RETURN && char_input != VK_ESCAPE &&
+               char_input != 127)
+            {
+                OS_PushEvent(OS_CharacterInputEvent(char_input));
+            }
+        } break;
+        default:
         {
             result = DefWindowProc(window_handle, message, w_param, l_param);
         }
     }
-    else if(message == WM_SYSKEYDOWN || message == WM_SYSKEYUP ||
-            message == WM_KEYDOWN || message == WM_KEYUP)
-    {
-        u64 vkey_code = w_param;
-        i8 was_down = !!(l_param & (1 << 30));
-        i8 is_down =   !(l_param & (1 << 31));
-        
-        u64 key_input = 0;
-        
-        if((vkey_code >= 'A' && vkey_code <= 'Z') ||
-           (vkey_code >= '0' && vkey_code <= '9'))
-        {
-            // NOTE(rjf): Letter/number buttons
-            key_input = (vkey_code >= 'A' && vkey_code <= 'Z') ? Key_A + (vkey_code-'A') : Key_0 + (vkey_code-'0');
-        }
-        else
-        {
-            if(vkey_code == VK_ESCAPE)
-            {
-                key_input = Key_Esc;
-            }
-            else if(vkey_code >= VK_F1 && vkey_code <= VK_F12)
-            {
-                key_input = Key_F1 + vkey_code - VK_F1;
-            }
-            else if(vkey_code == VK_OEM_3)
-            {
-                key_input = Key_GraveAccent;
-            }
-            else if(vkey_code == VK_OEM_MINUS)
-            {
-                key_input = Key_Minus;
-            }
-            else if(vkey_code == VK_OEM_PLUS)
-            {
-                key_input = Key_Equal;
-            }
-            else if(vkey_code == VK_BACK)
-            {
-                key_input = Key_Backspace;
-            }
-            else if(vkey_code == VK_TAB)
-            {
-                key_input = Key_Tab;
-            }
-            else if(vkey_code == VK_SPACE)
-            {
-                key_input = Key_Space;
-            }
-            else if(vkey_code == VK_RETURN)
-            {
-                key_input = Key_Enter;
-            }
-            else if(vkey_code == VK_CONTROL)
-            {
-                key_input = Key_Ctrl;
-                modifiers &= ~KeyModifier_Ctrl;
-            }
-            else if(vkey_code == VK_SHIFT)
-            {
-                key_input = Key_Shift;
-                modifiers &= ~KeyModifier_Shift;
-            }
-            else if(vkey_code == VK_MENU)
-            {
-                key_input = Key_Alt;
-                modifiers &= ~KeyModifier_Alt;
-            }
-            else if(vkey_code == VK_UP)
-            {
-                key_input = Key_Up;
-            }
-            else if(vkey_code == VK_LEFT)
-            {
-                key_input = Key_Left;
-            }
-            else if(vkey_code == VK_DOWN)
-            {
-                key_input = Key_Down;
-            }
-            else if(vkey_code == VK_RIGHT)
-            {
-                key_input = Key_Right;
-            }
-            else if(vkey_code == VK_DELETE)
-            {
-                key_input = Key_Delete;
-            }
-            else if(vkey_code == VK_PRIOR)
-            {
-                key_input = Key_PageUp;
-            }
-            else if(vkey_code == VK_NEXT)
-            {
-                key_input = Key_PageDown;
-            }
-            else if(vkey_code == VK_HOME)
-            {
-                key_input = Key_Home;
-            }
-            else if(vkey_code == VK_END)
-            {
-                key_input = Key_End;
-            }
-            else if(vkey_code == VK_OEM_2)
-            {
-                key_input = Key_ForwardSlash;
-            }
-            else if(vkey_code == VK_OEM_PERIOD)
-            {
-                key_input = Key_Period;
-            }
-            else if(vkey_code == VK_OEM_COMMA)
-            {
-                key_input = Key_Comma;
-            }
-            else if(vkey_code == VK_OEM_7)
-            {
-                key_input = Key_Quote;
-            }
-            else if(vkey_code == VK_OEM_4)
-            {
-                key_input = Key_LeftBracket;
-            }
-            else if(vkey_code == VK_OEM_6)
-            {
-                key_input = Key_RightBracket;
-            }
-        }
-        
-        switch(key_input)
-        {
-            case Key_Left:
-            {
-                os->controller.move_left.pressed = is_down;
-                os->controller.move_left.released = was_down;
-            } break;
-            case Key_Right:
-            {
-                os->controller.move_right.pressed = is_down;
-                os->controller.move_right.released = was_down;
-            } break;
-            case Key_Up:
-            {
-                os->controller.move_up.pressed = is_down;
-                os->controller.move_up.released = was_down;
-            } break;
-            case Key_Down:
-            {
-                os->controller.move_down.pressed = is_down;
-                os->controller.move_down.released = was_down;
-            } break;
-            case Key_Enter:
-            {
-                os->controller.confirm.pressed = is_down;
-                os->controller.confirm.released = was_down;
-            } break;
-            case Key_Esc:
-            {
-                os->controller.escape_key.pressed = is_down;
-                os->controller.escape_key.released = was_down;
-            } break;
-        }
-        
-        if(is_down)
-        {
-            OS_PushEvent(OS_KeyPressEvent((Key)key_input, modifiers));
-        }
-        else
-        {
-            OS_PushEvent(OS_KeyReleaseEvent((Key)key_input, modifiers));
-        }
-        
-        result = DefWindowProc(window_handle, message, w_param, l_param);
-    }
-    else if(message == WM_CHAR)
-    {
-        u64 char_input = w_param;
-        if(char_input >= 32 && char_input != VK_RETURN && char_input != VK_ESCAPE &&
-           char_input != 127)
-        {
-            OS_PushEvent(OS_CharacterInputEvent(char_input));
-        }
-    }
-    else
-    {
-        result = DefWindowProc(window_handle, message, w_param, l_param);
-    }
-    
     return result;
 }
 
@@ -448,9 +434,117 @@ W32_SetCursorToVerticalResize(void)
     global_cursor_style = W32_CursorStyle_VerticalResize;
 }
 
+// NOTE(fakhri): the networking thread will insert other players moves in this queue
+struct MessageQueue
+{
+    NetworkMessage queue[256];
+    u32 msg_index;
+    u32 msg_count;
+};
+
+// NOTE(fakhri): the messages that needs to get out to the server
+MessageQueue network_out_queue;
+// NOTE(fakhri): the messages that we receive from the server
+MessageQueue network_in_queue;
+
+// NOTE(fakhri): when our turn ends we update the turn_move variable and signal this semaphore
+HANDLE turn_ended_semaphore;
+NetworkMessage turn_move;
+b32 our_turn = 0;
+
+HANDLE iocp_handle;
+
+#define GAME_MESSAGE   0
+#define SERVER_MESSAGE 1
+
+// NOTE(fakhri): this thread is responsible for network communication with the server
+DWORD WINAPI NetworkMain(LPVOID lpParameter)
+{
+    u32 joined_game = 0;
+    // NOTE(fakhri): this is true when it's our turn and false otherwise
+    for(;;)
+    {
+        DWORD bytes_transferred;
+        u64 completion_key;
+        OVERLAPPED *Overlapped = 0;
+        if (GetQueuedCompletionStatus(iocp_handle, 
+                                      &bytes_transferred,
+                                      &completion_key,
+                                      &Overlapped,
+                                      INFINITE))
+        {
+            switch(completion_key)
+            {
+                case GAME_MESSAGE:
+                {
+                    Log("we received a message from the game");
+                    // NOTE(fakhri): something on the network out queue
+                    // TODO(fakhri): handle all the messages on the network out queue
+                } break;
+                case SERVER_MESSAGE:
+                {
+                    // TODO(fakhri): we have a message from the server
+                    // TODO(fakhri): handle the request
+                    // TODO(fakhri): insert the server message into the network in queue
+                } break;
+            }
+        }
+    }
+}
+
+internal void
+W32_PushNetworkMessage(NetworkMessage msg)
+{
+    network_out_queue.queue[network_out_queue.msg_count] = msg;
+    // TODO(fakhri): put a write barrier here
+    network_out_queue.msg_count++;
+    // NOTE(fakhri): notify the network thread
+    u64 completion_key = GAME_MESSAGE;
+    PostQueuedCompletionStatus(iocp_handle, 0, completion_key, 0);
+}
+
+internal b32
+W32_IsMessageQueueEmpty(MessageQueue *queue)
+{
+    b32 result = (queue->msg_index == queue->msg_count);
+    return result;
+}
+
+internal void
+W32_GetNextNetworkMessageIfAvailable(NetworkMessage *message)
+{
+    Assert(message);
+    if (!W32_IsMessageQueueEmpty(&network_in_queue))
+    {
+        // NOTE(fakhri): single consumer single producer
+        *message = network_in_queue.queue[network_in_queue.msg_index];
+        network_in_queue.msg_index++;
+        message->is_available = 1;
+    }
+    else
+    {
+        message->is_available = 0;
+    }
+}
+
 int
 WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_show_cmd)
 {
+    u32 concurrent_threads_count = 1;
+    
+    iocp_handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE,
+                                         0, 0,
+                                         concurrent_threads_count);
+    
+    HANDLE server_thread_handle  = CreateThread(0, 0, ServerMain, 0, 0, 0);
+    // TODO(fakhri): wait for the server thread to create a socket and give us info about our address?
+    
+    HANDLE network_thread_handle = CreateThread(0, 0, NetworkMain, 0, 0, 0);
+    
+    // NOTE(fakhri): we won't be using talking about these threads again
+    CloseHandle(network_thread_handle);
+    CloseHandle(server_thread_handle);
+    
     global_instance_handle = instance;
     
     W32_TimerInit(&global_win32_timer);
@@ -560,32 +654,39 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         global_os.current_time              = 0.f;
         // TODO(fakhri): we can just target 30fps because we don't need 60fps for a cards game
         // and use the extra time for server processing and stuff
+        
+#if 1
         global_os.target_frames_per_second  = refresh_rate;
+#else
+        global_os.target_frames_per_second  = 30;
+#endif
         
         global_os.sample_out = (f32 *)W32_HeapAlloc(win32_sound_output.samples_per_second * sizeof(f32) * 2);
         global_os.samples_per_second = win32_sound_output.samples_per_second;
         
-        global_os.Reserve                        = W32_Reserve;
-        global_os.Release                        = W32_Release;
-        global_os.Commit                         = W32_Commit;
-        global_os.Decommit                       = W32_Decommit;
-        global_os.OutputError                    = W32_OutputError;
-        global_os.SaveToFile                     = W32_SaveToFile;
-        global_os.AppendToFile                   = W32_AppendToFile;
-        global_os.LoadEntireFile                 = W32_LoadEntireFile;
-        global_os.LoadEntireFileAndNullTerminate = W32_LoadEntireFileAndNullTerminate;
-        global_os.DeleteFile                     = W32_DeleteFile;
-        global_os.MakeDirectory                  = W32_MakeDirectory;
-        global_os.DoesFileExist                  = W32_DoesFileExist;
-        global_os.DoesDirectoryExist             = W32_DoesDirectoryExist;
-        global_os.CopyFile                       = W32_CopyFile;
-        global_os.ListDirectory                  = W32_DirectoryListLoad;
-        global_os.GetTime                        = W32_GetTime;
-        global_os.GetCycles                      = W32_GetCycles;
-        global_os.ResetCursor                    = W32_ResetCursor;
-        global_os.SetCursorToHorizontalResize    = W32_SetCursorToHorizontalResize;
-        global_os.SetCursorToVerticalResize      = W32_SetCursorToVerticalResize;
-        global_os.RefreshScreen                  = W32_OpenGLRefreshScreen;
+        global_os.Reserve                          = W32_Reserve;
+        global_os.Release                          = W32_Release;
+        global_os.Commit                           = W32_Commit;
+        global_os.Decommit                         = W32_Decommit;
+        global_os.OutputError                      = W32_OutputError;
+        global_os.SaveToFile                       = W32_SaveToFile;
+        global_os.AppendToFile                     = W32_AppendToFile;
+        global_os.LoadEntireFile                   = W32_LoadEntireFile;
+        global_os.LoadEntireFileAndNullTerminate   = W32_LoadEntireFileAndNullTerminate;
+        global_os.DeleteFile                       = W32_DeleteFile;
+        global_os.MakeDirectory                    = W32_MakeDirectory;
+        global_os.DoesFileExist                    = W32_DoesFileExist;
+        global_os.DoesDirectoryExist               = W32_DoesDirectoryExist;
+        global_os.CopyFile                         = W32_CopyFile;
+        global_os.ListDirectory                    = W32_DirectoryListLoad;
+        global_os.GetTime                          = W32_GetTime;
+        global_os.GetCycles                        = W32_GetCycles;
+        global_os.ResetCursor                      = W32_ResetCursor;
+        global_os.SetCursorToHorizontalResize      = W32_SetCursorToHorizontalResize;
+        global_os.SetCursorToVerticalResize        = W32_SetCursorToVerticalResize;
+        global_os.RefreshScreen                    = W32_OpenGLRefreshScreen;
+        global_os.PushNetworkMessage               = W32_PushNetworkMessage;
+        global_os.GetNextNetworkMessageIfAvailable = W32_GetNextNetworkMessageIfAvailable;
         
         global_os.permanent_arena = M_ArenaInitialize();
         global_os.frame_arena = M_ArenaInitialize();
@@ -623,8 +724,6 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    // TODO(fakhri): create a networking thread
-    
     while(!global_os.quit)
     {
         W32_TimerBeginFrame(&global_win32_timer);
@@ -633,11 +732,6 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         // NOTE(rjf): Update Windows events
         {
             MSG message;
-            if(global_os.wait_for_events_to_update && !global_os.pump_events)
-            {
-                WaitMessage();
-            }
-            
             while(PeekMessage(&message, 0, 0, 0, PM_REMOVE))
             {
                 TranslateMessage(&message);
@@ -647,6 +741,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         
         // NOTE(rjf): Update window size
         {
+            iv2 old_window_size = global_os.window_size;
             RECT client_rect;
             GetClientRect(window_handle, &client_rect);
             global_os.window_size.x = client_rect.right - client_rect.left;
@@ -662,6 +757,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
             W32_UpdateXInput();
             global_os.pump_events = 0;
         }
+        
         
         // NOTE(rjf): Find how much sound to write and where
         if(win32_sound_output.initialized)
@@ -703,7 +799,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
             
             win32_app_code.UpdateAndRender();
             
-            W32_OpenGLRefreshScreen();
+            
             
             // NOTE(rjf): Update fullscreen if necessary
             if(last_fullscreen != global_os.fullscreen)
@@ -723,10 +819,9 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
             OS_EndFrame();
         }
         
+        W32_OpenGLRefreshScreen();
         W32_TimerEndFrame(&global_win32_timer, 1000.0 * (1.0 / (f64)global_os.target_frames_per_second));
     }
-    
-    ShowWindow(window_handle, SW_HIDE);
     
     W32_AppCodeUnload(&win32_app_code);
     W32_CleanUpOpenGL(&global_device_context);

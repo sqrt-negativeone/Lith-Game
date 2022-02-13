@@ -32,7 +32,7 @@ IsBufferEmpty(Buffer *buffer)
     return result;
 }
 
-internal void
+inline void
 InsertCharacterToBuffer(Buffer *buffer, char c)
 {
     Assert(buffer);
@@ -40,6 +40,14 @@ InsertCharacterToBuffer(Buffer *buffer, char c)
     u64 len = buffer->buffer.size;
     buffer->buffer.str[len] = c;
     buffer->buffer.size = len + 1;
+}
+
+inline void
+RemoveLastCharacterFromBuffer(Buffer *buffer)
+{
+    Assert(buffer);
+    u64 len = buffer->buffer.size;
+    --buffer->buffer.size;
 }
 
 internal void

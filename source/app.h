@@ -23,70 +23,108 @@ struct Controller
     Input move_right;
     Input move_up;
     Input move_down;
-    Input confirm;
-    Input deceit;
-    Input escape_key;
-};
-
-enum MessagesType
-{
-    // NOTE(fakhri): the client sends these message to the server to tell it about events
-    Message_PlayCard, // NOTE(fakhri): needs to know what cards is played
-    Message_QuestionCredibility, // NOTE(fakhri): doesn't need any extra data
-    Message_BurnCards, // NOTE(fakhri): the burnt cards numbers
     
-    // NOTE(fakhri): the server sends these messages to us so we can synchronize our state
-    Message_ChangeTurn, // NOTE(fakhri): needs the player index who is going to play this turn
-    Message_TakesCardsFromTable, // NOTE(fakhri): needs the inex of the player that will take the cards, and the numbers on these cards
-    Message_PlayerBurntCards,
+    Input right_mouse;
+    Input left_mouse;
+    
+    Input confirm;
+    Input escape_key;
+    Input toggle_fullscreen;
 };
 
 enum Game_Mode
 {
-    Game_Mode_BEGIN_MENU = 0,
-    Game_Mode_MENU_JOIN_GAME,
+    Game_Mode_GAME,
+    
+    Game_Mode_MENU_BEGIN,
+    // NOTE(fakhri): begin menu modes
+    Game_Mode_MENU_USERNAME,
     Game_Mode_MENU_MAIN,
+    Game_Mode_MENU_JOIN_GAME,
     Game_Mode_MENU_HOST_GAME,
     Game_Mode_MENU_WAITING_PLAYERS,
-    Game_Mode_END_MENU,
-    Game_Mode_GAME,
+    Game_Mode_MENU_END,
+    
 };
+
+
+enum Game_Session_Flags
+{
+    SESSION_FLAG_HOSTING_GAME        = (1 << 0),
+    SESSION_FLAG_TRYING_CONNECT_GAME = (1 << 2),
+    SESSION_FLAG_CONNECTED_TO_GAME   = (1 << 3),
+    SESSION_FLAG_FAILED_CONNECT_GAME = (1 << 4),
+    SESSION_FLAG_TRYING_JOIN_GAME    = (1 << 5),
+    SESSION_FLAG_FAILED_JOIN_GAME    = (1 << 6),
+    SESSION_FLAG_JOINED_GAME         = (1 << 7),
+};
+
 
 struct Game_Session
 {
-    b32 game_started;
-    u32 index_of_current_player;
-    b32 is_hosting_game;
-    b32 attempt_joining_session;
-    s8 joined_players_usernames[PLAYERS_COUNT];
+    s8 players[PLAYERS_COUNT];
     u32 players_joined_sofar;
+    // NOTE(fakhri): indicate if we are the ones hosting the game
+    u32 session_state_flags;
 };
+
+#if 1
+enum Entity_Type
+{
+    Entity_Type_Null_Entity,
+    Entity_Type_Cursor_Entity, // NOTE(fakhri): always following mouse
+    Entity_Type_Entity_Card,
+    Entity_Type_Entity_Card_Number,
+};
+
+struct Entity
+{
+    Entity_Type type;
+    v2 original_pos;
+    v2 center_pos;
+    v2 target_pos;
+    
+    v2 original_dimension;
+    v2 current_dimension;
+    v2 target_dimension;
+    f32 dDimension;
+    
+    v2 velocity;
+    
+    b32 is_under_cursor;
+    b32 is_pressed;
+    
+    f32 following_trigger_distance;
+    u32 followed_entity_index;
+    
+    u32 card_number;
+};
+
+#else
+struct Card
+{
+    v2 size;
+    v2 postion;
+};
+
+struct Number
+{
+    u32 value;
+    u32 followed_card;
+};
+#endif
+
+
 
 struct Game_State
 {
     Game_Mode game_mode;
-    
-    u32 my_index;
-    u32 selected_card_index;
-    u32 hand_cards[DECK_CARDS_COUNT];
-    u32 hand_cards_count[PLAYERS_COUNT];
-    // NOTE(fakhri): only the server knows what's on theme
-    u32 cards_on_table[DECK_CARDS_COUNT];
-    u32 cards_on_table_count;
-    u32 burnt_cards[DECK_CARDS_COUNT];
-    u32 burnt_cards_count;
-    
-    // NOTE(fakhri): the card number i am suposed to play
-    u32 card_number_to_play;
-    
-    b32 choosing_a_move;
-    b32 is_table_empty;
-    b32 should_claim_number;
-    b32 played_my_turn;
-    
     UI_Context ui_context;
     Rendering_Context rendering_context;
     Game_Session game_session;
+    
+    Entity entities[256];
+    u32 entity_count;
 };
 
 struct Compile_Shader_Result

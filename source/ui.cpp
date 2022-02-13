@@ -1,3 +1,60 @@
+// TODO(fakhri): we need some way to automatically position menu items on the screen?
+
+internal u32
+ChangeSelectedItem(u32 item_index, i32 delta, u32 items_count)
+{
+    u32 result = (item_index + delta + items_count) % items_count;
+    return result;
+}
+
+internal void
+UI_ChangeMenuSelectedItem(UI_Context *ui_context, i32 delta)
+{
+    Assert(ui_context);
+    ui_context->prev_time = os->time;
+    ui_context->selected_item = ChangeSelectedItem(ui_context->selected_item, delta, ui_context->items_count);
+}
+
+internal void
+UI_ClearContext(UI_Context *ui_context)
+{
+    Assert(ui_context);
+    ui_context->selected_item = 0;
+    for (u32 field_buffer_index = 0;
+         field_buffer_index < ArrayCount(ui_context->input_field_buffers);
+         ++field_buffer_index)
+    {
+        EmptyBuffer(ui_context->input_field_buffers + field_buffer_index);
+    }
+}
+
+internal void
+UI_PositionItem(UI_Context *ui_context, v2 position)
+{
+    Assert(ui_context);
+    ui_context->item_position = position;
+}
+
+internal void
+UI_SetVerticalSpacing(UI_Context *ui_context, f32 new_vertical_spacing)
+{
+    Assert(ui_context);
+    ui_context->spacing.y = new_vertical_spacing;
+}
+
+internal void
+UI_SetHorizontalSpacing(UI_Context *ui_context, f32 new_horizontal_spacing)
+{
+    Assert(ui_context);
+    ui_context->spacing.y = new_horizontal_spacing;
+}
+
+internal void
+UI_VerticalAdvanceItemPosition(UI_Context *ui_context)
+{
+    Assert(ui_context);
+    ui_context->item_position.y += ui_context->spacing.y;
+}
 
 internal void
 UI_InitColorScheme(UI_ColorScheme *color_scheme)
@@ -22,6 +79,7 @@ UI_InitColorScheme(UI_ColorScheme *color_scheme)
     color_scheme->button_text_active_color1 = 0.85f * blue;
     color_scheme->button_text_active_color2 = blue;
     color_scheme->button_text_shadow_color = black;
+    color_scheme->button_text_clicked_color = red;
     
     // NOTE(fakhri): input field color
     color_scheme->input_field_background_color = 0.2f * white;
@@ -53,10 +111,25 @@ UI_BeginFrame(UI_Context *ui_context)
     Assert(ui_context);
     ui_context->buffer_index = 0;
     ui_context->items_count = 0;
+    ui_context->item_position = {};
 }
 
 internal void
-MenuItemLabel(Game_State *game_state, s8 text, v2 text_pos, b32 should_animate_color = 0)
+UI_EndFrame(UI_Context *ui_context, Controller *controller)
+{
+    // NOTE(fakhri): process input
+    if (controller->move_down.pressed)
+    {
+        UI_ChangeMenuSelectedItem(ui_context, +1);
+    }
+    if (controller->move_up.pressed)
+    {
+        UI_ChangeMenuSelectedItem(ui_context, -1);
+    }
+}
+
+internal void
+UI_MenuItemLabel(Game_State *game_state, s8 text, b32 should_animate_color = 0)
 {
     UI_Context        *ui_context        = &game_state->ui_context;
     Rendering_Context *rendering_context = &game_state->rendering_context;
@@ -65,7 +138,7 @@ MenuItemLabel(Game_State *game_state, s8 text, v2 text_pos, b32 should_animate_c
     v3 color;
     if (should_animate_color)
     {
-        f32 t = os->time - ui_context->last_time;
+        f32 t = os->time - ui_context->prev_time;
         f32 change = square_f(cos_f(PI * t));
         color = change * color_scheme->label_color1 + (1 - change) * color_scheme->label_color2;
     }
@@ -73,11 +146,11 @@ MenuItemLabel(Game_State *game_state, s8 text, v2 text_pos, b32 should_animate_c
     {
         color = color_scheme->label_color;
     }
-    DebugDrawText(rendering_context, text, text_pos, color);
+    DebugDrawText(rendering_context, text, ui_context->item_position, color);
 }
 
 internal b32
-MenuItemButton(Game_State *game_state, s8 item_text, v2 item_pos)
+UI_MenuItemButton(Game_State *game_state, s8 item_text)
 {
     UI_Context        *ui_context        = &game_state->ui_context;
     Rendering_Context *rendering_context = &game_state->rendering_context;
@@ -85,6 +158,8 @@ MenuItemButton(Game_State *game_state, s8 item_text, v2 item_pos)
     UI_ColorScheme    *color_scheme      = &ui_context->color_scheme;
     
     b32 clicked = 0;
+    
+    v2 item_pos = ui_context->item_position;
     
     v3 color;
     b32 is_selected = (ui_context->selected_item == ui_context->items_count);
@@ -96,9 +171,16 @@ MenuItemButton(Game_State *game_state, s8 item_text, v2 item_pos)
             clicked = 1;
         }
         // NOTE(fakhri): calculate color
-        f32 t = os->time - ui_context->last_time;
+        f32 t = os->time - ui_context->prev_time;
         f32 change = square_f(cos_f(PI * t));
-        color = change * color_scheme->button_text_active_color1 + (1 - change) * color_scheme->button_text_active_color2;
+        if (!clicked)
+        {
+            color = change * color_scheme->button_text_active_color1 + (1 - change) * color_scheme->button_text_active_color2;
+        }
+        else
+        {
+            color = color_scheme->button_text_clicked_color;
+        }
         
         DebugDrawText(rendering_context, item_text, item_pos + ui_context->button_shadow_offset, color_scheme->button_text_shadow_color);
     }
@@ -118,29 +200,44 @@ HandleInputFieldKeyboardInput(Buffer *input_buffer)
 {
     // TODO(fakhri): support ctr+v
     // TODO(fakhri): support moving cursor with arrow keys
+    // TODO(fakhri): support ctr+backspace
     OS_Event *event = 0;
     while(OS_GetNextEvent(&event))
     {
         if (event->type == OS_EventType_CharacterInput)
         {
             char c = (char)event->character;
-            if (!IsBufferFull(input_buffer) && 
-                (c == '.' || CharIsDigit(c)))
+            if (!IsBufferFull(input_buffer))
             {
                 InsertCharacterToBuffer(input_buffer, c);
             }
             OS_EatEvent(event);
         }
-        else if (event->type == OS_EventType_KeyPress && event->key == Key_Backspace && 
-                 !IsBufferEmpty(input_buffer))
+        else if (event->type == OS_EventType_KeyPress)
         {
-            --(input_buffer->buffer.size);
+            if (event->key == Key_Backspace && 
+                !IsBufferEmpty(input_buffer))
+            {
+                if (event->modifiers & KeyModifier_Ctrl)
+                {
+                    EmptyBuffer(input_buffer);
+                }
+                else
+                {
+                    RemoveLastCharacterFromBuffer(input_buffer);
+                }
+            }
+        }
+        else if (event->key == Key_V && (event->modifiers & KeyModifier_Ctrl))
+        {
+            // TODO(fakhri): insert the content of the clipboad into the buffer
+            Log("Pasting clipboad content to the buffer");
         }
     }
 }
 
 internal void
-MenuItemInputField(Game_State *game_state,v2 item_pos, v2 item_size)
+UI_MenuItemInputField(Game_State *game_state, v2 item_size)
 {
     UI_Context        *ui_context        = &game_state->ui_context;
     Rendering_Context *rendering_context = &game_state->rendering_context;
@@ -153,6 +250,7 @@ MenuItemInputField(Game_State *game_state,v2 item_pos, v2 item_size)
     v3 background_color;
     v3 text_color;
     
+    v2 item_pos = ui_context->item_position;
     
     b32 is_selected = (ui_context->selected_item == ui_context->items_count);
     if (is_selected)
@@ -177,7 +275,7 @@ MenuItemInputField(Game_State *game_state,v2 item_pos, v2 item_size)
     
     if (is_selected)
     {
-        f32 t = os->time - ui_context->last_time;
+        f32 t = os->time - ui_context->prev_time;
         f32 change = square_f(cos_f(PI * t));
         v3 cursor_color = change * background_color + (1 - change) * text_color;
         
@@ -191,3 +289,4 @@ MenuItemInputField(Game_State *game_state,v2 item_pos, v2 item_size)
     ++ui_context->items_count;
     ++ui_context->buffer_index;
 }
+

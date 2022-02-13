@@ -15,7 +15,6 @@ typedef hmm_v4 v4;
 typedef hmm_m4 m4;
 typedef hmm_quaternion quaternion;
 
-
 internal
 f32 sin_f(f32 radians)
 {
@@ -122,7 +121,7 @@ f32 lerp(f32 a, f32 time, f32 b)
 }
 
 internal
-f32 clamp(f32 min, f32 value, f32 max)
+f32 Clamp(f32 min, f32 value, f32 max)
 {
     f32 result = HMM_Clamp(min, value, max);
     return result;
@@ -442,4 +441,68 @@ quaternion QuaternionFromAxisAngle(hmm_vec3 axis, float AngleOfRotation)
     quaternion result = HMM_QuaternionFromAxisAngle(axis, AngleOfRotation);
     return result;
 }
+
+struct Rectangle2D
+{
+    v2 min_p;
+    v2 max_p;
+};
+
+inline Rectangle2D
+RectMinMax(v2 min_p, v2 max_p)
+{
+    Rectangle2D result;
+    result.min_p = min_p;
+    result.max_p = max_p;
+    return result;
+}
+
+inline Rectangle2D
+RectTwoPoints(v2 a, v2 b)
+{
+    Rectangle2D result;
+    result.min_p = vec2(Min(a.x, b.x), Min(a.y, b.y));
+    result.max_p = vec2(Max(a.x, b.x), Max(a.y, b.y));
+    return result;
+}
+
+inline Rectangle2D
+RectCentHalfDim(v2 center, v2 half_dim)
+{
+    Rectangle2D result = RectMinMax(center - half_dim, center + half_dim);
+    return result;
+}
+
+inline Rectangle2D
+RectCentDim(v2 center, v2 dim)
+{
+    Rectangle2D result = RectCentHalfDim(center, 0.5f * dim);
+    return result;
+}
+
+inline b32
+IsInsideRect(Rectangle2D rect, v2 pos)
+{
+    b32 result = ((pos.x >= rect.min_p.x && pos.x < rect.max_p.x) &&
+                  (pos.y >= rect.min_p.y && pos.y < rect.max_p.y));
+    return result;
+}
+
+inline v2
+ClampInsideRect(Rectangle2D rect, v2 p)
+{
+    v2 result;
+    result.x = Clamp(rect.min_p.x, p.x, rect.max_p.x);
+    result.y = Clamp(rect.min_p.y, p.y, rect.max_p.y);
+    return result;
+}
+
+inline v2
+Vec2MoveTowards(v2 start, v2 end, f32 amount)
+{
+    v2 result = start + amount * NormalizeVec2(end - start);
+    result = ClampInsideRect(RectTwoPoints(start, end), result);
+    return result;
+}
+
 #endif //MATH_H
