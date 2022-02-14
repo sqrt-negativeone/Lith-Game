@@ -245,11 +245,29 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
     {
         if (!entity->is_pressed)
         {
-            if(os->controller.left_mouse.pressed)
+            if(os->controller.left_mouse.pressed && entity->residency == Card_Residency_Down)
             {
-                // TODO(fakhri): make sure we are not holding another card
-                entity->is_pressed = true;
-                entity->followed_entity_index = Entity_Type_Cursor_Entity;
+                // NOTE(fakhri): make sure we are not pressing another card
+                b32 should_become_pressed = true;
+                
+                Residency *card_residency = game_state->entity_residencies + Card_Residency_Down;
+                for (u32 down_residency_index = 0;
+                     down_residency_index < card_residency->entity_count;
+                     ++down_residency_index)
+                {
+                    Entity *test_entity = game_state->entities + card_residency->entity_indices[down_residency_index];
+                    if (test_entity->is_pressed)
+                    {
+                        should_become_pressed = false;
+                        break;
+                    }
+                }
+                
+                if (should_become_pressed)
+                {
+                    entity->is_pressed = true;
+                    entity->followed_entity_index = Entity_Type_Cursor_Entity;
+                }
             }
             if (os->controller.right_mouse.pressed)
             {
