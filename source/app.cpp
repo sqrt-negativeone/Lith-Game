@@ -69,6 +69,109 @@ OpenMenu(Game_State *game_state, Game_Mode menu_mode)
 }
 
 internal void
+ReorganizeResidency(Game_State *game_state, Card_Residency residency_type)
+{
+    if (residency_type != Card_Residency_None)
+    {
+        f32 world_width = MAX_UNITS_PER_X;
+        f32 world_height = MAX_UNITS_PER_X * game_state->rendering_context.aspect_ratio;
+        
+        Residency *entity_residency = game_state->entity_residencies + residency_type;
+        u32 entity_count = entity_residency->entity_count;
+        v2 start_point = {};
+        b32 change_x = true;
+        switch(residency_type)
+        {
+            case Card_Residency_Up:
+            {
+                start_point.x = 0.5f * (CARD_WIDTH + world_width - entity_count * CARD_WIDTH - (entity_count - 1) * CARD_X_GAP);
+                start_point.y = world_height - 6.5f;
+            } break;
+            case Card_Residency_Down:
+            {
+                start_point.y = 6.5f;
+                start_point.x = 0.5f * (CARD_WIDTH + world_width - entity_count * CARD_WIDTH - (entity_count - 1) * CARD_X_GAP);
+            } break;
+#if 0
+            case Card_Residency_Left:
+            {
+            } break;
+            case Card_Residency_Right:
+            {
+            } break;
+            case Card_Residency_Table:
+            {
+            } break;
+            case Card_Residency_Burnt:
+            {
+            } break;
+#endif
+            default:
+            {
+                // NOTE(fakhri): not yet implemented
+                BreakDebugger();
+            } break;
+        }
+        if (change_x)
+        {
+            for (u32 residency_index = 0;
+                 residency_index < entity_residency->entity_count;
+                 ++residency_index)
+            {
+                Entity *entity = game_state->entities + entity_residency->entity_indices[residency_index];
+                entity->residency_pos = start_point;
+                if (!entity->followed_entity_index)
+                {
+                    entity->target_pos = entity->residency_pos;
+                }
+                start_point.x += CARD_WIDTH + CARD_X_GAP;
+            }
+        }
+    }
+}
+
+internal void
+ChangeResidency(Game_State *game_state, u32 entity_index, Card_Residency residency)
+{
+    Entity *entity = game_state->entities + entity_index;
+    Card_Residency old_residency = entity->residency;
+    if (old_residency != residency)
+    {
+        if (old_residency != Card_Residency_None)
+        {
+            // NOTE(fakhri): remove the entity from the old residency
+            Residency *entity_residency = game_state->entity_residencies + old_residency;
+            for (u32 residency_index = 0;
+                 residency_index < entity_residency->entity_count;
+                 ++residency_index)
+            {
+                if (entity_residency->entity_indices[residency_index] == entity_index)
+                {
+                    for (; residency_index < entity_residency->entity_count; ++residency_index)
+                    {
+                        entity_residency->entity_indices[residency_index] = entity_residency->entity_indices[residency_index + 1];
+                    }
+                    --entity_residency->entity_count;
+                    break;
+                }
+            }
+        }
+        
+        if (residency != Card_Residency_None)
+        {
+            Residency *entity_residency = game_state->entity_residencies + residency;
+            Assert(entity_residency->entity_count < ArrayCount(entity_residency->entity_indices));
+            entity_residency->entity_indices[entity_residency->entity_count++] = entity_index;
+            entity->residency = residency;
+        }
+        
+        // TODO(fakhri): reorgianize the entities in residency
+        ReorganizeResidency(game_state, old_residency);
+        ReorganizeResidency(game_state, residency);
+    }
+}
+
+internal void
 MoveEntity(Game_State *game_state, Entity *entity, f32 spring_constant, f32 friction, f32 mass)
 {
     if (entity->followed_entity_index)
@@ -94,8 +197,9 @@ UpdateCursorEntity(Game_State *game_state, Entity *entity)
 }
 
 internal void
-UpdateCardEntity(Game_State *game_state, Entity *entity)
+UpdateCardEntity(Game_State *game_state, u32 entity_index)
 {
+    Entity *entity = game_state->entities + entity_index;
     Entity *cursor_entity = game_state->entities + (u32)Entity_Type_Cursor_Entity;
     Assert(cursor_entity->type == Entity_Type_Cursor_Entity);
     
@@ -104,21 +208,38 @@ UpdateCardEntity(Game_State *game_state, Entity *entity)
     if (!entity->is_under_cursor && should_be_under_cursor)
     {
         entity->is_under_cursor = true;
-        entity->target_dimension = 1.1f * entity->original_dimension;
+        entity->target_dimension = 1.1f * vec2(CARD_WIDTH, CARD_HEIGHT);
     }
     
     if (entity->is_under_cursor && !should_be_under_cursor)
     {
         entity->is_under_cursor = false;
-        entity->target_dimension = entity->original_dimension;
+        entity->target_dimension = vec2(CARD_WIDTH, CARD_HEIGHT);
     }
     
     if (entity->is_under_cursor)
     {
-        if (!entity->is_pressed && os->controller.left_mouse.pressed)
+        if (!entity->is_pressed)
         {
-            entity->is_pressed = true;
-            entity->followed_entity_index = Entity_Type_Cursor_Entity;
+            if(os->controller.left_mouse.pressed)
+            {
+                // TODO(fakhri): make sure we are not holding another card
+                entity->is_pressed = true;
+                entity->followed_entity_index = Entity_Type_Cursor_Entity;
+            }
+            if (os->controller.right_mouse.pressed)
+            {
+                Card_Residency target_residency;
+                if (entity->residency == Card_Residency_Down)
+                {
+                    target_residency = Card_Residency_Up;
+                }
+                else
+                {
+                    target_residency = Card_Residency_Down;
+                }
+                ChangeResidency(game_state, entity_index, target_residency);
+            }
         }
     }
     
@@ -127,7 +248,7 @@ UpdateCardEntity(Game_State *game_state, Entity *entity)
         if (os->controller.left_mouse.released)
         {
             entity->is_pressed = false;
-            entity->target_pos = entity->original_pos;
+            entity->target_pos = entity->residency_pos;
             entity->followed_entity_index = 0;
         }
     }
@@ -137,7 +258,7 @@ UpdateCardEntity(Game_State *game_state, Entity *entity)
                                                 entity->target_dimension,
                                                 os->dtime * entity->dDimension);
     
-    MoveEntity(game_state, entity, 9000, 600, 10);
+    MoveEntity(game_state, entity, 900, 60, 1);
 }
 
 internal void
@@ -145,22 +266,11 @@ UpdateCardNumberEntity(Game_State *game_state, Entity *entity)
 {
     Assert(entity->followed_entity_index);
     
-    MoveEntity(game_state, entity, 10000.f, 150.f, 10.f);
+    MoveEntity(game_state, entity, 1000.f, 15.f, 1.f);
     Entity *followed_entity = game_state->entities + entity->followed_entity_index;
     entity->center_pos = ClampInsideRect(RectCentDim(followed_entity->center_pos, followed_entity->current_dimension), entity->center_pos);
 }
 
-internal void
-ChangeResidency(Entity *entity, Card_Residency residency)
-{
-    Assert(entity);
-    if (entity->residency != residency)
-    {
-        
-    }
-}
-
-// TODO(fakhri): make the coordinates pixel independents
 // TODO(fakhri): come up with a client-server protocol for the game
 internal void
 UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context, Controller *controller)
@@ -185,7 +295,7 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
             } break;
             case Entity_Type_Entity_Card:
             {
-                UpdateCardEntity(game_state, entity);
+                UpdateCardEntity(game_state, entity_index);
                 if (entity->is_pressed)
                 {
                     DebugDrawQuadWorldCoord(rendering_context, entity->center_pos, 1.05f * entity->current_dimension, red);
@@ -485,26 +595,18 @@ AddCardNumberEntity(Game_State *game_state, u32 card_number, u32 card_entity_ind
 }
 
 internal void
-AddCardEntity(Game_State *game_state, v2 starting_pos, u32 card_number)
+AddCardEntity(Game_State *game_state, u32 card_number, Card_Residency card_residency)
 {
     u32 card_entity_index = AddEntity(game_state);
     Entity *card = game_state->entities + card_entity_index;
     *card = {};
     card->type = Entity_Type_Entity_Card;
-    card->original_pos = starting_pos;
-    card->center_pos = starting_pos;
-    card->target_pos = starting_pos;
-    
-#if 0    
-    card->original_dimension = vec2(90, 180);
-    card->target_dimension   = vec2(90, 180);
-    card->current_dimension  = vec2(90, 180);
-#else
-    card->original_dimension = vec2(8, 15);
-    card->target_dimension   = card->original_dimension;
-    card->current_dimension  = card->original_dimension;
-#endif
-    
+    card->target_dimension   = vec2(CARD_WIDTH, CARD_HEIGHT);
+    card->current_dimension  = vec2(CARD_WIDTH, CARD_HEIGHT);
+    ChangeResidency(game_state, card_entity_index, card_residency);
+    f32 world_width = MAX_UNITS_PER_X;
+    f32 world_height = MAX_UNITS_PER_X * game_state->rendering_context.aspect_ratio;
+    card->center_pos = 0.5f * vec2(world_width, world_height);
     card->dDimension = 20.f;
     AddCardNumberEntity(game_state, card_number, card_entity_index);
 }
@@ -537,11 +639,10 @@ extern "C"
         AddCursorEntity(game_state);
         
         for (u32 card_index = 0;
-             card_index < 1;
+             card_index < 10;
              ++card_index)
         {
-            v2 card_pos = vec2(50.f, 20.f);
-            AddCardEntity(game_state, card_pos, card_index);
+            AddCardEntity(game_state, card_index, Card_Residency_Down);
         }
     }
     

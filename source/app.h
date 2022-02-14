@@ -86,22 +86,28 @@ enum Card_Residency
     Card_Residency_Right,
     Card_Residency_Table,
     Card_Residency_Burnt,
+    
+    Card_Residency_Count,
 };
+
+#define CARD_WIDTH  (5.0f)
+#define CARD_HEIGHT (10.0f)
+#define CARD_X_GAP (1.0f)
 
 struct Entity
 {
     Entity_Type type;
-    v2 original_pos;
+    v2 residency_pos;
     v2 center_pos;
     v2 target_pos;
     
-    v2 original_dimension;
     v2 current_dimension;
     v2 target_dimension;
     f32 dDimension;
     
     v2 velocity;
     
+    // TODO(fakhri): we can have flags here instead, then each type of entity can have its own flags
     b32 is_under_cursor;
     b32 is_pressed;
     
@@ -110,6 +116,12 @@ struct Entity
     u32 card_number;
     
     Card_Residency residency;
+};
+
+struct Residency
+{
+    u32 entity_indices[40];
+    u32 entity_count;
 };
 
 #else
@@ -137,6 +149,7 @@ struct Game_State
     Entity entities[256];
     u32 entity_count;
     
+    Residency entity_residencies[Card_Residency_Count];
 };
 
 struct Compile_Shader_Result
