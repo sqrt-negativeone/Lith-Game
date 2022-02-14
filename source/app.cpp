@@ -79,26 +79,35 @@ ReorganizeResidency(Game_State *game_state, Card_Residency residency_type)
         Residency *entity_residency = game_state->entity_residencies + residency_type;
         u32 entity_count = entity_residency->entity_count;
         v2 start_point = {};
-        b32 change_x = true;
+        b32 change_x = false;
+        b32 change_y = false;
         switch(residency_type)
         {
             case Card_Residency_Up:
             {
+                change_x = true;
                 start_point.x = 0.5f * (CARD_WIDTH + world_width - entity_count * CARD_WIDTH - (entity_count - 1) * CARD_X_GAP);
                 start_point.y = world_height - 6.5f;
             } break;
             case Card_Residency_Down:
             {
+                change_x = true;
                 start_point.y = 6.5f;
                 start_point.x = 0.5f * (CARD_WIDTH + world_width - entity_count * CARD_WIDTH - (entity_count - 1) * CARD_X_GAP);
             } break;
-#if 0
             case Card_Residency_Left:
             {
+                change_y = true;
+                start_point.x = 6.5f;
+                start_point.y = 0.5f * (CARD_HEIGHT + world_height - entity_count * CARD_HEIGHT - (entity_count - 1) * CARD_Y_GAP);
             } break;
             case Card_Residency_Right:
             {
+                change_y = true;
+                start_point.x = world_width - 6.5f;
+                start_point.y = 0.5f * (CARD_HEIGHT + world_height - entity_count * CARD_HEIGHT - (entity_count - 1) * CARD_Y_GAP);
             } break;
+#if 0
             case Card_Residency_Table:
             {
             } break;
@@ -125,6 +134,21 @@ ReorganizeResidency(Game_State *game_state, Card_Residency residency_type)
                     entity->target_pos = entity->residency_pos;
                 }
                 start_point.x += CARD_WIDTH + CARD_X_GAP;
+            }
+        }
+        else if (change_y)
+        {
+            for (u32 residency_index = 0;
+                 residency_index < entity_residency->entity_count;
+                 ++residency_index)
+            {
+                Entity *entity = game_state->entities + entity_residency->entity_indices[residency_index];
+                entity->residency_pos = start_point;
+                if (!entity->followed_entity_index)
+                {
+                    entity->target_pos = entity->residency_pos;
+                }
+                start_point.y += CARD_HEIGHT + CARD_Y_GAP;
             }
         }
     }
@@ -229,14 +253,23 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
             }
             if (os->controller.right_mouse.pressed)
             {
+                // NOTE(fakhri): test move entity
                 Card_Residency target_residency;
                 if (entity->residency == Card_Residency_Down)
                 {
                     target_residency = Card_Residency_Up;
                 }
-                else
+                else if (entity->residency == Card_Residency_Up)
                 {
                     target_residency = Card_Residency_Down;
+                }
+                else if (entity->residency == Card_Residency_Right)
+                {
+                    target_residency = Card_Residency_Left;
+                }
+                else
+                {
+                    target_residency = Card_Residency_Right;
                 }
                 ChangeResidency(game_state, entity_index, target_residency);
             }
@@ -642,7 +675,28 @@ extern "C"
              card_index < 10;
              ++card_index)
         {
+            AddCardEntity(game_state, card_index, Card_Residency_Left);
+        }
+        
+        for (u32 card_index = 0;
+             card_index < 10;
+             ++card_index)
+        {
             AddCardEntity(game_state, card_index, Card_Residency_Down);
+        }
+        
+        for (u32 card_index = 0;
+             card_index < 10;
+             ++card_index)
+        {
+            AddCardEntity(game_state, card_index, Card_Residency_Up);
+        }
+        
+        for (u32 card_index = 0;
+             card_index < 10;
+             ++card_index)
+        {
+            AddCardEntity(game_state, card_index, Card_Residency_Right);
         }
     }
     

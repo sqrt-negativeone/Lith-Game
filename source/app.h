@@ -90,9 +90,10 @@ enum Card_Residency
     Card_Residency_Count,
 };
 
-#define CARD_WIDTH  (5.0f)
-#define CARD_HEIGHT (10.0f)
-#define CARD_X_GAP (1.0f)
+#define CARD_WIDTH  (3.5f)
+#define CARD_HEIGHT (6.9f)
+#define CARD_X_GAP (0.69f)
+#define CARD_Y_GAP (-5.0f)
 
 struct Entity
 {
