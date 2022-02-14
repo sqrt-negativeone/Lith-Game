@@ -192,7 +192,6 @@ InitRenderer(Rendering_Context *rendering_context)
             
             glTexImage2D(GL_TEXTURE_2D, 0, format, tex_width, tex_height, 0, format, GL_UNSIGNED_BYTE, data);
             stbi_image_free(data);
-            
         }
         else
         {
@@ -212,15 +211,17 @@ InitRenderer(Rendering_Context *rendering_context)
             LogError("Couldn't initialize free type library");
         }
     }
+    
+    rendering_context->normalized_width_unit_per_world_unit = 1.0f / MAX_UNITS_PER_X;
+    rendering_context->aspect_ratio = 1.0f / (16.0f / 9.0f);
 }
 
 internal void
-DebugDrawQuadScreenCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color, f32 z_rotation = 0.f)
+DebugDrawQuadScreenCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color)
 {
     m4 trans = m4_translate(vec3(pos, 0.f));
-    m4 rotat = m4_translate(vec3(-size / 2, 0.f)) * m4_rotate(-z_rotation, v3{0.f, 0.f, 1.f}) * m4_translate(vec3(size / 2, 0.f));
     m4 scale = m4_scale(vec3(size, 1.0f));
-    m4 model = trans * rotat * scale;
+    m4 model = trans * scale;
     
     glUseProgram(rendering_context->quad_shader);
     GLint model_location = glGetUniformLocation(rendering_context->quad_shader, "model");
@@ -233,18 +234,32 @@ DebugDrawQuadScreenCoord(Rendering_Context *rendering_context, v2 pos, v2 size, 
     glUseProgram(0);
 }
 
-internal
-void DebugDrawQuad(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color, f32 z_rotation = 0.f)
+internal void
+DebugDrawQuadNormalizedCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color)
 {
     f32 window_width = (f32)os->window_size.width;
     f32 window_height = (f32)os->window_size.height;
+    pos = v2{pos.x * window_width, pos.y * window_height};
+    size = v2{size.width * window_width, size.height * window_height};
     
-    pos = v2{pos.x + rendering_context->screen.width / 2, rendering_context->screen.height / 2 - pos.y};
-    DebugDrawQuadScreenCoord(rendering_context, pos, size, color, z_rotation);
+    DebugDrawQuadScreenCoord(rendering_context, pos, size, color);
 }
 
-internal
-void DebugDrawTexture(Rendering_Context *rendering_context, GLuint tex, v2 pos, v2 size)
+internal void
+DebugDrawQuadWorldCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color)
+{
+    f32 x_correction = rendering_context->normalized_width_unit_per_world_unit;
+    f32 y_correction = (1.0f / rendering_context->aspect_ratio) * x_correction;
+    pos = vec2(pos.x * x_correction,
+               1.0f - pos.y * y_correction);
+    size = vec2(size.x * x_correction,
+                size.y * y_correction);
+    
+    DebugDrawQuadNormalizedCoord(rendering_context, pos, size, color);
+}
+
+internal void
+DebugDrawTextureScreenCoord(Rendering_Context *rendering_context, GLuint tex, v2 pos, v2 size)
 {
     f32 window_width = (f32)os->window_size.width;
     f32 window_height = (f32)os->window_size.height;
@@ -266,14 +281,39 @@ void DebugDrawTexture(Rendering_Context *rendering_context, GLuint tex, v2 pos, 
     glUseProgram(0);
 }
 
-internal
-void ChangeActiveFont(Rendering_Context *rendering_context, Font *new_font)
+internal void 
+DebugDrawTextureNormalizedCoord(Rendering_Context *rendering_context, GLuint tex, v2 pos, v2 size)
+{
+    f32 window_width = (f32)os->window_size.width;
+    f32 window_height = (f32)os->window_size.height;
+    pos = v2{pos.x * window_width, pos.y * window_height};
+    size = v2{size.width * window_width, size.height * window_height};
+    
+    DebugDrawTextureScreenCoord(rendering_context, tex, pos, size);
+}
+
+internal void
+DebugDrawTextureWorldCoord(Rendering_Context *rendering_context, GLuint tex, v2 pos, v2 size)
+{
+    f32 x_correction = rendering_context->normalized_width_unit_per_world_unit;
+    f32 y_correction = (1.0f / rendering_context->aspect_ratio) * x_correction;
+    pos = vec2(pos.x * x_correction,
+               1.0f - pos.y * y_correction);
+    
+    size = vec2(size.x * x_correction,
+                size.y * y_correction);
+    
+    DebugDrawTextureScreenCoord(rendering_context, tex, pos, size);
+}
+
+internal void
+ChangeActiveFont(Rendering_Context *rendering_context, Font *new_font)
 {
     rendering_context->active_font = new_font;
 }
 
-internal
-f32 GetActiveFontWidth(Rendering_Context *rendering_context, s8 text, f32 scale = 1.0f)
+internal f32
+GetActiveFontWidth(Rendering_Context *rendering_context, s8 text, f32 scale = 1.0f)
 {
     f32 text_width = 0;
     if (rendering_context->active_font)
@@ -295,9 +335,16 @@ f32 GetActiveFontWidth(Rendering_Context *rendering_context, s8 text, f32 scale 
     return text_width;
 }
 
+internal f32
+GetActiveFontNormalizedWidth(Rendering_Context *rendering_context, s8 text, f32 scale = 1.0f)
+{
+    f32 result = GetActiveFontWidth(rendering_context, text, scale);
+    result *= 1.f / os->window_size.width;
+    return result;
+}
 
-internal
-f32 GetActiveFontHeight(Rendering_Context *rendering_context, f32 scale = 1.0f)
+internal f32
+GetActiveFontHeight(Rendering_Context *rendering_context, f32 scale = 1.0f)
 {
     f32 text_height = 0;
     if (rendering_context->active_font)
@@ -314,8 +361,16 @@ f32 GetActiveFontHeight(Rendering_Context *rendering_context, f32 scale = 1.0f)
     return text_height;
 }
 
-internal
-void DebugDrawText(Rendering_Context *rendering_context, s8 text, v2 pos, v3 text_color, f32 scale = 1.0f)
+internal f32
+GetActiveFontNormalizedHeight(Rendering_Context *rendering_context, f32 scale = 1.0f)
+{
+    f32 result = GetActiveFontHeight(rendering_context, scale);
+    result *= 1.f / os->window_size.height;
+    return result;
+}
+
+internal void
+DebugDrawTextScreenCoord(Rendering_Context *rendering_context, s8 text, v2 pos, v3 text_color, f32 scale = 1.0f)
 {
     if (rendering_context->active_font)
     {
@@ -339,10 +394,6 @@ void DebugDrawText(Rendering_Context *rendering_context, s8 text, v2 pos, v3 tex
             Character ch = font->characters[text.str[character_index]];
             
             f32 xpos = pos.x + ch.bearing.x * scale;
-            
-            //f32 yoffset = half_text_height;
-            //f32 ypos = pos.y + (font->characters['H'].bearing.y - ch.bearing.y) * scale - yoffset;
-            
             f32 ypos = pos.y  - ch.bearing.y * scale;
             
             float w = ch.size.x * scale;
@@ -379,18 +430,37 @@ void DebugDrawText(Rendering_Context *rendering_context, s8 text, v2 pos, v3 tex
     }
 }
 
-internal
-void DebugDrawTextWorldCoord(Rendering_Context *rendering_context, s8 text, v2 pos, v3 text_color, f32 scale = 1.0f)
+internal void
+DebugDrawTextNormalizedCoord(Rendering_Context *rendering_context, s8 text, v2 pos, v3 text_color, f32 scale = 1.0f)
 {
-    v2 half_screen = 0.5f * rendering_context->screen;
-    v2 screen_pos = vec2(pos.x + half_screen.x,
-                         -pos.y + half_screen.y);
-    //v2 screen_pos = pos + 0.5f * rendering_context->screen;
-    DebugDrawText(rendering_context, text, screen_pos, text_color, scale);
+    f32 window_width = (f32)os->window_size.width;
+    f32 window_height = (f32)os->window_size.height;
+    pos = v2{pos.x * window_width, pos.y * window_height};
+    DebugDrawTextScreenCoord(rendering_context, text, pos, text_color, scale);
 }
 
 internal void
-DebugDrawRectangle(Rendering_Context *rendering_context, Rectangle2D rectange, v3 color)
+DebugDrawTextWorldCoord(Rendering_Context *rendering_context, s8 text, v2 pos, v3 text_color, f32 scale = 1.0f)
 {
-    // TODO(fakhri): render rectangle
+    f32 x_correction = rendering_context->normalized_width_unit_per_world_unit;
+    f32 y_correction = (1.0f / rendering_context->aspect_ratio) * x_correction;
+    pos = vec2(pos.x * x_correction,
+               1.0f - pos.y * y_correction);
+    
+    DebugDrawTextNormalizedCoord(rendering_context, text, pos, text_color, scale);
+}
+
+internal v2
+ScreenToWorldCoord(Rendering_Context *rendering_context, v2 pos)
+{
+    pos.x *= 1.0f / rendering_context->screen.width;
+    pos.y *= 1.0f / rendering_context->screen.height;
+    
+    f32 x_correction = (1.0f / rendering_context->normalized_width_unit_per_world_unit);
+    f32 y_correction = x_correction * rendering_context->aspect_ratio;
+    
+    pos.x = pos.x *  x_correction;
+    pos.y = (1.0f - pos.y) * y_correction;
+    
+    return pos;
 }

@@ -77,6 +77,17 @@ enum Entity_Type
     Entity_Type_Entity_Card_Number,
 };
 
+enum Card_Residency
+{
+    Card_Residency_None,
+    Card_Residency_Up,
+    Card_Residency_Down,
+    Card_Residency_Left,
+    Card_Residency_Right,
+    Card_Residency_Table,
+    Card_Residency_Burnt,
+};
+
 struct Entity
 {
     Entity_Type type;
@@ -94,10 +105,11 @@ struct Entity
     b32 is_under_cursor;
     b32 is_pressed;
     
-    f32 following_trigger_distance;
     u32 followed_entity_index;
     
     u32 card_number;
+    
+    Card_Residency residency;
 };
 
 #else
@@ -115,7 +127,6 @@ struct Number
 #endif
 
 
-
 struct Game_State
 {
     Game_Mode game_mode;
@@ -125,6 +136,7 @@ struct Game_State
     
     Entity entities[256];
     u32 entity_count;
+    
 };
 
 struct Compile_Shader_Result

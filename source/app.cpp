@@ -69,9 +69,19 @@ OpenMenu(Game_State *game_state, Game_Mode menu_mode)
 }
 
 internal void
-MoveEntity(Entity *entity, f32 k, f32 c, f32 mass)
+MoveEntity(Game_State *game_state, Entity *entity, f32 spring_constant, f32 friction, f32 mass)
 {
-    v2 acceleration = -k * (entity->center_pos - entity->target_pos) - c * entity->velocity;
+    if (entity->followed_entity_index)
+    {
+        Entity *followed_entity = game_state->entities + entity->followed_entity_index;
+        f32 following_trigger_distance = .1f;
+        if (LengthSquaredVec2(followed_entity->center_pos - entity->center_pos) > following_trigger_distance)
+        {
+            entity->target_pos = followed_entity->center_pos;
+        }
+    }
+    
+    v2 acceleration = -spring_constant * (entity->center_pos - entity->target_pos) - friction * entity->velocity;
     acceleration *= 1.0f / mass;
     entity->velocity += os->dtime * acceleration;
     entity->center_pos += os->dtime * entity->velocity + 0.5f * square_f(os->dtime) * acceleration;
@@ -80,9 +90,7 @@ MoveEntity(Entity *entity, f32 k, f32 c, f32 mass)
 internal void
 UpdateCursorEntity(Game_State *game_state, Entity *entity)
 {
-    v2 half_screen = 0.5f * game_state->rendering_context.screen;
-    entity->center_pos = vec2(os->mouse_position.x - half_screen.x,
-                              -os->mouse_position.y + half_screen.y);
+    entity->center_pos = ScreenToWorldCoord(&game_state->rendering_context, os->mouse_position);
 }
 
 internal void
@@ -129,19 +137,7 @@ UpdateCardEntity(Game_State *game_state, Entity *entity)
                                                 entity->target_dimension,
                                                 os->dtime * entity->dDimension);
     
-    if (entity->followed_entity_index)
-    {
-        Entity *followed_entity = game_state->entities + entity->followed_entity_index;
-        if (LengthSquaredVec2(followed_entity->center_pos - entity->center_pos) > entity->following_trigger_distance)
-        {
-            entity->target_pos = followed_entity->center_pos;
-        }
-    }
-    
-    f32 k = 9000.f;
-    f32 c = 500.f;
-    f32 mass = 10.f;
-    MoveEntity(entity, k, c, mass);
+    MoveEntity(game_state, entity, 9000, 600, 10);
 }
 
 internal void
@@ -149,19 +145,22 @@ UpdateCardNumberEntity(Game_State *game_state, Entity *entity)
 {
     Assert(entity->followed_entity_index);
     
+    MoveEntity(game_state, entity, 10000.f, 150.f, 10.f);
     Entity *followed_entity = game_state->entities + entity->followed_entity_index;
-    if (LengthSquaredVec2(followed_entity->center_pos - entity->center_pos) > entity->following_trigger_distance)
-    {
-        entity->target_pos = followed_entity->center_pos;
-    }
-    
-    f32 k = 10000.f;
-    f32 c = 150.f;
-    f32 mass = 10.f;
-    MoveEntity(entity, k, c, mass);
     entity->center_pos = ClampInsideRect(RectCentDim(followed_entity->center_pos, followed_entity->current_dimension), entity->center_pos);
 }
 
+internal void
+ChangeResidency(Entity *entity, Card_Residency residency)
+{
+    Assert(entity);
+    if (entity->residency != residency)
+    {
+        
+    }
+}
+
+// TODO(fakhri): make the coordinates pixel independents
 // TODO(fakhri): come up with a client-server protocol for the game
 internal void
 UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context, Controller *controller)
@@ -171,9 +170,7 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
     v3 white = vec3(1, 1, 1);
     v3 red = vec3(1, 0, 0);
     
-    // NOTE(fakhri): draw the cards
-    // TODO(fakhri): choose a font for card number
-    ChangeActiveFont(rendering_context, &rendering_context->arial_font);
+    // NOTE(fakhri): loop over all the entities and update them
     for (u32 entity_index = 1;
          entity_index < game_state->entity_count;
          ++entity_index)
@@ -191,12 +188,10 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
                 UpdateCardEntity(game_state, entity);
                 if (entity->is_pressed)
                 {
-                    DebugDrawQuad(rendering_context, entity->center_pos, 1.05f * entity->current_dimension, red);
+                    DebugDrawQuadWorldCoord(rendering_context, entity->center_pos, 1.05f * entity->current_dimension, red);
                 }
-                
-                DebugDrawQuad(rendering_context, entity->center_pos, entity->current_dimension, white);
+                DebugDrawQuadWorldCoord(rendering_context, entity->center_pos, entity->current_dimension, white);
             } break;
-            
             case Entity_Type_Entity_Card_Number:
             {
                 UpdateCardNumberEntity(game_state, entity);
@@ -211,6 +206,7 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
             } break;
         }
     }
+    
 }
 
 internal
@@ -483,10 +479,9 @@ AddCardNumberEntity(Game_State *game_state, u32 card_number, u32 card_entity_ind
     number_entity->type = Entity_Type_Entity_Card_Number;
     number_entity->center_pos = card_entitiy->center_pos;
     number_entity->target_pos = card_entitiy->center_pos;
-    number_entity->current_dimension = vec2(20, 20);
+    number_entity->current_dimension = vec2(0.5f, 0.5f);
     number_entity->card_number = card_number;
     number_entity->followed_entity_index = card_entity_index;
-    number_entity->following_trigger_distance = 100.f;
 }
 
 internal void
@@ -499,11 +494,18 @@ AddCardEntity(Game_State *game_state, v2 starting_pos, u32 card_number)
     card->original_pos = starting_pos;
     card->center_pos = starting_pos;
     card->target_pos = starting_pos;
-    card->original_dimension   = vec2(90, 180);
+    
+#if 0    
+    card->original_dimension = vec2(90, 180);
     card->target_dimension   = vec2(90, 180);
-    card->current_dimension   = vec2(90, 180);
-    card->dDimension = 500.f;
-    card->following_trigger_distance = 100.f;
+    card->current_dimension  = vec2(90, 180);
+#else
+    card->original_dimension = vec2(8, 15);
+    card->target_dimension   = card->original_dimension;
+    card->current_dimension  = card->original_dimension;
+#endif
+    
+    card->dDimension = 20.f;
     AddCardNumberEntity(game_state, card_number, card_entity_index);
 }
 
@@ -535,10 +537,10 @@ extern "C"
         AddCursorEntity(game_state);
         
         for (u32 card_index = 0;
-             card_index < 10;
+             card_index < 1;
              ++card_index)
         {
-            v2 card_pos = vec2(-500 + card_index * 100.0f, -200.0f);
+            v2 card_pos = vec2(50.f, 20.f);
             AddCardEntity(game_state, card_pos, card_index);
         }
     }

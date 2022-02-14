@@ -3,6 +3,8 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
+#define MAX_UNITS_PER_X (100)
+
 struct Character
 {
     GLuint texture_id;  // ID handle of the glyph texture
@@ -37,6 +39,9 @@ struct Rendering_Context
     
     Font arial_font;
     Font *active_font;
+    
+    f32 normalized_width_unit_per_world_unit;
+    f32 aspect_ratio;
 };
 
 #endif //RENDERER_H

@@ -146,7 +146,7 @@ UI_MenuItemLabel(Game_State *game_state, s8 text, b32 should_animate_color = 0)
     {
         color = color_scheme->label_color;
     }
-    DebugDrawText(rendering_context, text, ui_context->item_position, color);
+    DebugDrawTextScreenCoord(rendering_context, text, ui_context->item_position, color);
 }
 
 internal b32
@@ -182,14 +182,14 @@ UI_MenuItemButton(Game_State *game_state, s8 item_text)
             color = color_scheme->button_text_clicked_color;
         }
         
-        DebugDrawText(rendering_context, item_text, item_pos + ui_context->button_shadow_offset, color_scheme->button_text_shadow_color);
+        DebugDrawTextScreenCoord(rendering_context, item_text, item_pos + ui_context->button_shadow_offset, color_scheme->button_text_shadow_color);
     }
     else
     {
         color = color_scheme->button_text_color;
     }
     
-    DebugDrawText(rendering_context, item_text, item_pos, color);
+    DebugDrawTextScreenCoord(rendering_context, item_text, item_pos, color);
     
     ++ui_context->items_count;
     return clicked;
@@ -271,7 +271,7 @@ UI_MenuItemInputField(Game_State *game_state, v2 item_size)
     // NOTE(fakhri): render input field background
     DebugDrawQuadScreenCoord(rendering_context, item_pos, item_size, background_color);
     
-    DebugDrawText(rendering_context, input_buffer->buffer, item_pos, text_color);
+    DebugDrawTextScreenCoord(rendering_context, input_buffer->buffer, item_pos, text_color);
     
     if (is_selected)
     {
