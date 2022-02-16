@@ -71,7 +71,7 @@ UpdateScreenSize(Rendering_Context *rendering_context)
         rendering_context->screen = current_screen;
         m4 ortho_projection = m4_orthographic(0.0f, rendering_context->screen.width, 
                                               rendering_context->screen.height, 0.0f,
-                                              0.f, 100.f);
+                                              -50.f, 100.f);
         
         // NOTE(fakhri): update projection matrices for all the shader that user it
         GLint projection_location;
@@ -92,6 +92,108 @@ UpdateScreenSize(Rendering_Context *rendering_context)
         // NOTE(fakhri): adjust view port
         glViewport(0, 0, os->window_size.width, os->window_size.height);
     }
+}
+
+internal GLuint
+LoadTexture(s8 image_path)
+{
+    GLuint result = 0;
+    glGenTextures(1, &result);
+    glBindTexture(GL_TEXTURE_2D, result);
+    
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
+    i32 nb_channels, tex_width, tex_height;
+    void* data = stbi_load(image_path.str, &tex_width, &tex_height, &nb_channels, 0);
+    if (data)
+    {
+        GLenum format = 0;
+        switch(nb_channels)
+        {
+            case 1: format = GL_RED; break;
+            case 3: format = GL_RGB; break;
+            case 4: format = GL_RGBA; break;
+            default: LogWarning("channels count %d not handled when loading image %s", nb_channels, image_path.str);
+        }
+        
+        glTexImage2D(GL_TEXTURE_2D, 0, format, tex_width, tex_height, 0, format, GL_UNSIGNED_BYTE, data);
+        stbi_image_free(data);
+    }
+    else
+    {
+        LogWarning("couldn't load image %s", image_path.str);
+    }
+    return result;
+}
+
+internal void
+LoadFrenshSuitedDeck(Frensh_Suited_Cards_Texture *deck_textures)
+{
+    deck_textures->card_frame_texture    = LoadTexture(S8Lit("Assets/Images/card_frame.png"));
+    deck_textures->card_back_texture     = LoadTexture(S8Lit("Assets/Images/card_back.png"));
+    deck_textures->clovers_up            = LoadTexture(S8Lit("Assets/Images/clovers_up.png"));
+    deck_textures->hearts_up             = LoadTexture(S8Lit("Assets/Images/hearts_up.png"));
+    deck_textures->pikes_up              = LoadTexture(S8Lit("Assets/Images/pikes_up.png"));
+    deck_textures->clovers_down          = LoadTexture(S8Lit("Assets/Images/clovers_down.png"));
+    deck_textures->hearts_down           = LoadTexture(S8Lit("Assets/Images/hearts_down.png"));
+    deck_textures->pikes_down            = LoadTexture(S8Lit("Assets/Images/pikes_down.png"));
+    deck_textures->tiles                 = LoadTexture(S8Lit("Assets/Images/tiles.png"));
+    
+    for (u32 number_index = Card_Number_2;
+         number_index <= Card_Number_10;
+         ++number_index)
+    {
+        u32 number = number_index + 1;
+        char buffer[50];
+        sprintf(buffer, "Assets/Images/%d_black_up.png", number);
+        deck_textures->black_numbers_up[number_index]    = LoadTexture(String8FromCString(buffer));
+        sprintf(buffer, "Assets/Images/%d_black_down.png", number);
+        deck_textures->black_numbers_down[number_index]  = LoadTexture(String8FromCString(buffer));
+        sprintf(buffer, "Assets/Images/%d_red_up.png", number);
+        deck_textures->red_numbers_up[number_index]      = LoadTexture(String8FromCString(buffer));
+        sprintf(buffer, "Assets/Images/%d_red_down.png", number);
+        deck_textures->red_numbers_down[number_index]    = LoadTexture(String8FromCString(buffer));
+    }
+    
+    deck_textures->black_numbers_up[Card_Number_Ace]   = LoadTexture(S8Lit("Assets/Images/A_black_up.png"));
+    deck_textures->black_numbers_down[Card_Number_Ace] = LoadTexture(S8Lit("Assets/Images/A_black_down.png"));
+    deck_textures->red_numbers_up[Card_Number_Ace]     = LoadTexture(S8Lit("Assets/Images/A_red_up.png"));
+    deck_textures->red_numbers_down[Card_Number_Ace]   = LoadTexture(S8Lit("Assets/Images/A_red_down.png"));
+    
+    deck_textures->black_numbers_up[Card_Number_Jack]   = LoadTexture(S8Lit("Assets/Images/J_black_up.png"));
+    deck_textures->black_numbers_down[Card_Number_Jack] = LoadTexture(S8Lit("Assets/Images/J_black_down.png"));
+    deck_textures->red_numbers_up[Card_Number_Jack]     = LoadTexture(S8Lit("Assets/Images/J_red_up.png"));
+    deck_textures->red_numbers_down[Card_Number_Jack]   = LoadTexture(S8Lit("Assets/Images/J_red_down.png"));
+    
+    deck_textures->black_numbers_up[Card_Number_Queen]   = LoadTexture(S8Lit("Assets/Images/Q_black_up.png"));
+    deck_textures->black_numbers_down[Card_Number_Queen] = LoadTexture(S8Lit("Assets/Images/Q_black_down.png"));
+    deck_textures->red_numbers_up[Card_Number_Queen]     = LoadTexture(S8Lit("Assets/Images/Q_red_up.png"));
+    deck_textures->red_numbers_down[Card_Number_Queen]   = LoadTexture(S8Lit("Assets/Images/Q_red_down.png"));
+    
+    deck_textures->black_numbers_up[Card_Number_King]   = LoadTexture(S8Lit("Assets/Images/K_black_up.png"));
+    deck_textures->black_numbers_down[Card_Number_King] = LoadTexture(S8Lit("Assets/Images/K_black_down.png"));
+    deck_textures->red_numbers_up[Card_Number_King]     = LoadTexture(S8Lit("Assets/Images/K_red_up.png"));
+    deck_textures->red_numbers_down[Card_Number_King]   = LoadTexture(S8Lit("Assets/Images/K_red_down.png"));
+    
+    deck_textures->jacks[Category_Clovers]  = LoadTexture(S8Lit("Assets/Images/jack_clovers.png"));
+    deck_textures->queens[Category_Clovers] = LoadTexture(S8Lit("Assets/Images/queen_clovers.png"));
+    deck_textures->kings[Category_Clovers]  = LoadTexture(S8Lit("Assets/Images/king_clovers.png"));
+    
+    deck_textures->jacks[Category_Hearts]  = LoadTexture(S8Lit("Assets/Images/jack_hearts.png"));
+    deck_textures->queens[Category_Hearts] = LoadTexture(S8Lit("Assets/Images/queen_hearts.png"));
+    deck_textures->kings[Category_Hearts]  = LoadTexture(S8Lit("Assets/Images/king_hearts.png"));
+    
+    deck_textures->jacks[Category_Pikes]  = LoadTexture(S8Lit("Assets/Images/jack_pikes.png"));
+    deck_textures->queens[Category_Pikes] = LoadTexture(S8Lit("Assets/Images/queen_pikes.png"));
+    deck_textures->kings[Category_Pikes]  = LoadTexture(S8Lit("Assets/Images/king_pikes.png"));
+    
+    deck_textures->jacks[Category_Tiles]  = LoadTexture(S8Lit("Assets/Images/jack_tiles.png"));
+    deck_textures->queens[Category_Tiles] = LoadTexture(S8Lit("Assets/Images/queen_tiles.png"));
+    deck_textures->kings[Category_Tiles]  = LoadTexture(S8Lit("Assets/Images/king_tiles.png"));
+    
 }
 
 internal void
@@ -167,42 +269,12 @@ InitRenderer(Rendering_Context *rendering_context)
     
     // NOTE(fakhri): load textures
     {
-        s8 image_path = S8Lit("images/take_my_money.jpg");
-        
-        glGenTextures(1, &rendering_context->test_2d_texture);
-        glBindTexture(GL_TEXTURE_2D, rendering_context->test_2d_texture);
-        
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        
-        i32 nb_channels, tex_width, tex_height;
-        void* data = stbi_load(image_path.str, &tex_width, &tex_height, &nb_channels, 0);
-        if (data)
-        {
-            GLenum format = 0;
-            switch(nb_channels)
-            {
-                case 1: format = GL_RED; break;
-                case 3: format = GL_RGB; break;
-                case 4: format = GL_RGBA; break;
-                default: LogWarning("channels count %d not handled when loading image %s", nb_channels, image_path.str);
-            }
-            
-            glTexImage2D(GL_TEXTURE_2D, 0, format, tex_width, tex_height, 0, format, GL_UNSIGNED_BYTE, data);
-            stbi_image_free(data);
-        }
-        else
-        {
-            LogWarning("couldn't load image %s", image_path.str);
-        }
-        
+        LoadFrenshSuitedDeck(&rendering_context->frensh_deck);
         // NOTE(fakhri): load fonts
         FT_Library ft;
         if (!FT_Init_FreeType(&ft))
         {
-            s8 font_path = S8Lit("fonts/arial.ttf");
+            s8 font_path = S8Lit("assets/fonts/arial.ttf");
             LoadGlyphsFromFont(ft, &rendering_context->arial_font, font_path, 48);
             FT_Done_FreeType(ft);
         }
@@ -217,11 +289,13 @@ InitRenderer(Rendering_Context *rendering_context)
 }
 
 internal void
-DebugDrawQuadScreenCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color)
+DebugDrawQuadScreenCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color, f32 y_angle = 0.0f)
 {
     m4 trans = m4_translate(vec3(pos, 0.f));
     m4 scale = m4_scale(vec3(size, 1.0f));
-    m4 model = trans * scale;
+    m4 rotat = m4_rotate(y_angle, vec3(0,1,0));
+    
+    m4 model = trans * rotat * scale;
     
     glUseProgram(rendering_context->quad_shader);
     GLint model_location = glGetUniformLocation(rendering_context->quad_shader, "model");
@@ -235,18 +309,18 @@ DebugDrawQuadScreenCoord(Rendering_Context *rendering_context, v2 pos, v2 size, 
 }
 
 internal void
-DebugDrawQuadNormalizedCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color)
+DebugDrawQuadNormalizedCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color, f32 y_angle = 0.0f)
 {
     f32 window_width = (f32)os->window_size.width;
     f32 window_height = (f32)os->window_size.height;
     pos = v2{pos.x * window_width, pos.y * window_height};
     size = v2{size.width * window_width, size.height * window_height};
     
-    DebugDrawQuadScreenCoord(rendering_context, pos, size, color);
+    DebugDrawQuadScreenCoord(rendering_context, pos, size, color, y_angle);
 }
 
 internal void
-DebugDrawQuadWorldCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color)
+DebugDrawQuadWorldCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color, f32 y_angle = 0.0f)
 {
     f32 x_correction = rendering_context->normalized_width_unit_per_world_unit;
     f32 y_correction = (1.0f / rendering_context->aspect_ratio) * x_correction;
@@ -255,12 +329,20 @@ DebugDrawQuadWorldCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v
     size = vec2(size.x * x_correction,
                 size.y * y_correction);
     
-    DebugDrawQuadNormalizedCoord(rendering_context, pos, size, color);
+    DebugDrawQuadNormalizedCoord(rendering_context, pos, size, color, y_angle);
 }
 
 internal void
-DebugDrawTextureScreenCoord(Rendering_Context *rendering_context, GLuint tex, v2 pos, v2 size)
+DebugDrawTextureScreenCoord(Rendering_Context *rendering_context, GLuint tex, v2 pos, v2 size, f32 y_angle = 0.0f)
 {
+#if 1
+    m4 trans = m4_translate(vec3(pos, 0.f));
+    m4 scale = m4_scale(vec3(size, 1.0f));
+    m4 rotat = m4_rotate(y_angle, vec3(0,1,0));
+    
+    m4 model = trans * scale;
+    
+#else
     f32 window_width = (f32)os->window_size.width;
     f32 window_height = (f32)os->window_size.height;
     
@@ -268,10 +350,12 @@ DebugDrawTextureScreenCoord(Rendering_Context *rendering_context, GLuint tex, v2
     pos = v2{pos.x + window_width / 2, window_height / 2 - pos.y};
     m4 trans = m4_translate(vec3(pos, 0.f));
     m4 scale = m4_scale(vec3(size, 1.0f));
-    m4 model = trans * scale;
+    m4 rotat = m4_rotate(y_angle, vec3(0,1,0));
+    m4 model = trans * rotat * scale;
+#endif
     
     glUseProgram(rendering_context->texture_shader);
-    GLint model_location = glGetUniformLocation(rendering_context->quad_shader, "model");
+    GLint model_location = glGetUniformLocation(rendering_context->texture_shader, "model");
     glUniformMatrix4fv(model_location, 1, GL_FALSE, (f32*)&model);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, tex);
@@ -282,28 +366,27 @@ DebugDrawTextureScreenCoord(Rendering_Context *rendering_context, GLuint tex, v2
 }
 
 internal void 
-DebugDrawTextureNormalizedCoord(Rendering_Context *rendering_context, GLuint tex, v2 pos, v2 size)
+DebugDrawTextureNormalizedCoord(Rendering_Context *rendering_context, GLuint tex, v2 pos, v2 size, f32 y_angle = 0.0f)
 {
     f32 window_width = (f32)os->window_size.width;
     f32 window_height = (f32)os->window_size.height;
     pos = v2{pos.x * window_width, pos.y * window_height};
     size = v2{size.width * window_width, size.height * window_height};
     
-    DebugDrawTextureScreenCoord(rendering_context, tex, pos, size);
+    DebugDrawTextureScreenCoord(rendering_context, tex, pos, size, y_angle);
 }
 
 internal void
-DebugDrawTextureWorldCoord(Rendering_Context *rendering_context, GLuint tex, v2 pos, v2 size)
+DebugDrawTextureWorldCoord(Rendering_Context *rendering_context, GLuint tex, v2 pos, v2 size, f32 y_angle = 0.0f)
 {
     f32 x_correction = rendering_context->normalized_width_unit_per_world_unit;
     f32 y_correction = (1.0f / rendering_context->aspect_ratio) * x_correction;
     pos = vec2(pos.x * x_correction,
                1.0f - pos.y * y_correction);
-    
     size = vec2(size.x * x_correction,
                 size.y * y_correction);
     
-    DebugDrawTextureScreenCoord(rendering_context, tex, pos, size);
+    DebugDrawTextureNormalizedCoord(rendering_context, tex, pos, size, y_angle);
 }
 
 internal void

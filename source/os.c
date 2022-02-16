@@ -150,4 +150,5 @@ OS_EmptyEvents()
 {
     HardAssert(os != 0);
     os->event_count = 0;
+    os->controller = {};
 }

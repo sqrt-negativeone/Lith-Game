@@ -505,4 +505,16 @@ Vec2MoveTowards(v2 start, v2 end, f32 amount)
     return result;
 }
 
+inline f32
+MoveTowards(f32 start, f32 end, f32 amount)
+{
+    if (start > end)
+    {
+        amount = -amount;
+    }
+    f32 result = start + amount;
+    result = Clamp(Min(start, end),result, Max(start, end));
+    return result;
+}
+
 #endif //MATH_H

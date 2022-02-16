@@ -74,7 +74,7 @@ enum Entity_Type
     Entity_Type_Null_Entity,
     Entity_Type_Cursor_Entity, // NOTE(fakhri): always following mouse
     Entity_Type_Entity_Card,
-    Entity_Type_Entity_Card_Number,
+    Entity_Type_Entity_Companion,
 };
 
 enum Card_Residency
@@ -90,10 +90,11 @@ enum Card_Residency
     Card_Residency_Count,
 };
 
-#define CARD_WIDTH  (3.5f)
-#define CARD_HEIGHT (6.9f)
-#define CARD_X_GAP (0.69f)
+#define CARD_WIDTH  (2 * 3.5f)
+#define CARD_HEIGHT (2 * 5.45f)
+#define CARD_X_GAP (0.420f)
 #define CARD_Y_GAP (-5.0f)
+
 
 struct Entity
 {
@@ -101,6 +102,10 @@ struct Entity
     v2 residency_pos;
     v2 center_pos;
     v2 target_pos;
+    
+    f32 y_angle;
+    f32 target_y_angle;
+    f32 dy_angle;
     
     v2 current_dimension;
     v2 target_dimension;
@@ -113,10 +118,12 @@ struct Entity
     b32 is_pressed;
     
     u32 followed_entity_index;
+    v2  offset_in_follwed_entity;
     
-    u32 card_number;
+    Card_Type card_type;
     
     Card_Residency residency;
+    GLuint texture;
 };
 
 struct Residency

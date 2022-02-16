@@ -24,6 +24,9 @@
 #include "ui.cpp"
 #include "network_message.cpp"
 
+// TODO(fakhri): add support for z
+#define TEST_ONE_CARD 1
+
 internal void
 HandleAvailableNetworkMessages(Game_State *game_state)
 {
@@ -69,7 +72,7 @@ OpenMenu(Game_State *game_state, Game_Mode menu_mode)
 }
 
 internal void
-ReorganizeResidency(Game_State *game_state, Card_Residency residency_type)
+ReorganizeResidencyCards(Game_State *game_state, Card_Residency residency_type)
 {
     if (residency_type != Card_Residency_None)
     {
@@ -81,6 +84,7 @@ ReorganizeResidency(Game_State *game_state, Card_Residency residency_type)
         v2 start_point = {};
         b32 change_x = false;
         b32 change_y = false;
+        b32 change_z = false;
         switch(residency_type)
         {
             case Card_Residency_Up:
@@ -107,10 +111,11 @@ ReorganizeResidency(Game_State *game_state, Card_Residency residency_type)
                 start_point.x = world_width - 6.5f;
                 start_point.y = 0.5f * (CARD_HEIGHT + world_height - entity_count * CARD_HEIGHT - (entity_count - 1) * CARD_Y_GAP);
             } break;
-#if 0
             case Card_Residency_Table:
             {
+                start_point = vec2(0.5f * world_width, 0.55f * world_height);
             } break;
+#if 0
             case Card_Residency_Burnt:
             {
             } break;
@@ -151,6 +156,21 @@ ReorganizeResidency(Game_State *game_state, Card_Residency residency_type)
                 start_point.y += CARD_HEIGHT + CARD_Y_GAP;
             }
         }
+        else
+        {
+            for (u32 residency_index = 0;
+                 residency_index < entity_residency->entity_count;
+                 ++residency_index)
+            {
+                Entity *entity = game_state->entities + entity_residency->entity_indices[residency_index];
+                entity->residency_pos = start_point;
+                if (!entity->followed_entity_index)
+                {
+                    entity->target_pos = entity->residency_pos;
+                }
+                start_point.y += 0.1f;
+            }
+        }
     }
 }
 
@@ -189,9 +209,8 @@ ChangeResidency(Game_State *game_state, u32 entity_index, Card_Residency residen
             entity->residency = residency;
         }
         
-        // TODO(fakhri): reorgianize the entities in residency
-        ReorganizeResidency(game_state, old_residency);
-        ReorganizeResidency(game_state, residency);
+        ReorganizeResidencyCards(game_state, old_residency);
+        ReorganizeResidencyCards(game_state, residency);
     }
 }
 
@@ -201,10 +220,10 @@ MoveEntity(Game_State *game_state, Entity *entity, f32 spring_constant, f32 fric
     if (entity->followed_entity_index)
     {
         Entity *followed_entity = game_state->entities + entity->followed_entity_index;
-        f32 following_trigger_distance = .1f;
+        f32 following_trigger_distance = 0.0f;
         if (LengthSquaredVec2(followed_entity->center_pos - entity->center_pos) > following_trigger_distance)
         {
-            entity->target_pos = followed_entity->center_pos;
+            entity->target_pos = followed_entity->center_pos + entity->offset_in_follwed_entity;
         }
     }
     
@@ -245,7 +264,11 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
     {
         if (!entity->is_pressed)
         {
+#if TEST_ONE_CARD
+            if(os->controller.left_mouse.pressed)
+#else
             if(os->controller.left_mouse.pressed && entity->residency == Card_Residency_Down)
+#endif
             {
                 // NOTE(fakhri): make sure we are not pressing another card
                 b32 should_become_pressed = true;
@@ -272,6 +295,16 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
             if (os->controller.right_mouse.pressed)
             {
                 // NOTE(fakhri): test move entity
+#if TEST_ONE_CARD
+                if (entity->target_y_angle == 0)
+                {
+                    entity->target_y_angle = PI;
+                }
+                else
+                {
+                    entity->target_y_angle = 0;
+                }
+#else
                 Card_Residency target_residency;
                 if (entity->residency == Card_Residency_Down)
                 {
@@ -290,6 +323,7 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
                     target_residency = Card_Residency_Right;
                 }
                 ChangeResidency(game_state, entity_index, target_residency);
+#endif
             }
         }
     }
@@ -304,6 +338,9 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
         }
     }
     
+    
+    entity->y_angle = MoveTowards(entity->y_angle, entity->target_y_angle, entity->dy_angle * os->dtime);
+    
     // NOTE(fakhri): update dimension
     entity->current_dimension = Vec2MoveTowards(entity->current_dimension,
                                                 entity->target_dimension,
@@ -313,11 +350,11 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
 }
 
 internal void
-UpdateCardNumberEntity(Game_State *game_state, Entity *entity)
+UpdateCompanionEntity(Game_State *game_state, Entity *entity)
 {
     Assert(entity->followed_entity_index);
     
-    MoveEntity(game_state, entity, 1000.f, 15.f, 1.f);
+    MoveEntity(game_state, entity, 1000.f, 10.f, 1.f);
     Entity *followed_entity = game_state->entities + entity->followed_entity_index;
     entity->center_pos = ClampInsideRect(RectCentDim(followed_entity->center_pos, followed_entity->current_dimension), entity->center_pos);
 }
@@ -331,6 +368,7 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
     v3 white = vec3(1, 1, 1);
     v3 red = vec3(1, 0, 0);
     
+#if 1    
     // NOTE(fakhri): loop over all the entities and update them
     for (u32 entity_index = 1;
          entity_index < game_state->entity_count;
@@ -349,17 +387,15 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
                 UpdateCardEntity(game_state, entity_index);
                 if (entity->is_pressed)
                 {
-                    DebugDrawQuadWorldCoord(rendering_context, entity->center_pos, 1.05f * entity->current_dimension, red);
+                    DebugDrawQuadWorldCoord(rendering_context, entity->center_pos, 1.05f * entity->current_dimension, red, entity->y_angle);
                 }
-                DebugDrawQuadWorldCoord(rendering_context, entity->center_pos, entity->current_dimension, white);
+                DebugDrawTextureWorldCoord(rendering_context, entity->texture, entity->center_pos, entity->current_dimension, entity->y_angle);
+                
             } break;
-            case Entity_Type_Entity_Card_Number:
+            case Entity_Type_Entity_Companion:
             {
-                UpdateCardNumberEntity(game_state, entity);
-                char text[2] = {'0' + (char)entity->card_number,};
-                s8 number = S8Lit(text);
-                ChangeActiveFont(rendering_context, &rendering_context->arial_font);
-                DebugDrawTextWorldCoord(rendering_context, number, entity->center_pos, red);
+                UpdateCompanionEntity(game_state, entity);
+                DebugDrawTextureWorldCoord(rendering_context, entity->texture, entity->center_pos, entity->current_dimension, entity->y_angle);
             } break;
             default:
             {
@@ -367,7 +403,9 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
             } break;
         }
     }
+#endif
     
+    //DebugDrawTextureWorldCoord(rendering_context, rendering_context->card_frame_texture, vec2(50, 25), vec2(100, 100));
 }
 
 internal
@@ -631,22 +669,297 @@ AddCursorEntity(Game_State *game_state)
 }
 
 internal void
-AddCardNumberEntity(Game_State *game_state, u32 card_number, u32 card_entity_index)
+AddCompanionEntity(Game_State *game_state, GLuint texture, v2 companion_dimensions, u32 followed_entity_index, v2 followed_offset)
 {
-    u32 number_entity_index = AddEntity(game_state);
-    Entity *number_entity = game_state->entities + number_entity_index;
-    Entity *card_entitiy = game_state->entities + card_entity_index;
-    *number_entity = {};
-    number_entity->type = Entity_Type_Entity_Card_Number;
-    number_entity->center_pos = card_entitiy->center_pos;
-    number_entity->target_pos = card_entitiy->center_pos;
-    number_entity->current_dimension = vec2(0.5f, 0.5f);
-    number_entity->card_number = card_number;
-    number_entity->followed_entity_index = card_entity_index;
+    u32 companion_entity_index = AddEntity(game_state);
+    Entity *companion_entity = game_state->entities + companion_entity_index;
+    Entity *card_entitiy = game_state->entities + followed_entity_index;
+    *companion_entity = {};
+    companion_entity->type = Entity_Type_Entity_Companion;
+    companion_entity->center_pos = card_entitiy->center_pos;
+    companion_entity->target_pos = card_entitiy->center_pos;
+    companion_entity->current_dimension = companion_dimensions;
+    companion_entity->followed_entity_index = followed_entity_index;
+    companion_entity->offset_in_follwed_entity = followed_offset;
+    companion_entity->texture = texture;
+}
+
+internal inline void
+AddCompanion_Ace(Game_State *game_state, GLuint category, v2 companion_size, u32 card_entity_index)
+{
+    AddCompanionEntity(game_state, category, companion_size, card_entity_index, vec2(0, 0));
+}
+
+internal inline void
+AddCompanion_2(Game_State *game_state, GLuint category_up, GLuint category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+{
+    v2 padding = vec2(0.5f, 0.3f);
+    v2 companion_offset = +0.5f * card_dimension - 0.5f * companion_size - padding;
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+                       vec2(0, companion_offset.y));
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+                       vec2(0, -companion_offset.y));
+}
+
+internal inline void
+AddCompanion_3(Game_State *game_state, GLuint category_up, GLuint category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+{
+    AddCompanion_Ace(game_state, category_up, companion_size, card_entity_index);
+    
+    AddCompanion_2(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+}
+
+internal inline void
+AddCompanion_4(Game_State *game_state, GLuint category_up, GLuint category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+{
+    v2 padding = vec2(0.5f, 0.3f);
+    v2 companion_offset = +0.5f * card_dimension - 1.0f * companion_size - padding;
+    
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+                       vec2(-companion_offset.x, companion_offset.y));
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+                       vec2(companion_offset.x, companion_offset.y));
+    
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+                       vec2(-companion_offset.x, -companion_offset.y));
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+                       vec2(companion_offset.x, -companion_offset.y));
+    
+}
+
+internal inline void
+AddCompanion_5(Game_State *game_state, GLuint category_up, GLuint category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+{
+    AddCompanion_Ace(game_state, category_up, companion_size, card_entity_index);
+    
+    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+}
+
+internal inline  void
+AddCompanion_6(Game_State *game_state, GLuint category_up, GLuint category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+{
+    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+    
+    v2 padding = vec2(0.5f, 0.3f);
+    v2 companion_offset = +0.5f * card_dimension - 1.0f * companion_size - padding;
+    
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+                       vec2(-companion_offset.x, 0));
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+                       vec2(companion_offset.x, 0));
+    
+}
+
+internal inline void
+AddCompanion_7(Game_State *game_state, GLuint category_up, GLuint category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+{
+    AddCompanion_6(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+    
+    v2 padding = vec2(0.5f, 0.3f);
+    v2 companion_offset = +0.5f * card_dimension - 1.0f * companion_size - padding;
+    
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+                       vec2(0, 0.5f * companion_offset.y));
+    
+}
+
+internal inline void
+AddCompanion_8(Game_State *game_state, GLuint category_up, GLuint category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+{
+    AddCompanion_7(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+    
+    v2 padding = vec2(0.5f, 0.3f);
+    v2 companion_offset = +0.5f * card_dimension - 1.0f * companion_size - padding;
+    
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+                       vec2(0, -0.5f * companion_offset.y));
+    
+}
+
+internal inline void
+AddCompanion_9(Game_State *game_state, GLuint category_up, GLuint category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+{
+    AddCompanion_Ace(game_state, category_up, companion_size, card_entity_index);
+    
+    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+    
+    v2 padding = vec2(0.5f, 0.3f);
+    v2 companion_offset = +0.5f * card_dimension - 1.0f * companion_size - padding;
+    
+    
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+                       vec2(-companion_offset.x, 0.3f * companion_offset.y));
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+                       vec2(companion_offset.x, 0.3f * companion_offset.y));
+    
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+                       vec2(-companion_offset.x, -0.3f * companion_offset.y));
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+                       vec2(companion_offset.x, -0.3f * companion_offset.y));
+    
+}
+
+internal inline void
+AddCompanion_10(Game_State *game_state, GLuint category_up, GLuint category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+{
+    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+    
+    v2 padding = vec2(0.5f, 0.3f);
+    v2 companion_offset = +0.5f * card_dimension - 1.0f * companion_size - padding;
+    
+    
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+                       vec2(-companion_offset.x, 0.3f * companion_offset.y));
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+                       vec2(companion_offset.x, 0.3f * companion_offset.y));
+    
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+                       vec2(-companion_offset.x, -0.3f * companion_offset.y));
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+                       vec2(companion_offset.x, -0.3f * companion_offset.y));
+    
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+                       vec2(0, 0.69f * companion_offset.y));
+    
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+                       vec2(0, -0.69f * companion_offset.y));
+    
+}
+
+internal inline  void
+AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_deck, Card_Type card_type, v2 card_dimension, u32 card_entity_index)
+{
+    
+    GLuint category_up = 0;
+    GLuint category_down = 0;
+    
+    b32 is_black = false;
+    switch(card_type.category)
+    {
+        case Category_Clovers: // black
+        {
+            is_black = true;
+            category_up   = frensh_deck->clovers_up;
+            category_down = frensh_deck->clovers_down;
+        } break;
+        case Category_Hearts:  // red
+        {
+            is_black = false;
+            category_up   = frensh_deck->hearts_up;
+            category_down = frensh_deck->hearts_down;
+        } break;
+        case Category_Tiles:   // red
+        {
+            is_black = false;
+            category_up   = frensh_deck->tiles;
+            category_down = frensh_deck->tiles;
+        } break;
+        case Category_Pikes:   // black
+        {
+            is_black = true;
+            category_up   = frensh_deck->pikes_up;
+            category_down = frensh_deck->pikes_down;
+        } break;
+    }
+    
+    GLuint number_up; 
+    GLuint number_down;
+    if (is_black)
+    {
+        number_up   = frensh_deck->black_numbers_up[card_type.number];
+        number_down = frensh_deck->black_numbers_down[card_type.number];
+    }
+    else
+    {
+        number_up   = frensh_deck->red_numbers_up[card_type.number];
+        number_down = frensh_deck->red_numbers_down[card_type.number];
+    }
+    
+    v2 padding = vec2(0.5f, 0.5f);
+    v2 companion_size = vec2(0.75f, 1.0f);
+    v2 companion_offset = +0.5f * card_dimension - 0.5f * companion_size - padding;
+    
+    AddCompanionEntity(game_state, number_up, companion_size, card_entity_index,
+                       vec2(-companion_offset.x, companion_offset.y));
+    
+    AddCompanionEntity(game_state, number_down, companion_size, card_entity_index,
+                       vec2(companion_offset.x, -companion_offset.y));
+    
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index,
+                       vec2(-companion_offset.x, companion_offset.y - (padding.y + 0.5f * companion_size.y + 0.1f)));
+    
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index,
+                       vec2(companion_offset.x,  -companion_offset.y + (padding.y + 0.5f * companion_size.y + 0.1f)));
+    
+    
+    companion_size = vec2(1.75f, 1.75f);
+    switch (card_type.number)
+    {
+        case Card_Number_Ace:
+        {
+            AddCompanion_Ace(game_state, category_up, companion_size, card_entity_index);
+        } break;
+        case Card_Number_2:
+        {
+            AddCompanion_2(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+        } break;
+        case Card_Number_3:
+        {
+            AddCompanion_3(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+        } break;
+        case Card_Number_4:
+        {
+            AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+        } break;
+        case Card_Number_5:
+        {
+            AddCompanion_5(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+        } break;
+        case Card_Number_6:
+        {
+            AddCompanion_6(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+        } break;
+        case Card_Number_7:
+        {
+            AddCompanion_7(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+        } break;
+        case Card_Number_8:
+        {
+            AddCompanion_8(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+            
+        } break;
+        case Card_Number_9:
+        {
+            AddCompanion_9(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+        } break;
+        case Card_Number_10:
+        {
+            AddCompanion_10(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+        } break;
+        case Card_Number_Jack:
+        {
+            GLuint jack = frensh_deck->jacks[card_type.category];
+            companion_size = card_dimension - companion_size - 2 * padding;
+            AddCompanion_Ace(game_state, jack, companion_size, card_entity_index);
+        } break;
+        case Card_Number_Queen:
+        {
+            GLuint queen = frensh_deck->queens[card_type.category];
+            companion_size = card_dimension - companion_size - 2 * padding;
+            AddCompanion_Ace(game_state, queen, companion_size, card_entity_index);
+        } break;
+        case Card_Number_King:
+        {
+            GLuint king = frensh_deck->kings[card_type.category];
+            companion_size = card_dimension - companion_size - 2 * padding;
+            AddCompanion_Ace(game_state, king, companion_size, card_entity_index);
+        } break;
+    }
+    
 }
 
 internal void
-AddCardEntity(Game_State *game_state, u32 card_number, Card_Residency card_residency)
+AddCardEntity(Game_State *game_state, Card_Type card_type, Card_Residency card_residency)
 {
     u32 card_entity_index = AddEntity(game_state);
     Entity *card = game_state->entities + card_entity_index;
@@ -658,8 +971,31 @@ AddCardEntity(Game_State *game_state, u32 card_number, Card_Residency card_resid
     f32 world_width = MAX_UNITS_PER_X;
     f32 world_height = MAX_UNITS_PER_X * game_state->rendering_context.aspect_ratio;
     card->center_pos = 0.5f * vec2(world_width, world_height);
+    
+    card->dy_angle = 4 * PI;
+    
+#if TEST_ONE_CARD
+    card->target_pos = card->center_pos;
+    card->residency_pos = card->center_pos;
+#endif
+    
     card->dDimension = 20.f;
-    AddCardNumberEntity(game_state, card_number, card_entity_index);
+    
+    Frensh_Suited_Cards_Texture *frensh_deck = &game_state->rendering_context.frensh_deck;
+    card->texture = frensh_deck->card_frame_texture;
+    
+    AddCardCompanions(game_state, frensh_deck, card_type, card->current_dimension, card_entity_index);
+} 
+
+
+
+internal Card_Type
+MakeCardType(Card_Category category, Card_Number number)
+{
+    Card_Type result;
+    result.category = category;
+    result.number   = number;
+    return result;
 }
 
 extern "C"
@@ -685,10 +1021,12 @@ extern "C"
         game_state->game_session.players[2] = S8Lit("2");
         game_state->game_session.players[3] = S8Lit("3");
         
-        // TODO(fakhri): add some bounce for the numbers when the cards moves, that should look cool lol
         AddNullEntity(game_state);
         AddCursorEntity(game_state);
         
+#if TEST_ONE_CARD
+        AddCardEntity(game_state, MakeCardType(Category_Tiles, Card_Number_Jack), Card_Residency_None);
+#else
         for (u32 card_index = 0;
              card_index < 10;
              ++card_index)
@@ -716,6 +1054,14 @@ extern "C"
         {
             AddCardEntity(game_state, card_index, Card_Residency_Right);
         }
+        
+        for (u32 card_index = 0;
+             card_index < 10;
+             ++card_index)
+        {
+            AddCardEntity(game_state, card_index, Card_Residency_Table);
+        }
+#endif
     }
     
     APP_HOT_LOAD
@@ -779,11 +1125,11 @@ extern "C"
         DebugDrawText(rendering_context, frame_time, vec2(400, 60), vec3(1,1,1));
 #endif
         
-        // NOTE(fakhri): ignore any input i didn't handle this frame
         if (os->controller.toggle_fullscreen.pressed)
         {
             os->fullscreen ^= 1;
         }
-        os->controller = {};
+        // NOTE(fakhri): ignore any input i didn't handle this frame
+        OS_EmptyEvents();
     }
 }

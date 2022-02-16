@@ -264,6 +264,8 @@ W32_WindowProc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param)
                     case VK_ESCAPE:
                     {
                         key_input = Key_Esc;
+                        os->controller.escape_key.pressed = is_down;
+                        os->controller.escape_key.released = was_down;
                     } break;
                     case VK_OEM_3:
                     {
@@ -292,6 +294,8 @@ W32_WindowProc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param)
                     case VK_RETURN:
                     {
                         key_input = Key_Enter;
+                        os->controller.confirm.pressed = is_down;
+                        os->controller.confirm.released = was_down;
                     } break;
                     case VK_CONTROL:
                     {
@@ -311,18 +315,26 @@ W32_WindowProc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param)
                     case VK_UP:
                     {
                         key_input = Key_Up;
+                        os->controller.move_up.pressed = is_down;
+                        os->controller.move_up.released = was_down;
                     } break;
                     case VK_LEFT:
                     {
                         key_input = Key_Left;
+                        os->controller.move_left.pressed = is_down;
+                        os->controller.move_left.released = was_down;
                     } break;
                     case VK_DOWN:
                     {
                         key_input = Key_Down;
+                        os->controller.move_down.pressed = is_down;
+                        os->controller.move_down.released = was_down;
                     } break;
                     case VK_RIGHT:
                     {
                         key_input = Key_Right;
+                        os->controller.move_right.pressed = is_down;
+                        os->controller.move_right.released = was_down;
                     } break;
                     case VK_DELETE:
                     {
@@ -382,6 +394,16 @@ W32_WindowProc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param)
                     } break;
                 }
             }
+            
+            if(is_down)
+            {
+                OS_PushEvent(OS_KeyPressEvent((Key)key_input, modifiers));
+            }
+            else
+            {
+                OS_PushEvent(OS_KeyReleaseEvent((Key)key_input, modifiers));
+            }
+            result = DefWindowProc(window_handle, message, w_param, l_param);
         } break;
         case WM_CHAR:
         {
