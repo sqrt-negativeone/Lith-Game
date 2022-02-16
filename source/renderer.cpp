@@ -207,13 +207,13 @@ InitRenderer(Rendering_Context *rendering_context)
     // NOTE(fakhri): quad vertex buffers
     {
         f32 quad_vertices[] = {
+            -0.5f, -0.5f,
             -0.5f, +0.5f,
             +0.5f, +0.5f,
-            +0.5f, -0.5f,
             
-            -0.5f, +0.5f,
-            +0.5f, -0.5f,
             -0.5f, -0.5f,
+            +0.5f, +0.5f,
+            +0.5f, -0.5f,
         };
         
         glGenVertexArrays(1, &rendering_context->quad_vao);
@@ -233,12 +233,12 @@ InitRenderer(Rendering_Context *rendering_context)
         f32 texture_vertices[] = {
             // position         texture
             -0.5f, -0.5f, 	 0.0f, 0.0f,
-            +0.5f,  0.5f, 	 1.0f, 1.0f,
-            -0.5f,  0.5f, 	 0.0f, 1.0f,
+            -0.5f, +0.5f, 	 0.0f, 1.0f,
+            +0.5f, +0.5f, 	 1.0f, 1.0f,
             
             -0.5f, -0.5f, 	 0.0f, 0.0f,
+            +0.5f, +0.5f, 	 1.0f, 1.0f,
             +0.5f, -0.5f, 	 1.0f, 0.0f,
-            +0.5f,  0.5f, 	 1.0f, 1.0f
         };
         
         glGenVertexArrays(1, &rendering_context->texture_vao);
@@ -333,13 +333,13 @@ DebugDrawQuadWorldCoord(Rendering_Context *rendering_context, v3 pos, v2 size, v
 }
 
 internal void
-DebugDrawTextureScreenCoord(Rendering_Context *rendering_context, GLuint tex, v3 pos, v2 size, f32 y_angle = 0.0f)
+DebugDrawTextureScreenCoord(Rendering_Context *rendering_context, GLuint tex, v3 pos, v2 size, f32 y_angle = 0.0f, v3 rotation_axe = vec3(0, 1, 0))
 {
     m4 trans = m4_translate(pos);
     m4 scale = m4_scale(vec3(size, 1.0f));
-    m4 rotat = m4_rotate(y_angle, vec3(0,1,0));
+    m4 rotat = m4_rotate(y_angle, rotation_axe);
     
-    m4 model = trans * scale;
+    m4 model = trans * rotat * scale;
     
     glUseProgram(rendering_context->texture_shader);
     GLint model_location = glGetUniformLocation(rendering_context->texture_shader, "model");

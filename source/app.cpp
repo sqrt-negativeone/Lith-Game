@@ -379,7 +379,12 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
                 {
                     DebugDrawQuadWorldCoord(rendering_context, vec3(entity->center_pos.xy, entity->center_pos.z - 0.01f), 1.05f * entity->current_dimension, red, entity->y_angle);
                 }
+                
                 DebugDrawTextureWorldCoord(rendering_context, entity->texture, entity->center_pos, entity->current_dimension, entity->y_angle);
+                
+                v3 card_back_pos = entity->center_pos;
+                DebugDrawTextureWorldCoord(rendering_context, game_state->rendering_context.frensh_deck.card_back_texture,
+                                           card_back_pos, entity->current_dimension, PI - entity->y_angle);
                 
             } break;
             case Entity_Type_Entity_Companion:
@@ -387,7 +392,7 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
                 UpdateCompanionEntity(game_state, entity);
                 Entity *followed_entity = game_state->entities + entity->followed_entity_index;
                 Assert(followed_entity);
-                DebugDrawTextureWorldCoord(rendering_context, entity->texture, vec3(entity->center_pos.xy, followed_entity->center_pos.z + 0.01f), entity->current_dimension, entity->y_angle);
+                DebugDrawTextureWorldCoord(rendering_context, entity->texture, vec3(entity->center_pos.xy, followed_entity->center_pos.z + 0.01f), entity->current_dimension, followed_entity->y_angle);
             } break;
             default:
             {
@@ -819,7 +824,6 @@ AddCompanion_10(Game_State *game_state, GLuint category_up, GLuint category_down
 internal inline  void
 AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_deck, Card_Type card_type, v2 card_dimension, u32 card_entity_index)
 {
-    
     GLuint category_up = 0;
     GLuint category_down = 0;
     
@@ -965,8 +969,8 @@ AddCardEntity(Game_State *game_state, Card_Type card_type, Card_Residency card_r
     card->dy_angle = 4 * PI;
     
 #if TEST_ONE_CARD
-    card->target_pos = card->center_pos;
-    card->residency_pos = card->center_pos;
+    card->target_pos.xy = card->center_pos.xy;
+    card->residency_pos.xy = card->center_pos.xy;
 #endif
     
     card->dDimension = 20.f;
@@ -1015,7 +1019,7 @@ extern "C"
         AddCursorEntity(game_state);
         
 #if TEST_ONE_CARD
-        AddCardEntity(game_state, MakeCardType(Category_Hearts, Card_Number_10), Card_Residency_None);
+        AddCardEntity(game_state, MakeCardType(Category_Hearts, Card_Number_10), Card_Residency_Down);
 #else
         for (u32 card_index = 0;
              card_index < 13;
