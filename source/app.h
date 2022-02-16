@@ -7,8 +7,8 @@
 #include "ui.h"
 #include "renderer.h"
 
-#define PLAYERS_COUNT 4
-#define CARDS_PER_PLAYER 10
+#define PLAYERS_COUNT (4)
+#define CARDS_PER_PLAYER (13)
 #define DECK_CARDS_COUNT (PLAYERS_COUNT * CARDS_PER_PLAYER)
 
 struct Input
@@ -89,10 +89,17 @@ enum Card_Residency
     
     Card_Residency_Count,
 };
+#define TEST_ONE_CARD 0
 
-#define CARD_WIDTH  (2 * 3.5f)
-#define CARD_HEIGHT (2 * 5.45f)
-#define CARD_X_GAP (0.420f)
+#if TEST_ONE_CARD
+#define CARD_WIDTH  (2.f * 3.5f)
+#define CARD_HEIGHT (2.f * 5.45f)
+#else
+#define CARD_WIDTH  (1.2f * 3.5f)
+#define CARD_HEIGHT (1.2f * 5.45f)
+#endif
+
+#define CARD_X_GAP (0.05f)
 #define CARD_Y_GAP (-5.0f)
 
 
@@ -128,7 +135,7 @@ struct Entity
 
 struct Residency
 {
-    u32 entity_indices[40];
+    u32 entity_indices[DECK_CARDS_COUNT];
     u32 entity_count;
 };
 
@@ -154,7 +161,7 @@ struct Game_State
     Rendering_Context rendering_context;
     Game_Session game_session;
     
-    Entity entities[256];
+    Entity entities[512];
     u32 entity_count;
     
     Residency entity_residencies[Card_Residency_Count];

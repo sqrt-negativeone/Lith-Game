@@ -25,7 +25,7 @@
 #include "network_message.cpp"
 
 // TODO(fakhri): add support for z
-#define TEST_ONE_CARD 1
+
 
 internal void
 HandleAvailableNetworkMessages(Game_State *game_state)
@@ -354,7 +354,7 @@ UpdateCompanionEntity(Game_State *game_state, Entity *entity)
 {
     Assert(entity->followed_entity_index);
     
-    MoveEntity(game_state, entity, 1000.f, 10.f, 1.f);
+    MoveEntity(game_state, entity, 800.f, 10.f, 1.f);
     Entity *followed_entity = game_state->entities + entity->followed_entity_index;
     entity->center_pos = ClampInsideRect(RectCentDim(followed_entity->center_pos, followed_entity->current_dimension), entity->center_pos);
 }
@@ -875,8 +875,8 @@ AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_de
         number_down = frensh_deck->red_numbers_down[card_type.number];
     }
     
-    v2 padding = vec2(0.5f, 0.5f);
-    v2 companion_size = vec2(0.75f, 1.0f);
+    v2 padding        = 0.6f * vec2(0.5f, 0.5f);
+    v2 companion_size = 0.6f * vec2(0.75f, 1.0f);
     v2 companion_offset = +0.5f * card_dimension - 0.5f * companion_size - padding;
     
     AddCompanionEntity(game_state, number_up, companion_size, card_entity_index,
@@ -892,7 +892,7 @@ AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_de
                        vec2(companion_offset.x,  -companion_offset.y + (padding.y + 0.5f * companion_size.y + 0.1f)));
     
     
-    companion_size = vec2(1.75f, 1.75f);
+    companion_size = 0.6f * vec2(1.5f, 1.5f);
     switch (card_type.number)
     {
         case Card_Number_Ace:
@@ -1025,42 +1025,35 @@ extern "C"
         AddCursorEntity(game_state);
         
 #if TEST_ONE_CARD
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, Card_Number_Jack), Card_Residency_None);
+        AddCardEntity(game_state, MakeCardType(Category_Hearts, Card_Number_10), Card_Residency_None);
 #else
         for (u32 card_index = 0;
-             card_index < 10;
+             card_index < 13;
              ++card_index)
         {
-            AddCardEntity(game_state, card_index, Card_Residency_Left);
+            AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Left);
         }
         
         for (u32 card_index = 0;
-             card_index < 10;
+             card_index < 13;
              ++card_index)
         {
-            AddCardEntity(game_state, card_index, Card_Residency_Down);
+            AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Down);
         }
         
         for (u32 card_index = 0;
-             card_index < 10;
+             card_index < 13;
              ++card_index)
         {
-            AddCardEntity(game_state, card_index, Card_Residency_Up);
+            AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Up);
+        }
+        for (u32 card_index = 0;
+             card_index < 13;
+             ++card_index)
+        {
+            AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Right);
         }
         
-        for (u32 card_index = 0;
-             card_index < 10;
-             ++card_index)
-        {
-            AddCardEntity(game_state, card_index, Card_Residency_Right);
-        }
-        
-        for (u32 card_index = 0;
-             card_index < 10;
-             ++card_index)
-        {
-            AddCardEntity(game_state, card_index, Card_Residency_Table);
-        }
 #endif
     }
     
