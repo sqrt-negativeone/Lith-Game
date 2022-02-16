@@ -106,9 +106,9 @@ enum Card_Residency
 struct Entity
 {
     Entity_Type type;
-    v2 residency_pos;
-    v2 center_pos;
-    v2 target_pos;
+    v3 residency_pos;
+    v3 center_pos;
+    v3 target_pos;
     
     f32 y_angle;
     f32 target_y_angle;
@@ -164,6 +164,8 @@ struct Game_State
     Entity entities[512];
     u32 entity_count;
     
+    u32 card_pressed_index;
+    u32 card_under_cursor_index;
     Residency entity_residencies[Card_Residency_Count];
 };
 

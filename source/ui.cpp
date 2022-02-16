@@ -269,7 +269,7 @@ UI_MenuItemInputField(Game_State *game_state, v2 item_size)
     }
     
     // NOTE(fakhri): render input field background
-    DebugDrawQuadScreenCoord(rendering_context, item_pos, item_size, background_color);
+    DebugDrawQuadScreenCoord(rendering_context, vec3(item_pos, 0), item_size, background_color);
     
     DebugDrawTextScreenCoord(rendering_context, input_buffer->buffer, item_pos, text_color);
     
@@ -283,7 +283,7 @@ UI_MenuItemInputField(Game_State *game_state, v2 item_size)
                              item_pos.y);
         
         v2 cursor_size = vec2(2, 1.1f * GetActiveFontHeight(rendering_context));
-        DebugDrawQuadScreenCoord(rendering_context, cursor_pos, cursor_size, cursor_color);
+        DebugDrawQuadScreenCoord(rendering_context, vec3(cursor_pos, 0), cursor_size, cursor_color);
     }
     
     ++ui_context->items_count;

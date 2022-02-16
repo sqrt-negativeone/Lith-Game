@@ -743,6 +743,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     // NOTE(fakhri): setup directory watcher to see if any shader changed
     W32_BeginWatchDirectory( &global_shaders_watcher, &global_os.permanent_arena, S8Lit("shaders/"));
     
+    glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     

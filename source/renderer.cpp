@@ -71,7 +71,7 @@ UpdateScreenSize(Rendering_Context *rendering_context)
         rendering_context->screen = current_screen;
         m4 ortho_projection = m4_orthographic(0.0f, rendering_context->screen.width, 
                                               rendering_context->screen.height, 0.0f,
-                                              -50.f, 100.f);
+                                              -100.f, 100.f);
         
         // NOTE(fakhri): update projection matrices for all the shader that user it
         GLint projection_location;
@@ -289,9 +289,9 @@ InitRenderer(Rendering_Context *rendering_context)
 }
 
 internal void
-DebugDrawQuadScreenCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color, f32 y_angle = 0.0f)
+DebugDrawQuadScreenCoord(Rendering_Context *rendering_context, v3 pos, v2 size, v3 color, f32 y_angle = 0.0f)
 {
-    m4 trans = m4_translate(vec3(pos, 0.f));
+    m4 trans = m4_translate(pos);
     m4 scale = m4_scale(vec3(size, 1.0f));
     m4 rotat = m4_rotate(y_angle, vec3(0,1,0));
     
@@ -309,23 +309,23 @@ DebugDrawQuadScreenCoord(Rendering_Context *rendering_context, v2 pos, v2 size, 
 }
 
 internal void
-DebugDrawQuadNormalizedCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color, f32 y_angle = 0.0f)
+DebugDrawQuadNormalizedCoord(Rendering_Context *rendering_context, v3 pos, v2 size, v3 color, f32 y_angle = 0.0f)
 {
     f32 window_width = (f32)os->window_size.width;
     f32 window_height = (f32)os->window_size.height;
-    pos = v2{pos.x * window_width, pos.y * window_height};
-    size = v2{size.width * window_width, size.height * window_height};
+    pos.xy = vec2(pos.x * window_width, pos.y * window_height);
+    size = vec2(size.width * window_width, size.height * window_height);
     
     DebugDrawQuadScreenCoord(rendering_context, pos, size, color, y_angle);
 }
 
 internal void
-DebugDrawQuadWorldCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v3 color, f32 y_angle = 0.0f)
+DebugDrawQuadWorldCoord(Rendering_Context *rendering_context, v3 pos, v2 size, v3 color, f32 y_angle = 0.0f)
 {
     f32 x_correction = rendering_context->normalized_width_unit_per_world_unit;
     f32 y_correction = (1.0f / rendering_context->aspect_ratio) * x_correction;
-    pos = vec2(pos.x * x_correction,
-               1.0f - pos.y * y_correction);
+    pos.xy = vec2(pos.x * x_correction,
+                  1.0f - pos.y * y_correction);
     size = vec2(size.x * x_correction,
                 size.y * y_correction);
     
@@ -333,26 +333,13 @@ DebugDrawQuadWorldCoord(Rendering_Context *rendering_context, v2 pos, v2 size, v
 }
 
 internal void
-DebugDrawTextureScreenCoord(Rendering_Context *rendering_context, GLuint tex, v2 pos, v2 size, f32 y_angle = 0.0f)
+DebugDrawTextureScreenCoord(Rendering_Context *rendering_context, GLuint tex, v3 pos, v2 size, f32 y_angle = 0.0f)
 {
-#if 1
-    m4 trans = m4_translate(vec3(pos, 0.f));
+    m4 trans = m4_translate(pos);
     m4 scale = m4_scale(vec3(size, 1.0f));
     m4 rotat = m4_rotate(y_angle, vec3(0,1,0));
     
     m4 model = trans * scale;
-    
-#else
-    f32 window_width = (f32)os->window_size.width;
-    f32 window_height = (f32)os->window_size.height;
-    
-    // NOTE(fakhri): the origin at the center of the screen
-    pos = v2{pos.x + window_width / 2, window_height / 2 - pos.y};
-    m4 trans = m4_translate(vec3(pos, 0.f));
-    m4 scale = m4_scale(vec3(size, 1.0f));
-    m4 rotat = m4_rotate(y_angle, vec3(0,1,0));
-    m4 model = trans * rotat * scale;
-#endif
     
     glUseProgram(rendering_context->texture_shader);
     GLint model_location = glGetUniformLocation(rendering_context->texture_shader, "model");
@@ -366,23 +353,23 @@ DebugDrawTextureScreenCoord(Rendering_Context *rendering_context, GLuint tex, v2
 }
 
 internal void 
-DebugDrawTextureNormalizedCoord(Rendering_Context *rendering_context, GLuint tex, v2 pos, v2 size, f32 y_angle = 0.0f)
+DebugDrawTextureNormalizedCoord(Rendering_Context *rendering_context, GLuint tex, v3 pos, v2 size, f32 y_angle = 0.0f)
 {
     f32 window_width = (f32)os->window_size.width;
     f32 window_height = (f32)os->window_size.height;
-    pos = v2{pos.x * window_width, pos.y * window_height};
-    size = v2{size.width * window_width, size.height * window_height};
+    pos.xy = vec2(pos.x * window_width, pos.y * window_height);
+    size = vec2(size.width * window_width, size.height * window_height);
     
     DebugDrawTextureScreenCoord(rendering_context, tex, pos, size, y_angle);
 }
 
 internal void
-DebugDrawTextureWorldCoord(Rendering_Context *rendering_context, GLuint tex, v2 pos, v2 size, f32 y_angle = 0.0f)
+DebugDrawTextureWorldCoord(Rendering_Context *rendering_context, GLuint tex, v3 pos, v2 size, f32 y_angle = 0.0f)
 {
     f32 x_correction = rendering_context->normalized_width_unit_per_world_unit;
     f32 y_correction = (1.0f / rendering_context->aspect_ratio) * x_correction;
-    pos = vec2(pos.x * x_correction,
-               1.0f - pos.y * y_correction);
+    pos.xy = vec2(pos.x * x_correction,
+                  1.0f - pos.y * y_correction);
     size = vec2(size.x * x_correction,
                 size.y * y_correction);
     
