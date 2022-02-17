@@ -178,7 +178,7 @@ ChangeResidency(Game_State *game_state, u32 entity_index, Card_Residency residen
 {
     Entity *entity = game_state->entities + entity_index;
     Card_Residency old_residency = entity->residency;
-    if (old_residency != residency)
+    if (residency != Card_Residency_None && old_residency != residency)
     {
         if (old_residency != Card_Residency_None)
         {
@@ -200,13 +200,11 @@ ChangeResidency(Game_State *game_state, u32 entity_index, Card_Residency residen
             }
         }
         
-        if (residency != Card_Residency_None)
-        {
-            Residency *entity_residency = game_state->entity_residencies + residency;
-            Assert(entity_residency->entity_count < ArrayCount(entity_residency->entity_indices));
-            entity_residency->entity_indices[entity_residency->entity_count++] = entity_index;
-            entity->residency = residency;
-        }
+        // NOTE(fakhri): add entity to the new residency
+        Residency *entity_residency = game_state->entity_residencies + residency;
+        Assert(entity_residency->entity_count < ArrayCount(entity_residency->entity_indices));
+        entity_residency->entity_indices[entity_residency->entity_count++] = entity_index;
+        entity->residency = residency;
         
         ReorganizeResidencyCards(game_state, old_residency);
         ReorganizeResidencyCards(game_state, residency);
@@ -246,24 +244,18 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
     Entity *cursor_entity = game_state->entities + (u32)Entity_Type_Cursor_Entity;
     Assert(cursor_entity->type == Entity_Type_Cursor_Entity);
     
-    b32 should_be_under_cursor = IsInsideRect(RectCentDim(entity->center_pos.xy, entity->current_dimension), cursor_entity->center_pos.xy) &&
-    (game_state->card_under_cursor_index == 0 || game_state->card_under_cursor_index == entity_index) && 
-    (game_state->card_pressed_index == 0 || game_state->card_pressed_index == entity_index);
+    b32 should_be_under_cursor = IsInsideRect(RectCentDim(entity->center_pos.xy, entity->current_dimension), cursor_entity->center_pos.xy) ;
     
     if (!entity->is_under_cursor && should_be_under_cursor)
     {
         entity->is_under_cursor = true;
         entity->target_dimension = 1.1f * vec2(CARD_WIDTH, CARD_HEIGHT);
-        entity->target_pos.z = 50.f;
-        game_state->card_under_cursor_index = entity_index;
     }
     
     if (entity->is_under_cursor && !should_be_under_cursor)
     {
         entity->is_under_cursor = false;
         entity->target_dimension = vec2(CARD_WIDTH, CARD_HEIGHT);
-        entity->target_pos.z =  entity->residency_pos.z;
-        game_state->card_under_cursor_index = entity_index = 0;
     }
     
     if (entity->is_under_cursor)
@@ -278,55 +270,44 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
                     entity->is_pressed = true;
                     entity->followed_entity_index = Entity_Type_Cursor_Entity;
                     game_state->card_pressed_index = entity_index;
+                    entity->target_pos.z = 50.f;
                 }
             }
         }
-        
-        if (os->controller.right_mouse.pressed)
-        {
-            // NOTE(fakhri): test move entity
-#if 1
-            if (entity->target_y_angle == 0)
-            {
-                entity->target_y_angle = PI;
-            }
-            else
-            {
-                entity->target_y_angle = 0;
-            }
-#else
-            Card_Residency target_residency;
-            if (entity->residency == Card_Residency_Down)
-            {
-                target_residency = Card_Residency_Up;
-            }
-            else if (entity->residency == Card_Residency_Up)
-            {
-                target_residency = Card_Residency_Down;
-            }
-            else if (entity->residency == Card_Residency_Right)
-            {
-                target_residency = Card_Residency_Left;
-            }
-            else
-            {
-                target_residency = Card_Residency_Right;
-            }
-            ChangeResidency(game_state, entity_index, target_residency);
-#endif
-        }
-        
     }
     
     if (entity->is_pressed)
     {
+        
+        f32 world_width = MAX_UNITS_PER_X;
+        f32 world_height = MAX_UNITS_PER_X * game_state->rendering_context.aspect_ratio;
+        v2 world_dimension = vec2(world_width, world_height);
+        
+        v2 table_center = vec2(0.5f * world_width, 0.55f * world_height);
+        b32 can_move_to_table = false;
+        if (IsInsideRect(RectCentDim(table_center, vec2(20, 20)), entity->center_pos.xy))
+        {
+            
+            ChangeActiveFont(&game_state->rendering_context, &game_state->rendering_context.arial_font);
+            DebugDrawTextWorldCoord(&game_state->rendering_context, S8Lit("release your mouse to play the card"), 0.5f * world_dimension,vec3(1,1,1));
+            can_move_to_table = 1;
+        }
+        
         if (os->controller.left_mouse.released)
         {
             entity->is_pressed = false;
             entity->target_pos = entity->residency_pos;
             entity->followed_entity_index = 0;
             game_state->card_pressed_index = 0;
+            entity->target_pos.z =  entity->residency_pos.z;
+            
+            if (can_move_to_table)
+            {
+                entity->target_y_angle = PI;
+                ChangeResidency(game_state, entity_index, Card_Residency_Table);
+            }
         }
+        
     }
     
     entity->y_angle = MoveTowards(entity->y_angle, entity->target_y_angle, entity->dy_angle * os->dtime);
@@ -953,7 +934,7 @@ AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_de
 }
 
 internal void
-AddCardEntity(Game_State *game_state, Card_Type card_type, Card_Residency card_residency)
+AddCardEntity(Game_State *game_state, Card_Type card_type, Card_Residency card_residency, b32 is_fliped = false)
 {
     u32 card_entity_index = AddEntity(game_state);
     Entity *card = game_state->entities + card_entity_index;
@@ -967,6 +948,12 @@ AddCardEntity(Game_State *game_state, Card_Type card_type, Card_Residency card_r
     card->center_pos.xy = 0.5f * vec2(world_width, world_height);
     
     card->dy_angle = 4 * PI;
+    
+    if (is_fliped)
+    {
+        card->target_y_angle = PI;
+        card->y_angle = PI;
+    }
     
 #if TEST_ONE_CARD
     card->target_pos.xy = card->center_pos.xy;
@@ -1041,12 +1028,22 @@ extern "C"
         {
             AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Up);
         }
+        
         for (u32 card_index = 0;
              card_index < 13;
              ++card_index)
         {
             AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Right);
         }
+        
+        
+        for (u32 card_index = 0;
+             card_index < 13;
+             ++card_index)
+        {
+            AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Table, true);
+        }
+        
         
 #endif
     }

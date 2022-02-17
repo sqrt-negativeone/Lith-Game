@@ -161,11 +161,10 @@ struct Game_State
     Rendering_Context rendering_context;
     Game_Session game_session;
     
-    Entity entities[512];
+    Entity entities[1024];
     u32 entity_count;
     
     u32 card_pressed_index;
-    u32 card_under_cursor_index;
     Residency entity_residencies[Card_Residency_Count];
 };
 

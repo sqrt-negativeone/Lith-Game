@@ -69,6 +69,7 @@ UpdateScreenSize(Rendering_Context *rendering_context)
     if (rendering_context->screen != current_screen)
     {
         rendering_context->screen = current_screen;
+        rendering_context->aspect_ratio = current_screen.height / current_screen.width;
         m4 ortho_projection = m4_orthographic(0.0f, rendering_context->screen.width, 
                                               rendering_context->screen.height, 0.0f,
                                               -100.f, 100.f);
