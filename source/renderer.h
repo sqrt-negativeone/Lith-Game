@@ -17,6 +17,7 @@ struct Font
 {
 #define CHARACTERS_COUNT 128
     Character characters[CHARACTERS_COUNT];
+    f32 font_height;
 };
 
 enum Card_Category
@@ -91,6 +92,8 @@ struct Rendering_Context
     
     
     Font arial_font;
+    Font menu_title_font;
+    Font menu_item_font;
     Font *active_font;
     
     f32 normalized_width_unit_per_world_unit;

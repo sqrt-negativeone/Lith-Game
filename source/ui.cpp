@@ -1,59 +1,10 @@
-// TODO(fakhri): we need some way to automatically position menu items on the screen?
-
-internal u32
-ChangeSelectedItem(u32 item_index, i32 delta, u32 items_count)
-{
-    u32 result = (item_index + delta + items_count) % items_count;
-    return result;
-}
 
 internal void
-UI_ChangeMenuSelectedItem(UI_Context *ui_context, i32 delta)
+UI_ChangeSelectedItem(UI_Context *ui_context, i32 delta)
 {
     Assert(ui_context);
-    ui_context->prev_time = os->time;
-    ui_context->selected_item = ChangeSelectedItem(ui_context->selected_item, delta, ui_context->items_count);
-}
-
-internal void
-UI_ClearContext(UI_Context *ui_context)
-{
-    Assert(ui_context);
-    ui_context->selected_item = 0;
-    for (u32 field_buffer_index = 0;
-         field_buffer_index < ArrayCount(ui_context->input_field_buffers);
-         ++field_buffer_index)
-    {
-        EmptyBuffer(ui_context->input_field_buffers + field_buffer_index);
-    }
-}
-
-internal void
-UI_PositionItem(UI_Context *ui_context, v2 position)
-{
-    Assert(ui_context);
-    ui_context->item_position = position;
-}
-
-internal void
-UI_SetVerticalSpacing(UI_Context *ui_context, f32 new_vertical_spacing)
-{
-    Assert(ui_context);
-    ui_context->spacing.y = new_vertical_spacing;
-}
-
-internal void
-UI_SetHorizontalSpacing(UI_Context *ui_context, f32 new_horizontal_spacing)
-{
-    Assert(ui_context);
-    ui_context->spacing.y = new_horizontal_spacing;
-}
-
-internal void
-UI_VerticalAdvanceItemPosition(UI_Context *ui_context)
-{
-    Assert(ui_context);
-    ui_context->item_position.y += ui_context->spacing.y;
+    ui_context->last_select_time = os->time;
+    ui_context->selected_item = (ui_context->selected_item + delta + ui_context->items_count) % ui_context->items_count;
 }
 
 internal void
@@ -92,26 +43,14 @@ UI_InitColorScheme(UI_ColorScheme *color_scheme)
 internal void
 UI_Init(UI_Context *ui_context, M_Arena *arena)
 {
-    for (u32 buffer_index = 0;
-         buffer_index < ArrayCount(ui_context->input_field_buffers);
-         ++buffer_index)
-    {
-        Buffer *buffer = ui_context->input_field_buffers + buffer_index;
-        *buffer = InitBuffer(arena, SERVER_ADDRESS_BUFFER_SIZE);
-    }
-    
     UI_InitColorScheme(&ui_context->color_scheme);
-    ui_context->button_shadow_offset = vec2(5, 5);
 }
 
-// TODO(fakhri): support mouse
 internal void 
 UI_BeginFrame(UI_Context *ui_context)
 {
     Assert(ui_context);
-    ui_context->buffer_index = 0;
     ui_context->items_count = 0;
-    ui_context->item_position = {};
 }
 
 internal void
@@ -120,37 +59,29 @@ UI_EndFrame(UI_Context *ui_context, Controller *controller)
     // NOTE(fakhri): process input
     if (controller->move_down.pressed)
     {
-        UI_ChangeMenuSelectedItem(ui_context, +1);
+        UI_ChangeSelectedItem(ui_context, +1);
     }
     if (controller->move_up.pressed)
     {
-        UI_ChangeMenuSelectedItem(ui_context, -1);
+        UI_ChangeSelectedItem(ui_context, -1);
     }
 }
 
 internal void
-UI_MenuItemLabel(Game_State *game_state, s8 text, b32 should_animate_color = 0)
+UI_Label(Game_State *game_state, s8 text, f32 x, f32 y, b32 should_animate_color = 0)
 {
     UI_Context        *ui_context        = &game_state->ui_context;
     Rendering_Context *rendering_context = &game_state->rendering_context;
     UI_ColorScheme    *color_scheme      = &ui_context->color_scheme;
     
-    v3 color;
-    if (should_animate_color)
-    {
-        f32 t = os->time - ui_context->prev_time;
-        f32 change = square_f(cos_f(PI * t));
-        color = change * color_scheme->label_color1 + (1 - change) * color_scheme->label_color2;
-    }
-    else
-    {
-        color = color_scheme->label_color;
-    }
-    DebugDrawTextScreenCoord(rendering_context, text, ui_context->item_position, color);
+    f32 change = should_animate_color? square_f(cos_f(PI * os->time)) : 0;
+    v3 color = lerp(color_scheme->label_color1, change, color_scheme->label_color2);
+    
+    DebugDrawTextScreenCoord(rendering_context, text, vec2(x, y), color);
 }
 
 internal b32
-UI_MenuItemButton(Game_State *game_state, s8 item_text)
+UI_Button(Game_State *game_state, s8 item_text, f32 x, f32 y, v2 hitbox)
 {
     UI_Context        *ui_context        = &game_state->ui_context;
     Rendering_Context *rendering_context = &game_state->rendering_context;
@@ -159,37 +90,38 @@ UI_MenuItemButton(Game_State *game_state, s8 item_text)
     
     b32 clicked = 0;
     
-    v2 item_pos = ui_context->item_position;
+    v2 item_pos = vec2(x, y);
     
-    v3 color;
+    v3 text_color;
+    
+    //DebugDrawQuadScreenCoord(rendering_context, vec3(x, y, 0), hitbox, vec3(1, 1, 1));
+    if (IsInsideRect(RectCentDim(item_pos, hitbox), os->mouse_position ))
+    {
+        ui_context->last_select_time = os->time;
+        ui_context->selected_item = ui_context->items_count;
+    }
+    
     b32 is_selected = (ui_context->selected_item == ui_context->items_count);
+    
     if (is_selected)
     {
-        if (controller->confirm.pressed)
+        if (controller->confirm.pressed || controller->left_mouse.pressed)
         {
-            controller->confirm.pressed = 0;
             clicked = 1;
         }
-        // NOTE(fakhri): calculate color
-        f32 t = os->time - ui_context->prev_time;
+        // TODO(fakhri): maybe show some change in color when the button is clicked?
+        f32 t = os->time - ui_context->last_select_time;
         f32 change = square_f(cos_f(PI * t));
-        if (!clicked)
-        {
-            color = change * color_scheme->button_text_active_color1 + (1 - change) * color_scheme->button_text_active_color2;
-        }
-        else
-        {
-            color = color_scheme->button_text_clicked_color;
-        }
-        
-        DebugDrawTextScreenCoord(rendering_context, item_text, item_pos + ui_context->button_shadow_offset, color_scheme->button_text_shadow_color);
+        text_color = lerp(color_scheme->button_text_active_color1, change, color_scheme->button_text_active_color2);
+        v2 shadow_offset = vec2(5, 5);
+        DebugDrawTextScreenCoord(rendering_context, item_text, item_pos + shadow_offset, color_scheme->button_text_shadow_color);
     }
     else
     {
-        color = color_scheme->button_text_color;
+        text_color = color_scheme->button_text_color;
     }
     
-    DebugDrawTextScreenCoord(rendering_context, item_text, item_pos, color);
+    DebugDrawTextScreenCoord(rendering_context, item_text, item_pos, text_color);
     
     ++ui_context->items_count;
     return clicked;
@@ -200,7 +132,6 @@ HandleInputFieldKeyboardInput(Buffer *input_buffer)
 {
     // TODO(fakhri): support ctr+v
     // TODO(fakhri): support moving cursor with arrow keys
-    // TODO(fakhri): support ctr+backspace
     OS_Event *event = 0;
     while(OS_GetNextEvent(&event))
     {
@@ -237,20 +168,22 @@ HandleInputFieldKeyboardInput(Buffer *input_buffer)
 }
 
 internal void
-UI_MenuItemInputField(Game_State *game_state, v2 item_size)
+UI_InputField(Game_State *game_state, v2 item_size, f32 x, f32 y, Buffer *input_buffer)
 {
     UI_Context        *ui_context        = &game_state->ui_context;
     Rendering_Context *rendering_context = &game_state->rendering_context;
     UI_ColorScheme    *color_scheme      = &ui_context->color_scheme;
     Controller        *controller        = &os->controller;
     
-    Assert(ui_context->buffer_index < ArrayCount(ui_context->input_field_buffers));
-    Buffer *input_buffer = ui_context->input_field_buffers + ui_context->buffer_index;
-    
     v3 background_color;
     v3 text_color;
     
-    v2 item_pos = ui_context->item_position;
+    v2 item_pos = vec2(x, y);
+    
+    if (IsInsideRect(RectCentDim(item_pos, item_size), os->mouse_position ))
+    {
+        ui_context->selected_item = ui_context->items_count;
+    }
     
     b32 is_selected = (ui_context->selected_item == ui_context->items_count);
     if (is_selected)
@@ -275,9 +208,9 @@ UI_MenuItemInputField(Game_State *game_state, v2 item_size)
     
     if (is_selected)
     {
-        f32 t = os->time - ui_context->prev_time;
+        f32 t = os->time - ui_context->last_select_time;
         f32 change = square_f(cos_f(PI * t));
-        v3 cursor_color = change * background_color + (1 - change) * text_color;
+        v3 cursor_color = lerp(background_color, change, text_color);
         
         v2 cursor_pos = vec2(item_pos.x +  0.5f * GetActiveFontWidth(rendering_context, input_buffer->buffer),
                              item_pos.y);
@@ -287,6 +220,5 @@ UI_MenuItemInputField(Game_State *game_state, v2 item_size)
     }
     
     ++ui_context->items_count;
-    ++ui_context->buffer_index;
 }
 

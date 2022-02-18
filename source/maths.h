@@ -120,6 +120,20 @@ f32 lerp(f32 a, f32 time, f32 b)
     return result;
 }
 
+internal v2
+lerp(v2 a, f32 time, v2 b)
+{
+    v2 result = (1 - time) * a + time * b;
+    return result;
+}
+
+internal v3
+lerp(v3 a, f32 time, v3 b)
+{
+    v3 result = (1 - time) * a + time * b;
+    return result;
+}
+
 internal
 f32 Clamp(f32 min, f32 value, f32 max)
 {

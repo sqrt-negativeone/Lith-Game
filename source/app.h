@@ -57,6 +57,7 @@ enum Game_Session_Flags
     SESSION_FLAG_TRYING_JOIN_GAME    = (1 << 5),
     SESSION_FLAG_FAILED_JOIN_GAME    = (1 << 6),
     SESSION_FLAG_JOINED_GAME         = (1 << 7),
+    SESSION_FLAG_SERVER_DOWN         = (1 << 8),
 };
 
 
@@ -166,6 +167,10 @@ struct Game_State
     
     u32 card_pressed_index;
     Residency entity_residencies[Card_Residency_Count];
+    
+    // NOTE(fakhri): menu stuff
+    Buffer host_address_buffer;
+    Buffer username_buffer;
 };
 
 struct Compile_Shader_Result

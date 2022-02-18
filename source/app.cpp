@@ -64,8 +64,9 @@ inline void
 OpenMenu(Game_State *game_state, Game_Mode menu_mode)
 {
     Assert(Game_Mode_MENU_BEGIN < menu_mode && menu_mode < Game_Mode_MENU_END);
-    UI_ClearContext(&game_state->ui_context);
     game_state->game_mode = menu_mode;
+    game_state->ui_context.selected_item = -1;
+    glDepthFunc(GL_ALWAYS);
 }
 
 internal void
@@ -394,37 +395,41 @@ void UpdateAndRenderMainMenu(Game_State *game_state, Rendering_Context *renderin
     UI_BeginFrame(ui_context);
     
     glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    UI_PositionItem(ui_context, vec2(half_screen.x, 0.1f * screen.height));
-    UI_SetVerticalSpacing(ui_context, 0.3f * screen.y);
+    ChangeActiveFont(rendering_context, &rendering_context->menu_title_font);
+    f32 x = 0.5f * screen.width;
+    f32 y = 0.1f * screen.height;
     
-    // NOTE(fakhri): render menu title
-    // TODO(fakhri): use title fonts
-    ChangeActiveFont(rendering_context, &rendering_context->arial_font);
-    UI_MenuItemLabel(game_state, S8Lit("Truth Or Lies?"));
     
-    // TODO(fakhri): use item fonts
-    ChangeActiveFont(rendering_context, &rendering_context->arial_font);
-    UI_VerticalAdvanceItemPosition(ui_context);
+    // NOTE(fakhri): Menu Title
+    UI_Label(game_state, S8Lit("Truth Or Lies?"), x, y);
     
-    UI_SetVerticalSpacing(ui_context, 0.15f * screen.y);
+    y = 0.5f * screen.height;
+    // NOTE(fakhri): Join Game Button
+    ChangeActiveFont(rendering_context, &rendering_context->menu_item_font);
+    f32 stride = 1.9f * rendering_context->active_font->font_height;
     
     // NOTE(fakhri): join session button
-    if (UI_MenuItemButton(game_state, S8Lit("Join Game Room")))
+    if (UI_Button(game_state, S8Lit("Join Game Room"), x, y, vec2(half_screen.width, 1.1f * rendering_context->active_font->font_height)))
     {
-        // NOTE(fakhri): join session was clicked
         OpenMenu(game_state, Game_Mode_MENU_JOIN_GAME);
     }
+    y += stride;
     
-    UI_VerticalAdvanceItemPosition(ui_context);
-    // NOTE(fakhri): host session button
-    if (UI_MenuItemButton(game_state, S8Lit("Create Game Room")))
+    // NOTE(fakhri): Host Session button
+    if (UI_Button(game_state, S8Lit("Create Game Room"), x, y, vec2(half_screen.width, 1.1f * rendering_context->active_font->font_height)))
     {
-        // NOTE(fakhri): host session was clicked
         OpenMenu(game_state, Game_Mode_MENU_WAITING_PLAYERS);
         os->PushNetworkMessage(CreateNewGameSessionMessage());
         SetFlag(game_session->session_state_flags, SESSION_FLAG_HOSTING_GAME);
+    }
+    y += stride;
+    
+    // NOTE(fakhri): Quit
+    if (UI_Button(game_state, S8Lit("Quit"), x, y, vec2(half_screen.width, 1.1f * rendering_context->active_font->font_height)))
+    {
+        os->quit = 1;
     }
     
     UI_EndFrame(ui_context, controller);
@@ -439,49 +444,52 @@ void UpdateAndRenderJoinSessionMenu(Game_State *game_state,  Rendering_Context *
     v2 screen = rendering_context->screen;
     
     glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    ChangeActiveFont(rendering_context, &rendering_context->arial_font);
-    UI_PositionItem(ui_context, vec2(half_screen.x, 0.05f * screen.height));
+    ChangeActiveFont(rendering_context, &rendering_context->menu_title_font);
+    f32 x = 0.5f * screen.width;
+    f32 y = 0.1f * screen.height;
     
-    UI_SetVerticalSpacing(ui_context, 0.2f * screen.y);
+    // NOTE(fakhri): Menu Title
+    UI_Label(game_state, S8Lit("Connect to game"), x, y);
     
-    UI_MenuItemLabel(game_state, S8Lit("Connect to game"));
-    
-    u32 host_address_index;
+    ChangeActiveFont(rendering_context, &rendering_context->menu_item_font);
+    y = 0.4f * screen.height;
+    f32 stride = 2.0f * rendering_context->active_font->font_height;
     
     // NOTE(fakhri): host address input field
     {
-        UI_VerticalAdvanceItemPosition(ui_context);
-        UI_MenuItemLabel(game_state, S8Lit("host address"));
-        v2 item_size = {600, 50};
-        host_address_index = ui_context->items_count;
-        UI_VerticalAdvanceItemPosition(ui_context);
-        UI_MenuItemInputField(game_state, item_size);
+        s8 label_text = S8Lit("host address");
+        UI_Label(game_state, label_text, x, y);
+        y+= stride;
+        
+        v2 input_field_size = {500, 50};
+        UI_InputField(game_state, input_field_size, x, y, &game_state->host_address_buffer);
+        y += stride;
     }
     
-    UI_VerticalAdvanceItemPosition(ui_context);
-    
+    y = 0.7f * screen.height;
     if (!IsFlagSet(game_session->session_state_flags, SESSION_FLAG_TRYING_CONNECT_GAME))
     {
-        // TODO(fakhri): just for debug while we don't have a working server
-        SetFlag(game_session->session_state_flags, SESSION_FLAG_CONNECTED_TO_GAME);
-        
-        if (UI_MenuItemButton(game_state, S8Lit("Connect")))
+        if (UI_Button(game_state, S8Lit("Connect"), x, y, vec2(half_screen.width, 1.1f * rendering_context->active_font->font_height)))
         {
             SetFlag(game_session->session_state_flags, SESSION_FLAG_TRYING_CONNECT_GAME);
-            s8 input =  ui_context->input_field_buffers[host_address_index].buffer;
+            s8 input =  game_state->host_address_buffer.buffer;
             os->PushNetworkMessage(CreateConnectToServerMessage(&os->permanent_arena, input));
         }
+        
         if (controller->escape_key.pressed)
         {
             OpenMenu(game_state, Game_Mode_MENU_MAIN);
         }
+        
+        // TODO(fakhri): just for debug while we don't have a working server
+        SetFlag(game_session->session_state_flags, SESSION_FLAG_CONNECTED_TO_GAME);
     }
     else
     {
         // NOTE(fakhri): trying to connect to game
-        UI_MenuItemLabel(game_state, S8Lit("Connecting to Game"));
+        UI_Label(game_state, S8Lit("Connecting to Game"), x, y, true);
         if (IsFlagSet(game_session->session_state_flags, SESSION_FLAG_CONNECTED_TO_GAME))
         {
             // NOTE(fakhri): good, we should now enter our username and see if it's valid
@@ -499,6 +507,7 @@ void UpdateAndRenderJoinSessionMenu(Game_State *game_state,  Rendering_Context *
 
 void UpdateAndRenderUserNameMenu(Game_State *game_state,  Rendering_Context *rendering_context, UI_Context *ui_context, Controller *controller)
 {
+#if 1
     Game_Session *game_session = &game_state->game_session;
     UI_BeginFrame(ui_context);
     
@@ -506,33 +515,44 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state,  Rendering_Context *ren
     v2 screen = rendering_context->screen;
     
     glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    ChangeActiveFont(rendering_context, &rendering_context->arial_font);
+    ChangeActiveFont(rendering_context, &rendering_context->menu_title_font);
+    f32 x = 0.5f * screen.width;
+    f32 y = 0.1f * screen.height;
     
-    UI_PositionItem(ui_context, vec2(half_screen.x, 0.3f * screen.height));
-    UI_MenuItemLabel(game_state, S8Lit("Please Enter a username"));
+    // NOTE(fakhri): Menu Title
+    UI_Label(game_state, S8Lit("Connect to game"), x, y);
     
-    u32 username_index = ui_context->items_count;
+    ChangeActiveFont(rendering_context, &rendering_context->menu_item_font);
+    y = 0.4f * screen.height;
+    f32 stride = 2.0f * rendering_context->active_font->font_height;
     
-    v2 item_size = {600, 50};
-    UI_VerticalAdvanceItemPosition(ui_context);
-    UI_MenuItemInputField(game_state, item_size);
+    // NOTE(fakhri): Username input field
+    {
+        s8 label_text = S8Lit("Your username is?");
+        UI_Label(game_state, label_text, x, y);
+        y+= stride;
+        
+        v2 input_field_size = {500, 50};
+        UI_InputField(game_state, input_field_size, x, y, &game_state->username_buffer);
+        y += stride;
+    }
     
-    UI_VerticalAdvanceItemPosition(ui_context);
+    y = 0.7f * screen.height;
     if (!IsFlagSet(game_session->session_state_flags, SESSION_FLAG_TRYING_JOIN_GAME))
     {
-        // TODO(fakhri): just for debug while we don't have a working server
-        SetFlag(game_session->session_state_flags, SESSION_FLAG_JOINED_GAME);
-        
-        if (UI_MenuItemButton(game_state, S8Lit("Join")))
+        if (UI_Button(game_state, S8Lit("Join"), x, y, vec2(half_screen.width, 1.1f * rendering_context->active_font->font_height)))
         {
-            s8 username =  ui_context->input_field_buffers[username_index].buffer;
+            s8 username =  game_state->username_buffer.buffer;
             
             os->PushNetworkMessage(CreateUsernameRequest(username));
             // TODO(fakhri): make sure the username isn't empty
             SetFlag(game_session->session_state_flags, SESSION_FLAG_TRYING_JOIN_GAME);
         }
+        
+        // TODO(fakhri): just for debug while we don't have a working server
+        SetFlag(game_session->session_state_flags, SESSION_FLAG_JOINED_GAME);
     }
     else
     {
@@ -542,17 +562,20 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state,  Rendering_Context *ren
             OpenMenu(game_state, Game_Mode_MENU_WAITING_PLAYERS);
             ClearFlag(game_session->session_state_flags, SESSION_FLAG_TRYING_JOIN_GAME);
         }
+        
         if (IsFlagSet(game_session->session_state_flags, SESSION_FLAG_FAILED_JOIN_GAME))
         {
-            // TODO(fakhri): display message indicating that we couldn't join the game and the reason
+            // TODO(fakhri): investigate reasons and report them
         }
     }
     UI_EndFrame(ui_context, controller);
+#endif
 }
 
 internal
 void UpdateAndRenderWaitingPlayersMenu(Game_State *game_state,  Rendering_Context *rendering_context, UI_Context *ui_context, Controller *controller)
 {
+#if 1
     Game_Session *game_session = &game_state->game_session;
     v2 half_screen = 0.5f * rendering_context->screen;
     v2 screen = rendering_context->screen;
@@ -560,64 +583,90 @@ void UpdateAndRenderWaitingPlayersMenu(Game_State *game_state,  Rendering_Contex
     UI_BeginFrame(ui_context);
     
     glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     v3 white = vec3(1.0f, 1.0f, 1.0f);
     v3 none_white = 0.3f * white;
     
     
+    ChangeActiveFont(rendering_context, &rendering_context->menu_title_font);
+    f32 x = 0.5f * screen.width;
+    f32 y = 0.1f * screen.height;
+    
     // NOTE(fakhri): render menu title
-    // TODO(fakhri): use title fonts
-    ChangeActiveFont(rendering_context, &rendering_context->arial_font);
+    UI_Label(game_state, S8Lit("Joined Players"), x, y);
     
-    UI_PositionItem(ui_context, vec2(half_screen.x, 0.05f * screen.height));
-    UI_SetVerticalSpacing(ui_context, 0.2f * screen.y);
-    UI_MenuItemLabel(game_state, S8Lit("Joined Players"));
+    // NOTE(fakhri): use menu item fonts
+    ChangeActiveFont(rendering_context, &rendering_context->menu_item_font);
+    y = 0.2f * screen.height;
+    f32 stride = 2.0f * rendering_context->active_font->font_height;
     
-    // TODO(fakhri): remove the 1 from here
     if (IsFlagSet(game_session->session_state_flags, SESSION_FLAG_HOSTING_GAME))
     {
-        UI_VerticalAdvanceItemPosition(ui_context);
-        UI_MenuItemLabel(game_state, S8Lit("You are hosting the game"));
+        UI_Label(game_state, S8Lit("You are hosting the game"), x, y);
+        y += stride;
         
         // TODO(fakhri): format this text
-        UI_VerticalAdvanceItemPosition(ui_context);
-        s8 server_addres_message = S8Lit("the game session address is 127.0.0.1");
-        UI_MenuItemLabel(game_state, server_addres_message);
+        s8 server_addres_message = S8Lit("your address is 127.0.0.1");
+        x = 0.3f * screen.width; 
+        UI_Label(game_state, server_addres_message, x, y);
         
-        UI_VerticalAdvanceItemPosition(ui_context);
-        if (UI_MenuItemButton(game_state, S8Lit("Copy to Clipboard")))
+        x = 0.7f * screen.width;  
+        if (UI_Button(game_state, S8Lit("Copy to Clipboard"), x, y, vec2(half_screen.width, 1.1f * rendering_context->active_font->font_height)))
         {
             // TODO(fakhri): copy server address to clipboard
         }
+        x = 0.5f * screen.width;
+        y += stride;
     }
     
-    // TODO(fakhri): change font
-    ChangeActiveFont(rendering_context, &rendering_context->arial_font);
+    UI_Label(game_state, S8Lit("Connected players"), x, y);
+    y += stride;
     
-    // NOTE(fakhri): draw usernames of the connected players 
-    // TODO(fakhri): use usernames font
-    ChangeActiveFont(rendering_context, &rendering_context->arial_font);
-    
-    UI_VerticalAdvanceItemPosition(ui_context);
-    UI_SetVerticalSpacing(ui_context, 0.1f * screen.height);
     for (u32 players_index = 0;
          players_index < PLAYERS_COUNT;
          ++players_index)
     {
-        UI_VerticalAdvanceItemPosition(ui_context);
-        UI_MenuItemLabel(game_state, game_session->players[players_index]);
+        UI_Label(game_state, S8Lit("blabla"), x , y);
+        //UI_Label(game_state, game_session->players[players_index], x , y);
+        y += stride;
     }
     
-    UI_SetVerticalSpacing(ui_context, 0.2f * screen.height);
-    UI_VerticalAdvanceItemPosition(ui_context);
-    UI_MenuItemLabel(game_state, S8Lit("Waiting Players to Join"), true);
+    y = 0.8f * screen.height;
+    UI_Label(game_state, S8Lit("Waiting Players to Join"), x, y, true);
+    y += stride;
+    
+    if (UI_Button(game_state, S8Lit("Cancel"), x, y, vec2(half_screen.width, 1.1f * rendering_context->active_font->font_height)))
+    {
+        if (IsFlagSet(game_session->session_state_flags, SESSION_FLAG_HOSTING_GAME))
+        {
+            // TODO(fakhri): display a warning message
+        }
+        else
+        {
+            // TODO(fakhri): dispaly a confirmation message
+        }
+        
+        b32 cancled_join_game_confirmed = true;
+        if (cancled_join_game_confirmed)
+        {
+            OpenMenu(game_state, Game_Mode_MENU_MAIN);
+            
+            if (IsFlagSet(game_session->session_state_flags, SESSION_FLAG_HOSTING_GAME))
+            {
+                // TODO(fakhri): stop the server
+            }
+        }
+    }
     
     if (game_session->players_joined_sofar == PLAYERS_COUNT)
     {
         // NOTE(fakhri): enough players here
         game_state->game_mode = Game_Mode_GAME;
+        glDepthFunc(GL_LESS);
     }
+    
+#endif
 }
 
 internal u32
@@ -992,11 +1041,13 @@ extern "C"
         InitRenderer(&game_state->rendering_context);
         UI_Init(&game_state->ui_context, &os->permanent_arena);
         
+        game_state->host_address_buffer = InitBuffer(&os->permanent_arena, SERVER_ADDRESS_BUFFER_SIZE);
+        game_state->username_buffer = InitBuffer(&os->permanent_arena, USERNAME_BUFFER_SIZE);
         
         // TODO(fakhri): this is just for debug
-        game_state->game_mode = Game_Mode_GAME;
+        OpenMenu(game_state, Game_Mode_MENU_MAIN);
         game_state->game_session = {};
-        game_state->game_session.players_joined_sofar = PLAYERS_COUNT;
+        //game_state->game_session.players_joined_sofar = PLAYERS_COUNT;
         game_state->game_session.players[0] = S8Lit("0");
         game_state->game_session.players[1] = S8Lit("1");
         game_state->game_session.players[2] = S8Lit("2");

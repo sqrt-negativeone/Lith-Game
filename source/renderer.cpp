@@ -54,6 +54,7 @@ LoadGlyphsFromFont(FT_Library ft, Font *font, s8 font_path, u32 font_size)
         }
         glBindTexture(GL_TEXTURE_2D, 0);
         FT_Done_Face(face);
+        font->font_height = (f32)font->characters['H'].bearing.y;;
     }
     else
     {
@@ -268,21 +269,23 @@ InitRenderer(Rendering_Context *rendering_context)
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
     
-    // NOTE(fakhri): load textures
+    LoadFrenshSuitedDeck(&rendering_context->frensh_deck);
+    
+    // NOTE(fakhri): load fonts
+    FT_Library ft;
+    if (!FT_Init_FreeType(&ft))
     {
-        LoadFrenshSuitedDeck(&rendering_context->frensh_deck);
-        // NOTE(fakhri): load fonts
-        FT_Library ft;
-        if (!FT_Init_FreeType(&ft))
-        {
-            s8 font_path = S8Lit("assets/fonts/arial.ttf");
-            LoadGlyphsFromFont(ft, &rendering_context->arial_font, font_path, 48);
-            FT_Done_FreeType(ft);
-        }
-        else
-        {
-            LogError("Couldn't initialize free type library");
-        }
+        // TODO(fakhri): use the right fonts
+        s8 font_path = S8Lit("assets/fonts/arial.ttf");
+        LoadGlyphsFromFont(ft, &rendering_context->arial_font, font_path, 48);
+        FT_Done_FreeType(ft);
+        
+        rendering_context->menu_title_font = rendering_context->arial_font;
+        rendering_context->menu_item_font = rendering_context->arial_font;
+    }
+    else
+    {
+        LogError("Couldn't initialize free type library");
     }
     
     rendering_context->normalized_width_unit_per_world_unit = 1.0f / MAX_UNITS_PER_X;
@@ -414,25 +417,14 @@ GetActiveFontNormalizedWidth(Rendering_Context *rendering_context, s8 text, f32 
     return result;
 }
 
-internal f32
+internal inline f32
 GetActiveFontHeight(Rendering_Context *rendering_context, f32 scale = 1.0f)
 {
-    f32 text_height = 0;
-    if (rendering_context->active_font)
-    {
-        Font *font = rendering_context->active_font;
-        text_height = (f32)font->characters['H'].bearing.y;
-        text_height *= scale;
-    }
-    else
-    {
-        LogError("active font is null");
-        BreakDebugger();
-    }
-    return text_height;
+    Assert(rendering_context->active_font);
+    return rendering_context->active_font->font_height;
 }
 
-internal f32
+internal inline f32
 GetActiveFontNormalizedHeight(Rendering_Context *rendering_context, f32 scale = 1.0f)
 {
     f32 result = GetActiveFontHeight(rendering_context, scale);
@@ -521,7 +513,7 @@ DebugDrawTextWorldCoord(Rendering_Context *rendering_context, s8 text, v2 pos, v
     DebugDrawTextNormalizedCoord(rendering_context, text, pos, text_color, scale);
 }
 
-internal v2
+internal inline v2
 ScreenToWorldCoord(Rendering_Context *rendering_context, v2 pos)
 {
     pos.x *= 1.0f / rendering_context->screen.width;
@@ -533,5 +525,33 @@ ScreenToWorldCoord(Rendering_Context *rendering_context, v2 pos)
     pos.x = pos.x *  x_correction;
     pos.y = (1.0f - pos.y) * y_correction;
     
+    return pos;
+}
+
+internal inline v2
+NormalizedToScreenCoords(Rendering_Context *rendering_context, v2 pos)
+{
+    f32 window_width  = rendering_context->screen.width;
+    f32 window_height = rendering_context->screen.height;
+    pos = vec2(pos.x * window_width, pos.y * window_height);
+    return pos;
+}
+
+internal inline v2
+WorldToNormalizedCoords(Rendering_Context *rendering_context, v2 pos)
+{
+    f32 x_correction = rendering_context->normalized_width_unit_per_world_unit;
+    f32 y_correction = (1.0f / rendering_context->aspect_ratio) * x_correction;
+    pos = vec2(pos.x * x_correction,
+               1.0f - pos.y * y_correction);
+    
+}
+
+
+internal inline v2
+WorldToScreenCoords(Rendering_Context *rendering_context, v2 pos)
+{
+    pos = WorldToNormalizedCoords(rendering_context, pos);
+    pos = NormalizedToScreenCoords(rendering_context, pos);
     return pos;
 }

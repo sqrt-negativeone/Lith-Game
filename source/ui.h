@@ -25,22 +25,15 @@ struct UI_ColorScheme
     v3 input_field_text_active_color;
 };
 
-#define MAX_INPUT_FIELDS_PER_MENU 2
-#define SERVER_ADDRESS_BUFFER_SIZE 16
+#define SERVER_ADDRESS_BUFFER_SIZE (16 * sizeof(char))
+#define USERNAME_BUFFER_SIZE (16 * sizeof(char))
 
 struct UI_Context
 {
-    u32 selected_item;
-    u32 items_count;
-    v2 button_shadow_offset;
+    i32 selected_item;
+    i32 items_count;
     
-    u32 buffer_index;
-    Buffer input_field_buffers[MAX_INPUT_FIELDS_PER_MENU];
-    
-    f32 prev_time;
-    
-    v2 item_position;
-    v3 spacing;
+    f32 last_select_time;
     
     UI_ColorScheme color_scheme;
 };
