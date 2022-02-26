@@ -6,7 +6,7 @@ set build_options= -DBUILD_WIN32=1
 set warnings= /W4 /wd4211 /wd4189 /wd4533 /wd4310 /wd4100 /wd4201 /wd4505 /wd4996 /wd4127 /wd4510 /wd4512 /wd4610 /wd4457 /WX
 set compile_flags= -FC -GR- -EHa- -nologo -Zi %warnings% /I "%code%/source/" /I "%code%/extern/include/" /I "%code%/extern/include/freetype-2.10.4"
 set common_link_flags= opengl32.lib -incremental:no
-set platform_link_flags= gdi32.lib user32.lib Kernel32.lib winmm.lib %common_link_flags%
+set platform_link_flags= Ws2_32.lib gdi32.lib user32.lib Kernel32.lib winmm.lib %common_link_flags%
 set app_link_flags= /LIBPATH:"%code%/extern/lib" freetype.lib %common_link_flags%
 
 

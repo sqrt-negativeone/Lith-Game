@@ -85,11 +85,6 @@ RandomF32(f32 low, f32 high)
 
 //~ NOTE(rjf): Perlin Noise
 
-#undef Assert
-#define AssertStatement HardAssert
-#define Assert HardAssert
-#define HardAssert(b) do { if(!(b)) { _AssertFailure(#b, __LINE__, __FILE__, 1); } } while(0)
-#define SoftAssert(b) do { if(!(b)) { _AssertFailure(#b, __LINE__, __FILE__, 0); } } while(0)
 #define BreakDebugger() _DebugBreak_Internal_()
 #define Log(...)         _DebugLog(0,           __FILE__, __LINE__, __VA_ARGS__)
 #define LogWarning(...)  _DebugLog(Log_Warning, __FILE__, __LINE__, __VA_ARGS__)

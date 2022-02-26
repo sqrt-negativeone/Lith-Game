@@ -235,7 +235,7 @@ struct OS_State
     void (*SetCursorToIBar)(void);
     void (*RefreshScreen)(void);
     void (*PushNetworkMessage)(NetworkMessage msg);
-    void (*GetNextNetworkMessageIfAvailable)(NetworkMessage *message);
+    NetworkMessageResult (*GetNextNetworkMessageIfAvailable)(void);
     // NOTE(fakhri): game state
     Game_State *game_state;
     f32 dtime;

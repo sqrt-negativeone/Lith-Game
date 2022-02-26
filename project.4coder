@@ -51,7 +51,33 @@ command_list =
 		},
 	},
     
+	{
+		.name = "build_lobby",
+		.out = "*compilation*",
+		.footer_panel = true,
+		.save_dirty_files = true,
+		.cursor_at_end = false,
+		.cmd =
+		{
+			{ "build_lobby.bat", .os = "win" },
+		},
+	},
+    
+	{
+		.name = "run_lobby",
+		.out = "*compilation*",
+		.footer_panel = true,
+		.save_dirty_files = true,
+		.cursor_at_end = false,
+		.cmd =
+		{
+			{ "run_lobby.bat", .os = "win" },
+		},
+	},
+    
 };
 
 fkey_command[1] = "build";
 fkey_command[2] = "run";
+fkey_command[3] = "build_lobby";
+fkey_command[4] = "run_lobby";

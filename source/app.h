@@ -7,6 +7,8 @@
 #include "ui.h"
 #include "renderer.h"
 
+#include "network_shared/host_info.h"
+
 #define PLAYERS_COUNT (4)
 #define CARDS_PER_PLAYER (13)
 #define DECK_CARDS_COUNT (PLAYERS_COUNT * CARDS_PER_PLAYER)
@@ -60,14 +62,6 @@ enum Game_Session_Flags
     SESSION_FLAG_SERVER_DOWN         = (1 << 8),
 };
 
-
-struct Game_Session
-{
-    s8 players[PLAYERS_COUNT];
-    u32 players_joined_sofar;
-    // NOTE(fakhri): indicate if we are the ones hosting the game
-    u32 session_state_flags;
-};
 
 #if 1
 enum Entity_Type
@@ -154,6 +148,23 @@ struct Number
 };
 #endif
 
+struct Hosts_Storage
+{
+    // TODO(fakhri): how many do we need to display?
+    b32 is_fetching;
+    Host_Info hosts[10];
+    u32 hosts_count;
+};
+
+struct Game_Session
+{
+    s8 players[PLAYERS_COUNT];
+    u32 players_joined_sofar;
+    // NOTE(fakhri): indicate if we are the ones hosting the game
+    u32 session_state_flags;
+    
+    Hosts_Storage hosts_storage;
+};
 
 struct Game_State
 {

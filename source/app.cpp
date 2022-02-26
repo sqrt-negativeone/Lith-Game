@@ -3,6 +3,7 @@
 #include "GL/wglext.h"
 
 #include "language_layer.h"
+#include "asserts.h"
 #include "maths.h"
 #include "memory.h"
 #include "strings.h"
@@ -14,6 +15,7 @@
 #include <stb_image.h>
 
 #include "language_layer.c"
+#include "asserts.cpp"
 #include "memory.c"
 #include "strings.c"
 #include "perlin.c"
@@ -27,25 +29,19 @@
 internal void
 HandleAvailableNetworkMessages(Game_State *game_state)
 {
+    
     Game_Session *game_session = &game_state->game_session;
-    NetworkMessage message = {};
-    os->GetNextNetworkMessageIfAvailable(&message);
-    // TODO(fakhri): we can limit the nombre of messages handled per frame if it slowed things down
-    for(;
-        message.is_available;
-        os->GetNextNetworkMessageIfAvailable(&message)
+    for(NetworkMessageResult message_result = os->GetNextNetworkMessageIfAvailable();
+        message_result.is_available;
+        message_result = os->GetNextNetworkMessageIfAvailable()
         )
     {
-        switch(message.type)
+        switch(message_result.message.type)
         {
-            case NetworkMessageType_From_Server_PLAYER_TURN:
-            {
-                // TODO(fakhri): change the turn
-            } break;
             case NetworkMessageType_From_Server_PLAYER_JOINED_GAME:
             {
-                u32 player_index = message.player_index;
-                game_session->players[player_index] = message.player_username;
+                u32 player_index = message_result.message.player_index;
+                game_session->players[player_index] = message_result.message.player_username;
                 ++game_session->players_joined_sofar;
             } break;
             case NetworkMessageType_From_Server_INVALIDE_USERNAME:
@@ -54,8 +50,9 @@ HandleAvailableNetworkMessages(Game_State *game_state)
             default:
             {
                 // NOTE(fakhri): unhandled message
-                BreakDebugger();
-            } break;
+                // NOTE(fakhri): unhandled message
+                Assert(false);
+            }
         }
     }
 }
@@ -413,6 +410,7 @@ void UpdateAndRenderMainMenu(Game_State *game_state, Rendering_Context *renderin
     // NOTE(fakhri): join session button
     if (UI_Button(game_state, S8Lit("Join Game Room"), x, y, vec2(half_screen.width, 1.1f * rendering_context->active_font->font_height)))
     {
+        os->PushNetworkMessage(CreateFetchAvailableHostsMessage());
         OpenMenu(game_state, Game_Mode_MENU_JOIN_GAME);
     }
     y += stride;
@@ -451,56 +449,19 @@ void UpdateAndRenderJoinSessionMenu(Game_State *game_state,  Rendering_Context *
     f32 y = 0.1f * screen.height;
     
     // NOTE(fakhri): Menu Title
-    UI_Label(game_state, S8Lit("Connect to game"), x, y);
+    UI_Label(game_state, S8Lit("Choose a host game"), x, y);
     
-    ChangeActiveFont(rendering_context, &rendering_context->menu_item_font);
-    y = 0.4f * screen.height;
-    f32 stride = 2.0f * rendering_context->active_font->font_height;
-    
-    // NOTE(fakhri): host address input field
+    // TODO(fakhri): draw a list of available hosts here
+    if (!game_session->hosts_storage.is_fetching)
     {
-        s8 label_text = S8Lit("host address");
-        UI_Label(game_state, label_text, x, y);
-        y+= stride;
-        
-        v2 input_field_size = {500, 50};
-        UI_InputField(game_state, input_field_size, x, y, &game_state->host_address_buffer);
-        y += stride;
-    }
-    
-    y = 0.7f * screen.height;
-    if (!IsFlagSet(game_session->session_state_flags, SESSION_FLAG_TRYING_CONNECT_GAME))
-    {
-        if (UI_Button(game_state, S8Lit("Connect"), x, y, vec2(half_screen.width, 1.1f * rendering_context->active_font->font_height)))
-        {
-            SetFlag(game_session->session_state_flags, SESSION_FLAG_TRYING_CONNECT_GAME);
-            s8 input =  game_state->host_address_buffer.buffer;
-            os->PushNetworkMessage(CreateConnectToServerMessage(&os->permanent_arena, input));
-        }
-        
-        if (controller->escape_key.pressed)
-        {
-            OpenMenu(game_state, Game_Mode_MENU_MAIN);
-        }
-        
-        // TODO(fakhri): just for debug while we don't have a working server
-        SetFlag(game_session->session_state_flags, SESSION_FLAG_CONNECTED_TO_GAME);
+        // TODO(fakhri): draw the available hosts
     }
     else
     {
-        // NOTE(fakhri): trying to connect to game
-        UI_Label(game_state, S8Lit("Connecting to Game"), x, y, true);
-        if (IsFlagSet(game_session->session_state_flags, SESSION_FLAG_CONNECTED_TO_GAME))
-        {
-            // NOTE(fakhri): good, we should now enter our username and see if it's valid
-            OpenMenu(game_state, Game_Mode_MENU_USERNAME);
-            ClearFlag(game_session->session_state_flags, SESSION_FLAG_TRYING_CONNECT_GAME);
-        }
-        else if (IsFlagSet(game_session->session_state_flags, SESSION_FLAG_FAILED_CONNECT_GAME))
-        {
-            // TODO(fakhri): show some message indicating that we couldn't connect to server
-        }
+        // TODO(fakhri): draw something to indicate that we are waiting for the hosts to be fetched from the server
     }
+    
+    // TODO(fakhri): draw a refresh button or something
     
     UI_EndFrame(ui_context, controller);
 }
@@ -546,7 +507,7 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state,  Rendering_Context *ren
         {
             s8 username =  game_state->username_buffer.buffer;
             
-            os->PushNetworkMessage(CreateUsernameRequest(username));
+            os->PushNetworkMessage(CreateUsernameMessage(username));
             // TODO(fakhri): make sure the username isn't empty
             SetFlag(game_session->session_state_flags, SESSION_FLAG_TRYING_JOIN_GAME);
         }

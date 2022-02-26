@@ -1,11 +1,18 @@
+// NOTE(fakhri): windows shenanigans
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
 #include <windows.h>
 #include <windowsx.h>
 #define CINTERFACE
 #include <xinput.h>
 #include <objbase.h>
+#include <mmsystem.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 #include <audiopolicy.h>
+
 #undef DeleteFile
 
 extern "C"
@@ -25,6 +32,9 @@ extern "C"
 // NOTE(rjf): Headers
 #include "program_options.h"
 #include "language_layer.h"
+#include "network_shared/network_utilities.h"
+
+#include "asserts.h"
 #include "maths.h"
 #include "memory.h"
 #include "strings.h"
@@ -32,14 +42,18 @@ extern "C"
 #include "app.h"
 #include "os.h"
 #include "win32_timer.h"
+#include "win32_network_thread.h"
 
 #include "language_layer.c"
+#include "network_shared/network_utilities.cpp"
+#include "network_shared/host_info.cpp"
+#include "asserts.cpp"
 #include "memory.c"
 #include "strings.c"
 #include "win32_game_server.cpp"
 #include "os.c"
 #include "shader.cpp"
-
+#include "win32_network_thread.cpp"
 
 // NOTE(rjf): Globals
 global char global_executable_path[256];
@@ -456,107 +470,21 @@ W32_SetCursorToVerticalResize(void)
     global_cursor_style = W32_CursorStyle_VerticalResize;
 }
 
-// NOTE(fakhri): the networking thread will insert other players moves in this queue
-struct MessageQueue
-{
-    NetworkMessage queue[256];
-    u32 msg_index;
-    u32 msg_count;
-};
-
-// NOTE(fakhri): the messages that needs to get out to the server
-MessageQueue network_out_queue;
-// NOTE(fakhri): the messages that we receive from the server
-MessageQueue network_in_queue;
-
-// NOTE(fakhri): when our turn ends we update the turn_move variable and signal this semaphore
-HANDLE turn_ended_semaphore;
-NetworkMessage turn_move;
-b32 our_turn = 0;
-
-HANDLE iocp_handle;
-
-#define GAME_MESSAGE   0
-#define SERVER_MESSAGE 1
-
-// NOTE(fakhri): this thread is responsible for network communication with the server
-DWORD WINAPI NetworkMain(LPVOID lpParameter)
-{
-    u32 joined_game = 0;
-    // NOTE(fakhri): this is true when it's our turn and false otherwise
-    for(;;)
-    {
-        DWORD bytes_transferred;
-        u64 completion_key;
-        OVERLAPPED *Overlapped = 0;
-        if (GetQueuedCompletionStatus(iocp_handle, 
-                                      &bytes_transferred,
-                                      &completion_key,
-                                      &Overlapped,
-                                      INFINITE))
-        {
-            switch(completion_key)
-            {
-                case GAME_MESSAGE:
-                {
-                    Log("we received a message from the game");
-                    // NOTE(fakhri): something on the network out queue
-                    // TODO(fakhri): handle all the messages on the network out queue
-                } break;
-                case SERVER_MESSAGE:
-                {
-                    // TODO(fakhri): we have a message from the server
-                    // TODO(fakhri): handle the request
-                    // TODO(fakhri): insert the server message into the network in queue
-                } break;
-            }
-        }
-    }
-}
-
-internal void
-W32_PushNetworkMessage(NetworkMessage msg)
-{
-    network_out_queue.queue[network_out_queue.msg_count] = msg;
-    // TODO(fakhri): put a write barrier here
-    network_out_queue.msg_count++;
-    // NOTE(fakhri): notify the network thread
-    u64 completion_key = GAME_MESSAGE;
-    PostQueuedCompletionStatus(iocp_handle, 0, completion_key, 0);
-}
-
-internal b32
-W32_IsMessageQueueEmpty(MessageQueue *queue)
-{
-    b32 result = (queue->msg_index == queue->msg_count);
-    return result;
-}
-
-internal void
-W32_GetNextNetworkMessageIfAvailable(NetworkMessage *message)
-{
-    Assert(message);
-    if (!W32_IsMessageQueueEmpty(&network_in_queue))
-    {
-        // NOTE(fakhri): single consumer single producer
-        *message = network_in_queue.queue[network_in_queue.msg_index];
-        network_in_queue.msg_index++;
-        message->is_available = 1;
-    }
-    else
-    {
-        message->is_available = 0;
-    }
-}
-
 int
 WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_show_cmd)
 {
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) 
+    {
+        LogError("Couldn't init socket");
+        PostQuitMessage(1);
+    }
+    
     u32 concurrent_threads_count = 1;
     
-    iocp_handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE,
-                                         0, 0,
-                                         concurrent_threads_count);
+    global_iocp_handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE,
+                                                0, 0,
+                                                concurrent_threads_count);
     
     HANDLE server_thread_handle  = CreateThread(0, 0, ServerMain, 0, 0, 0);
     // TODO(fakhri): wait for the server thread to create a socket and give us info about our address?
@@ -707,7 +635,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         global_os.SetCursorToHorizontalResize      = W32_SetCursorToHorizontalResize;
         global_os.SetCursorToVerticalResize        = W32_SetCursorToVerticalResize;
         global_os.RefreshScreen                    = W32_OpenGLRefreshScreen;
-        global_os.PushNetworkMessage               = W32_PushNetworkMessage;
+        global_os.PushNetworkMessage               = W32_PushNetworkMessageToServer;
         global_os.GetNextNetworkMessageIfAvailable = W32_GetNextNetworkMessageIfAvailable;
         
         global_os.permanent_arena = M_ArenaInitialize();

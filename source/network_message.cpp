@@ -1,6 +1,6 @@
 
-internal
-NetworkMessage CreateConnectToServerMessage(M_Arena *arena, s8 server_address)
+internal NetworkMessage
+CreateConnectToServerMessage(M_Arena *arena, s8 server_address)
 {
     NetworkMessage result = {};
     result.type = NetworkMessageType_From_Player_CONNECT_TO_SERVER;
@@ -8,8 +8,8 @@ NetworkMessage CreateConnectToServerMessage(M_Arena *arena, s8 server_address)
     return result;
 }
 
-internal
-NetworkMessage CreateNewGameSessionMessage()
+internal NetworkMessage
+CreateNewGameSessionMessage()
 {
     NetworkMessage result = {};
     result.type = NetworkMessageType_From_Player_NEW_GAME_SESSION;
@@ -17,11 +17,27 @@ NetworkMessage CreateNewGameSessionMessage()
     return result;
 }
 
-internal
-NetworkMessage CreateUsernameRequest(s8 username)
+internal NetworkMessage
+CreateUsernameMessage(s8 username)
 {
     NetworkMessage result = {};
     result.type     = NetworkMessageType_From_Player_USERNAME;
     result.player_username = username;
+    return result;
+}
+
+internal NetworkMessage
+CreateFetchAvailableHostsMessage()
+{
+    NetworkMessage result = {};
+    result.type = NetworkMessageType_From_Player_FETCH_HOSTS;
+    return result;
+}
+
+internal NetworkMessage 
+CreateCouldNotConnectToServerMessage()
+{
+    NetworkMessage result = {};
+    result.type = NetworkMessageType_From_Server_COULD_NOT_CONNECT_TO_SERVER;
     return result;
 }
