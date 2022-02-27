@@ -22,6 +22,8 @@
 #define U64_MAX ((u64)-1)
 #define MAIN_THREAD_COMPLETION_KEY U64_MAX
 
+#include <stdio.h>
+
 typedef void WorkThreadWork(void *);
 
 struct Queue_Entry
@@ -139,7 +141,7 @@ AddHostInfo(Connected_Hosts_Storage *hosts_storage, HANDLE hosts_iocp, Connected
         // TODO(fakhri): should we notify the host about the problem? or the host always assuem that ther is no room and it should try later
         closesocket(connected_host->socket);
     }
-    ReleaseSemaphore(hosts_storage->hosts_mutex, 1, 0);
+    ReleaseMutex(hosts_storage->hosts_mutex);
 }
 
 internal void
@@ -164,7 +166,7 @@ ServePlayer(void *data)
             break;
         }
     }
-    ReleaseSemaphore(hosts_storage->hosts_mutex, 1, 0);
+    ReleaseMutex(hosts_storage->hosts_mutex);
     VirtualFree(input, sizeof(PlayerWorkInput), MEM_RELEASE);
     closesocket(input->player_socket);
 }
@@ -184,7 +186,7 @@ ServeHost(void *data)
         WaitForSingleObject(hosts_storage->hosts_mutex, INFINITE);
         *connected_host = hosts_storage->hosts[hosts_storage->hosts_count - 1];
         --hosts_storage->hosts_count;
-        ReleaseSemaphore(hosts_storage->hosts_mutex, 1, 0);
+        ReleaseMutex(hosts_storage->hosts_mutex);
     }
     VirtualFree(input, sizeof(HostWorkInput), MEM_RELEASE);
 }

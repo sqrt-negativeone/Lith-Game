@@ -27,10 +27,11 @@ CreateUsernameMessage(s8 username)
 }
 
 internal NetworkMessage
-CreateFetchAvailableHostsMessage()
+CreateFetchAvailableHostsMessage(Hosts_Storage *hosts_storage)
 {
     NetworkMessage result = {};
     result.type = NetworkMessageType_From_Player_FETCH_HOSTS;
+    result.hosts_storage = hosts_storage;
     return result;
 }
 

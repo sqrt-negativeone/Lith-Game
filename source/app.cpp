@@ -29,7 +29,6 @@
 internal void
 HandleAvailableNetworkMessages(Game_State *game_state)
 {
-    
     Game_Session *game_session = &game_state->game_session;
     for(NetworkMessageResult message_result = os->GetNextNetworkMessageIfAvailable();
         message_result.is_available;
@@ -55,6 +54,13 @@ HandleAvailableNetworkMessages(Game_State *game_state)
             }
         }
     }
+}
+
+inline void
+FetchHosts(Hosts_Storage *hosts_storage)
+{
+    os->PushNetworkMessage(CreateFetchAvailableHostsMessage(hosts_storage));
+    hosts_storage->is_fetching = true;
 }
 
 inline void
@@ -410,7 +416,7 @@ void UpdateAndRenderMainMenu(Game_State *game_state, Rendering_Context *renderin
     // NOTE(fakhri): join session button
     if (UI_Button(game_state, S8Lit("Join Game Room"), x, y, vec2(half_screen.width, 1.1f * rendering_context->active_font->font_height)))
     {
-        os->PushNetworkMessage(CreateFetchAvailableHostsMessage());
+        FetchHosts(&game_session->hosts_storage);
         OpenMenu(game_state, Game_Mode_MENU_JOIN_GAME);
     }
     y += stride;
@@ -450,18 +456,33 @@ void UpdateAndRenderJoinSessionMenu(Game_State *game_state,  Rendering_Context *
     
     // NOTE(fakhri): Menu Title
     UI_Label(game_state, S8Lit("Choose a host game"), x, y);
-    
+    f32 stride = 2.0f * rendering_context->active_font->font_height;
     // TODO(fakhri): draw a list of available hosts here
-    if (!game_session->hosts_storage.is_fetching)
+    b32 is_still_fetching_hosts = game_session->hosts_storage.is_fetching;
+    if (!is_still_fetching_hosts)
     {
-        // TODO(fakhri): draw the available hosts
+        y = 0.3f * screen.height;
+        for (u32 host_index = 0;
+             host_index < game_session->hosts_storage.hosts_count;
+             ++host_index)
+        {
+            Host_Info *host_info = game_session->hosts_storage.hosts + host_index;
+            UI_Label(game_state, String8FromCString(host_info->hostname),x, y );
+            y += stride;
+        }
+        
+        y = 0.9f * screen.height;
+        
+        if(UI_Button(game_state, S8Lit("Refresh Hosts List"), x, y, vec2(half_screen.width, 1.1f * rendering_context->active_font->font_height)))
+        {
+            FetchHosts(&game_session->hosts_storage);
+        }
     }
     else
     {
-        // TODO(fakhri): draw something to indicate that we are waiting for the hosts to be fetched from the server
+        y = 0.5f * screen.height;
+        UI_Label(game_state, S8Lit("Refreshing Available Hosts"), x, y);
     }
-    
-    // TODO(fakhri): draw a refresh button or something
     
     UI_EndFrame(ui_context, controller);
 }
@@ -1069,12 +1090,6 @@ extern "C"
     APP_HOT_UNLOAD {
     }
     
-    // BRAINSTORM(fakhri): the game should be a multiplayer game, each game sessoin is played between 4
-    // players, players join a game session with their 3 friends (they should have their ip addresses
-    // or something, I don't think we gonna have like some server for now that is going to be
-    // responsible for assigning game sessions to players, we won't allow voice communication now, we 
-    // will only have two action buttons, one to put the card and trust what the other player said
-    // and the other to call the last player liar
     APP_UPDATE
     {
         Game_State *game_state = os->game_state;

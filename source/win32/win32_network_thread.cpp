@@ -6,7 +6,6 @@ global SOCKET host_socket;
 internal void
 FetchHostsFromLobby(Hosts_Storage *hosts_storage)
 {
-    ReceiveBuffer(lobby_socket, &hosts_storage->hosts_count, sizeof(hosts_storage->hosts_count));
     if (!ReceiveBuffer(lobby_socket, &hosts_storage->hosts_count, sizeof(hosts_storage->hosts_count)))
     {
         LogError("couldn'r read stuff from lobby");
@@ -39,7 +38,7 @@ HandlePlayerMessage(NetworkMessage *message)
     {
         case NetworkMessageType_From_Player_FETCH_HOSTS:
         {
-            // TODO(fakhri): fetch hosts from lobby server
+            Log("fetching hosts from lobby");
             lobby_socket = ConnectToServer(LOBBY_ADDRESS, LOBBY_PORT);
             if (lobby_socket == INVALID_SOCKET)
             {
@@ -50,6 +49,7 @@ HandlePlayerMessage(NetworkMessage *message)
             FetchHostsFromLobby(message->hosts_storage);
             MemoryBarrier();
             message->hosts_storage->is_fetching = false;
+            closesocket(lobby_socket);
         } break;
         case NetworkMessageType_From_Player_CONNECT_TO_SERVER:
         {
