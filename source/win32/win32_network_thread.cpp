@@ -14,6 +14,10 @@ FetchHostsFromLobby(Hosts_Storage *hosts_storage)
     }
     
     hosts_storage->hosts_count = ntohl(hosts_storage->hosts_count);
+    if (hosts_storage->hosts_count > ArrayCount(hosts_storage->hosts))
+    {
+        hosts_storage->hosts_count = ArrayCount(hosts_storage->hosts);
+    }
     
     u32 host_index = 0;
     while(host_index < hosts_storage->hosts_count)
