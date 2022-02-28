@@ -3,6 +3,10 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+#ifndef DONT_SHOW_ASSERTION_MESSAGE_WINDOW
+#define DONT_SHOW_ASSERTION_MESSAGE_WINDOW
+#endif
+
 #include <windows.h>
 #include <windowsx.h>
 
@@ -20,7 +24,7 @@
 
 #define WORKER_THREAD_MAX 16
 #define U64_MAX ((u64)-1)
-#define MAIN_THREAD_COMPLETION_KEY U64_MAX
+#define MAIN_THREAD_COMPLETION_KEY 0
 
 #include <stdio.h>
 
@@ -50,10 +54,18 @@ struct Thread_Info
     struct Lobby_Context *lobby_context;
 };
 
+enum HostOperation
+{
+    HostOperation_WaitingMessage,
+};
+
 struct Connected_Host
 {
     SOCKET socket;
     Host_Info host_info;
+    WSABUF wsa_buf;
+    char buffer[1];
+    HostOperation operation;
 };
 
 struct Connected_Host_Queue
@@ -109,7 +121,7 @@ CompleteHostInfo(Connected_Host *connected_host)
     }
     
     // NOTE(fakhri): read the port
-    if (!ReceiveBuffer(connected_host->socket, (char *)&connected_host->host_info.port, sizeof(connected_host->host_info.port)))
+    if (!ReceiveBuffer(connected_host->socket, &connected_host->host_info.port, sizeof(connected_host->host_info.port)))
     {
         // NOTE(fakhri): an erro occured when reading from the socket
         closesocket(connected_host->socket);
@@ -120,26 +132,46 @@ CompleteHostInfo(Connected_Host *connected_host)
 }
 
 internal void
-AddHostInfo(Connected_Hosts_Storage *hosts_storage, HANDLE hosts_iocp, Connected_Host *connected_host)
+AddHostInfo(Connected_Hosts_Storage *hosts_storage, HANDLE hosts_iocp, Connected_Host *connected_host_to_add)
 {
     // TODO(fakhri): should we force the hostname to be unique?
     WaitForSingleObject(hosts_storage->hosts_mutex, INFINITE);
     if (hosts_storage->hosts_count < ArrayCount(hosts_storage->hosts))
     {
         u64 host_index = hosts_storage->hosts_count;
+        Connected_Host *connected_host = hosts_storage->hosts + host_index;
+        connected_host->socket = connected_host_to_add->socket;
+        connected_host->host_info = connected_host_to_add->host_info;
         if (CompleteHostInfo(connected_host))
         {
-            hosts_storage->hosts[host_index] = *connected_host;
             MemoryBarrier();
             ++hosts_storage->hosts_count;
             
-            CreateIoCompletionPort((HANDLE)connected_host->socket, hosts_iocp, host_index, 1);
+            if (CreateIoCompletionPort((HANDLE)connected_host->socket, hosts_iocp, (ULONG_PTR)connected_host, 1))
+            {
+                connected_host->wsa_buf.buf = connected_host->buffer;
+                connected_host->wsa_buf.len = sizeof(connected_host->buffer);
+                
+                WSAOVERLAPPED  Overlapped;
+                ZeroMemory(&Overlapped, sizeof(WSAOVERLAPPED));
+                DWORD flags = 0;
+                
+                WSARecv(connected_host->socket, 
+                        &connected_host->wsa_buf,
+                        1,
+                        0,
+                        &flags,
+                        &Overlapped,
+                        0
+                        );
+            }
+            
         }
     }
     else
     {
         // TODO(fakhri): should we notify the host about the problem? or the host always assuem that ther is no room and it should try later
-        closesocket(connected_host->socket);
+        closesocket(connected_host_to_add->socket);
     }
     ReleaseMutex(hosts_storage->hosts_mutex);
 }
@@ -179,14 +211,11 @@ ServeHost(void *data)
     Connected_Hosts_Storage *hosts_storage = &input->lobby_context->hosts_storage;
     Connected_Host *connected_host = hosts_storage->hosts + input->host_index;
     
-    char buffer;
-    if (recv(connected_host->socket, &buffer, sizeof(buffer), 0) == 0)
+    char message;
+    recv(connected_host->socket, &message, sizeof(message), 0);
+    if (message == 1)
     {
-        // NOTE(fakhri): connection closed, remove the host from the storage
-        WaitForSingleObject(hosts_storage->hosts_mutex, INFINITE);
-        *connected_host = hosts_storage->hosts[hosts_storage->hosts_count - 1];
-        --hosts_storage->hosts_count;
-        ReleaseMutex(hosts_storage->hosts_mutex);
+        
     }
     VirtualFree(input, sizeof(HostWorkInput), MEM_RELEASE);
 }
@@ -273,33 +302,47 @@ DWORD WINAPI HostsThreadMain(LPVOID param)
                                       &Overlapped,
                                       INFINITE))
         {
-            if (completion_key != MAIN_THREAD_COMPLETION_KEY)
+            if (completion_key)
             {
-                Connected_Host *host_info = lobby_context->hosts_storage.hosts + completion_key;
+                Connected_Host *connected_host = (Connected_Host *)completion_key;
                 
-                Queue_Entry work_entry = {};
-                
-                HostWorkInput *input = (HostWorkInput *) VirtualAlloc(0, sizeof(HostWorkInput), MEM_COMMIT, PAGE_READWRITE);
-                
-                input->host_index = completion_key;
-                input->lobby_context = lobby_context;
-                
-                work_entry.work = ServeHost;
-                work_entry.data = input;
-                
-                if(!PushWorkQueueEntry(work_queue, work_entry))
+                if (connected_host->operation == HostOperation_WaitingMessage)
                 {
-                    // NOTE(fakhri): queue is full we do the work ourselves
-                    work_entry.work(work_entry.data);
+                    // NOTE(fakhri): waiting message from server operatoin finished
+                    if (bytes_transferred == 0)
+                    {
+                        Log("host %s closed", connected_host->host_info.hostname);
+                        // NOTE(fakhri): connection closed, remove the host from the storage
+                        Connected_Hosts_Storage *hosts_storage = &lobby_context->hosts_storage;
+                        WaitForSingleObject(hosts_storage->hosts_mutex, INFINITE);
+                        *connected_host = hosts_storage->hosts[hosts_storage->hosts_count - 1];
+                        --hosts_storage->hosts_count;
+                        ReleaseMutex(hosts_storage->hosts_mutex);
+                        closesocket(connected_host->socket);
+                    }
+                    else
+                    {
+                        // TODO(fakhri): do we have any other possible message?
+                        Assert(!"DIDN'T IMPLEMENT THIS CASE YET, SHOULD NOT HAPPEN");
+                    }
                 }
             }
             else
             {
                 while(lobby_context->connected_host_queue.tail != lobby_context->connected_host_queue.head)
                 {
-                    Connected_Host *connected_host = lobby_context->connected_host_queue.queue + lobby_context->connected_host_queue.head;
-                    AddHostInfo(&lobby_context->hosts_storage, lobby_context->hosts_iocp, connected_host);
                     
+                    if(lobby_context->connected_host_queue.tail - lobby_context->connected_host_queue.head >= ArrayCount(lobby_context->connected_host_queue.queue))
+                    {
+                        Assert(!"WHAT THE FUCK IS GOIN ON HERE?");
+                        Log("*sighs*");
+                    }
+                    
+                    u64 host_index = lobby_context->connected_host_queue.head % ArrayCount(lobby_context->connected_host_queue.queue);
+                    Connected_Host *connected_host = lobby_context->connected_host_queue.queue + host_index;
+                    AddHostInfo(&lobby_context->hosts_storage, lobby_context->hosts_iocp, connected_host);
+                    MemoryBarrier();
+                    ++lobby_context->connected_host_queue.head;
                 }
             }
         }
@@ -351,21 +394,6 @@ InitLobbyContext(Lobby_Context *lobby_context)
     Log("Started hosts thread");
     
     
-    //~ TODO(fakhri): this is just for debug only
-    lobby_context->hosts_storage.hosts_count = 10;
-    char ip[] = "127.0.0.1";
-    char hostname[] = "hostname";
-    
-    for (u32 host_index = 0;
-         host_index < lobby_context->hosts_storage.hosts_count;
-         ++host_index)
-    {
-        Connected_Host *connected_host = lobby_context->hosts_storage.hosts + host_index;
-        Host_Info *host_info = &connected_host->host_info;
-        memcpy(host_info->ip, ip, sizeof(ip));
-        memcpy(host_info->hostname, hostname, sizeof(hostname));
-        host_info->port = htons(42069);
-    }
 }
 
 int
@@ -384,7 +412,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     Log("Initialized lobby context");
     
     SOCKET listen_players_socket = OpenListenSocket(LOBBY_SERVER_PLAYERS_PORT);
-    SOCKET listen_hosts_socket = OpenListenSocket(LOBBY_SERVER_PLAYERS_PORT);
+    SOCKET listen_hosts_socket = OpenListenSocket(LOBBY_SERVER_HOSTS_PORT);
     
     if (listen_players_socket == INVALID_SOCKET || listen_hosts_socket == INVALID_SOCKET )
     {
@@ -420,7 +448,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         {
             Log("received host connection");
             sockaddr_in host_addr;
-            i32 addrlen;
+            i32 addrlen = sizeof(host_addr);
             
             SOCKET host_socket = accept(listen_hosts_socket, (sockaddr *)&host_addr, &addrlen);
             if (host_socket != INVALID_SOCKET)
@@ -432,9 +460,11 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
                 
                 Log("host ip address is %s", connected_host.host_info.ip);
                 
-                if (lobby_context.connected_host_queue.tail - lobby_context.connected_host_queue.head < ArrayCount(lobby_context.connected_host_queue.queue))
+                u64 hosts_queue_size = ArrayCount(lobby_context.connected_host_queue.queue); 
+                if (lobby_context.connected_host_queue.tail - lobby_context.connected_host_queue.head < hosts_queue_size)
                 {
-                    Connected_Host *queue_entry = lobby_context.connected_host_queue.queue + lobby_context.connected_host_queue.tail;
+                    u64 entry_index = lobby_context.connected_host_queue.tail % hosts_queue_size;
+                    Connected_Host *queue_entry = lobby_context.connected_host_queue.queue + entry_index;
                     *queue_entry = connected_host;
                     MemoryBarrier();
                     ++lobby_context.connected_host_queue.tail;
@@ -447,6 +477,12 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
                     // NOTE(fakhri): queue is full, we process it ourselves
                     AddHostInfo(&lobby_context.hosts_storage, lobby_context.hosts_iocp,  &connected_host);
                 }
+            }
+            else
+            {
+                int last_error = WSAGetLastError();
+                Log("Invalid address, error number %d", last_error);
+                
             }
         }
         

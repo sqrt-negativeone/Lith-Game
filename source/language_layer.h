@@ -93,6 +93,13 @@ RandomF32(f32 low, f32 high)
 #define Log_Warning (1<<0)
 #define Log_Error   (1<<1)
 
+#undef Assert
+#define AssertStatement HardAssert
+#define Assert HardAssert
+#define HardAssert(b) do { if(!(b)) { _AssertFailure(#b, __LINE__, __FILE__, 1); } } while(0)
+#define SoftAssert(b) do { if(!(b)) { _AssertFailure(#b, __LINE__, __FILE__, 0); } } while(0)
+
+
 void _AssertFailure(char *expression, int line, char *file, int crash);
 void _DebugLog(i32 flags, char *file, int line, char *format, ...);
 void _DebugBreak_Internal_(void);

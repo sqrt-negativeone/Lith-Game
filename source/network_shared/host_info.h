@@ -7,8 +7,7 @@ struct Host_Info
 {
     char ip[20];
     char hostname[20];
-    
-    u16 port;
+    char port[6];
 };
 
 #endif //HOST_INFO_H

@@ -45,3 +45,18 @@ _DebugBreak_Internal_(void)
     *(volatile int *)0 = 0;
 #endif
 }
+
+void
+_AssertFailure(char *expression, int line, char *file, int crash)
+{
+    LogError("[Assertion Failure] Assertion of %s at %s:%i failed.", expression, file, line);
+    if(crash)
+    {
+#ifndef DONT_SHOW_ASSERTION_MESSAGE_WINDOW
+        os->OutputError("Assertion Failure", "Assertion of %s at %s:%i failed. Trying to crash...",
+                        expression, file, line);
+#endif
+        BreakDebugger();
+        *(volatile int *)0 = 0;
+    }
+}

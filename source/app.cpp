@@ -3,7 +3,6 @@
 #include "GL/wglext.h"
 
 #include "language_layer.h"
-#include "asserts.h"
 #include "maths.h"
 #include "memory.h"
 #include "strings.h"
@@ -15,7 +14,6 @@
 #include <stb_image.h>
 
 #include "language_layer.c"
-#include "asserts.cpp"
 #include "memory.c"
 #include "strings.c"
 #include "perlin.c"

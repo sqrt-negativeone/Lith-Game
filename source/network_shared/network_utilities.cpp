@@ -84,7 +84,8 @@ SendBuffer(SOCKET s, void *data, i32 len)
         i32 bytes_sent = send(s, buffer + total_bytes_sent, bytes_to_send, 0);
         if (bytes_sent == SOCKET_ERROR)
         {
-            LogError("send call failed");
+            int last_error = WSAGetLastError();
+            LogError("send call failed with error %d", last_error);
             result = false;
             break;
         }
@@ -108,10 +109,18 @@ ReceiveBuffer(SOCKET s, void *data, i32 len)
         i32 bytes_received = recv(s, buffer + total_bytes_received, bytes_to_receive, 0);
         if (bytes_received == SOCKET_ERROR)
         {
-            LogError("send call failed");
+            int last_error = WSAGetLastError();
+            LogError("receive call failed with error %d", last_error);
             result = false;
             break;
         }
+        if (bytes_received == 0)
+        {
+            Log("socket closed from other end");
+            result = false;
+            break;
+        }
+        
         total_bytes_received += bytes_received;
         bytes_to_receive -= bytes_received;
     }

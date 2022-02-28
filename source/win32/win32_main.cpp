@@ -34,7 +34,6 @@ extern "C"
 #include "language_layer.h"
 #include "network_shared/network_utilities.h"
 
-#include "asserts.h"
 #include "maths.h"
 #include "memory.h"
 #include "strings.h"
@@ -47,7 +46,6 @@ extern "C"
 #include "language_layer.c"
 #include "network_shared/network_utilities.cpp"
 #include "network_shared/host_info.cpp"
-#include "asserts.cpp"
 #include "memory.c"
 #include "strings.c"
 #include "win32_game_server.cpp"
@@ -486,8 +484,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
                                                 0, 0,
                                                 concurrent_threads_count);
     
-    HANDLE server_thread_handle  = CreateThread(0, 0, ServerMain, 0, 0, 0);
-    // TODO(fakhri): wait for the server thread to create a socket and give us info about our address?
+    HANDLE server_thread_handle  = CreateThread(0, 0, HostMain, 0, 0, 0);
     
     HANDLE network_thread_handle = CreateThread(0, 0, NetworkMain, 0, 0, 0);
     

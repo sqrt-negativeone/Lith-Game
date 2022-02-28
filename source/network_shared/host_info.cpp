@@ -21,8 +21,6 @@ ReceiveHostInfo(SOCKET sender_socket, Host_Info *host_info)
         return result;
     }
     
-    host_info->port = ntohs(host_info->port);
-    
     result = true;
     return result;
 }

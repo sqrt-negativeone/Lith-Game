@@ -3,9 +3,9 @@
 
 
 
-// NOTE(fakhri): main function for the thread that will serve as the server,
+// NOTE(fakhri): main function for the thread that will serve as the host,
 //it will be only active in case we are hosting the game
-DWORD WINAPI ServerMain(LPVOID lpParameter)
+DWORD WINAPI HostMain(LPVOID lpParameter)
 {
     for(;;)
     {
