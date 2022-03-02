@@ -131,7 +131,7 @@ OS_BeginFrame(void)
 internal void
 OS_EndFrame(void)
 {
-    os->current_time += 1.f / os->target_frames_per_second;
+    os->game_time += os->game_dt;
 }
 
 internal void

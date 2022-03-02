@@ -25,23 +25,23 @@
 #include "network_message.cpp"
 
 internal void
-HandleAvailableNetworkMessages(Game_State *game_state)
+HandleAvailableMessages(Game_State *game_state)
 {
     Game_Session *game_session = &game_state->game_session;
-    for(NetworkMessageResult message_result = os->GetNextNetworkMessageIfAvailable();
+    for(MessageResult message_result = os->GetNextNetworkMessageIfAvailable();
         message_result.is_available;
         message_result = os->GetNextNetworkMessageIfAvailable()
         )
     {
         switch(message_result.message.type)
         {
-            case NetworkMessageType_From_Server_PLAYER_JOINED_GAME:
+            case MessageType_From_Server_PLAYER_JOINED_GAME:
             {
                 u32 player_index = message_result.message.player_index;
                 game_session->players[player_index] = message_result.message.player_username;
                 ++game_session->players_joined_sofar;
             } break;
-            case NetworkMessageType_From_Server_INVALIDE_USERNAME:
+            case MessageType_From_Server_INVALIDE_USERNAME:
             {
             } break;
             default:
@@ -228,8 +228,8 @@ MoveEntity(Game_State *game_state, Entity *entity, f32 spring_constant, f32 fric
     
     v2 acceleration = -spring_constant * (entity->center_pos.xy - entity->target_pos.xy) - friction * entity->velocity;
     acceleration *= 1.0f / mass;
-    entity->velocity += os->dtime * acceleration;
-    entity->center_pos.xy += os->dtime * entity->velocity + 0.5f * square_f(os->dtime) * acceleration;
+    entity->velocity += os->game_dt * acceleration;
+    entity->center_pos.xy += os->game_dt * entity->velocity + 0.5f * square_f(os->game_dt) * acceleration;
     entity->center_pos.z = entity->target_pos.z;
 }
 
@@ -312,14 +312,14 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
         
     }
     
-    entity->y_angle = MoveTowards(entity->y_angle, entity->target_y_angle, entity->dy_angle * os->dtime);
+    entity->y_angle = MoveTowards(entity->y_angle, entity->target_y_angle, entity->dy_angle * os->game_dt);
     
     // NOTE(fakhri): update dimension
     entity->current_dimension = Vec2MoveTowards(entity->current_dimension,
                                                 entity->target_dimension,
-                                                os->dtime * entity->dDimension);
+                                                os->game_dt * entity->dDimension);
     
-    MoveEntity(game_state, entity, 900, 60, 1);
+    MoveEntity(game_state, entity, 100, 10, 0.5f);
 }
 
 internal void
@@ -327,9 +327,13 @@ UpdateCompanionEntity(Game_State *game_state, Entity *entity)
 {
     Assert(entity->followed_entity_index);
     
-    MoveEntity(game_state, entity, 800.f, 10.f, 1.f);
+    MoveEntity(game_state, entity, 85.f, 0.5f, 0.1f);
+    
+#if 0    
     Entity *followed_entity = game_state->entities + entity->followed_entity_index;
     entity->center_pos.xy = ClampInsideRect(RectCentDim(followed_entity->center_pos.xy, followed_entity->current_dimension), entity->center_pos.xy);
+#endif
+    
 }
 
 // TODO(fakhri): come up with a client-server protocol for the game
@@ -423,7 +427,7 @@ void UpdateAndRenderMainMenu(Game_State *game_state, Rendering_Context *renderin
     if (UI_Button(game_state, S8Lit("Create Game Room"), x, y, vec2(half_screen.width, 1.1f * rendering_context->active_font->font_height)))
     {
         OpenMenu(game_state, Game_Mode_MENU_WAITING_PLAYERS);
-        os->PushNetworkMessage(CreateNewGameSessionMessage());
+        os->PushNetworkMessage(CreateStartHostServerMessage());
         SetFlag(game_session->session_state_flags, SESSION_FLAG_HOSTING_GAME);
     }
     y += stride;
@@ -883,6 +887,8 @@ AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_de
     v2 companion_size = 0.6f * vec2(0.75f, 1.0f);
     v2 companion_offset = +0.5f * card_dimension - 0.5f * companion_size - padding;
     
+    // TODO(fakhri): experiment with each companion entity has it's own differnet speed
+    
     AddCompanionEntity(game_state, number_up, companion_size, card_entity_index,
                        vec2(-companion_offset.x, companion_offset.y));
     
@@ -1026,6 +1032,7 @@ extern "C"
         
         // TODO(fakhri): this is just for debug
         OpenMenu(game_state, Game_Mode_MENU_MAIN);
+        game_state->game_mode = Game_Mode_GAME;
         game_state->game_session = {};
         //game_state->game_session.players_joined_sofar = PLAYERS_COUNT;
         game_state->game_session.players[0] = S8Lit("0");
@@ -1095,7 +1102,7 @@ extern "C"
         UI_Context *ui_context = &game_state->ui_context;
         Controller *controller = &os->controller;
         
-        HandleAvailableNetworkMessages(game_state);
+        HandleAvailableMessages(game_state);
         UpdateScreenSize(rendering_context);
         
         switch(game_state->game_mode)
@@ -1124,14 +1131,15 @@ extern "C"
         
         DebugDrawQuadScreenCoord(rendering_context, vec3(os->mouse_position, 99), vec2(10, 10), vec3(1, .3f, .5f));
         
-#if 0
+#if 1
+        ChangeActiveFont(rendering_context, &rendering_context->arial_font);
         char buffer[64];
-        sprintf(buffer, "frame time : %f", os->dtime);
+        sprintf(buffer, "frame time : %f", os->real_dt);
         s8 frame_time = s8{buffer, CalculateCStringLength(buffer)};
-        DebugDrawText(rendering_context, frame_time, vec2(400, 20), vec3(1,1,1));
-        sprintf(buffer, "frame fps : %f", 1.0f / os->dtime);
+        DebugDrawTextScreenCoord(rendering_context, frame_time, vec2(400, 20), vec3(1,1,1));
+        sprintf(buffer, "frame fps : %f", 1.0f / os->real_dt);
         s8 frame_fps = s8{buffer, CalculateCStringLength(buffer)};
-        DebugDrawText(rendering_context, frame_time, vec2(400, 60), vec3(1,1,1));
+        DebugDrawTextScreenCoord(rendering_context, frame_time, vec2(400, 60), vec3(1,1,1));
 #endif
         
         if (os->controller.toggle_fullscreen.pressed)

@@ -28,8 +28,8 @@ W32_TimerEndFrameImmediately(W32_Timer *timer)
     LARGE_INTEGER end_frame;
     QueryPerformanceCounter(&end_frame);
     i64 elapsed_counts = end_frame.QuadPart - timer->begin_frame.QuadPart;
-    os->dtime = elapsed_counts  / (f32)timer->counts_per_second.QuadPart;
-    os->time += os->dtime;
+    os->real_dt = elapsed_counts  / (f32)timer->counts_per_second.QuadPart;
+    os->real_time += os->real_dt;
 }
 
 internal void 
@@ -86,6 +86,6 @@ W32_TimerEndFrame(W32_Timer *timer, f64 milliseconds_per_frame)
     
     QueryPerformanceCounter(&end_frame);
     i64 frame_counts = end_frame.QuadPart - timer->begin_frame.QuadPart;
-    os->dtime = frame_counts  / (f32)timer->counts_per_second.QuadPart;
-    os->time += os->dtime;
+    os->real_dt = frame_counts  / (f32)timer->counts_per_second.QuadPart;
+    os->real_time += os->real_dt;
 }

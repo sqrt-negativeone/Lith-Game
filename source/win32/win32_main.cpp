@@ -440,7 +440,7 @@ W32_GetTime(void)
     W32_Timer *timer = &global_win32_timer;
     LARGE_INTEGER current_time;
     QueryPerformanceCounter(&current_time);
-    return global_os.current_time + (f32)(current_time.QuadPart - timer->begin_frame.QuadPart) / (f32)timer->counts_per_second.QuadPart;
+    return global_os.real_time + (f32)(current_time.QuadPart - timer->begin_frame.QuadPart) / (f32)timer->counts_per_second.QuadPart;
 }
 
 internal u64
@@ -480,9 +480,9 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     
     u32 concurrent_threads_count = 1;
     
-    global_iocp_handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE,
-                                                0, 0,
-                                                concurrent_threads_count);
+    network_thread_iocp_handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE,
+                                                        0, 0,
+                                                        concurrent_threads_count);
     
     HANDLE server_thread_handle  = CreateThread(0, 0, HostMain, 0, 0, 0);
     
@@ -598,15 +598,13 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         global_os.fullscreen                = 0;
         global_os.window_size.x             = DEFAULT_WINDOW_WIDTH;
         global_os.window_size.y             = DEFAULT_WINDOW_HEIGHT;
-        global_os.current_time              = 0.f;
+        global_os.game_time              = 0.f;
         // TODO(fakhri): we can just target 30fps because we don't need 60fps for a cards game
         // and use the extra time for server processing and stuff
         
-#if 1
+        
         global_os.target_frames_per_second  = refresh_rate;
-#else
-        global_os.target_frames_per_second  = 30;
-#endif
+        global_os.game_dt = 1.f / os->target_frames_per_second; 
         
         global_os.sample_out = (f32 *)W32_HeapAlloc(win32_sound_output.samples_per_second * sizeof(f32) * 2);
         global_os.samples_per_second = win32_sound_output.samples_per_second;
@@ -673,6 +671,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
     
     while(!global_os.quit)
     {

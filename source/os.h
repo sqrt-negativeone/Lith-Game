@@ -196,8 +196,14 @@ struct OS_State
     b32 vsync;
     b32 fullscreen;
     iv2 window_size;
-    f32 current_time;
+    
     f32 target_frames_per_second;
+    f32 game_time;
+    f32 game_dt;
+    
+    f32 real_dt;
+    f32 real_time;
+    
     b32 wait_for_events_to_update;
     b32 pump_events;
     
@@ -234,12 +240,10 @@ struct OS_State
     void (*SetCursorToVerticalResize)(void);
     void (*SetCursorToIBar)(void);
     void (*RefreshScreen)(void);
-    void (*PushNetworkMessage)(NetworkMessage msg);
-    NetworkMessageResult (*GetNextNetworkMessageIfAvailable)(void);
+    void (*PushNetworkMessage)(Message msg);
+    MessageResult (*GetNextNetworkMessageIfAvailable)(void);
     // NOTE(fakhri): game state
     Game_State *game_state;
-    f32 dtime;
-    f32 time;
     
     // NOTE(fakhri): shader hotreload
     Shader_Array shaders_array;

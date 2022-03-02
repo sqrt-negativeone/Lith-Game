@@ -3,7 +3,7 @@ internal void
 UI_ChangeSelectedItem(UI_Context *ui_context, i32 delta)
 {
     Assert(ui_context);
-    ui_context->last_select_time = os->time;
+    ui_context->last_select_time = os->game_time;
     ui_context->selected_item = (ui_context->selected_item + delta + ui_context->items_count) % ui_context->items_count;
 }
 
@@ -74,7 +74,7 @@ UI_Label(Game_State *game_state, s8 text, f32 x, f32 y, b32 should_animate_color
     Rendering_Context *rendering_context = &game_state->rendering_context;
     UI_ColorScheme    *color_scheme      = &ui_context->color_scheme;
     
-    f32 change = should_animate_color? square_f(cos_f(PI * os->time)) : 0;
+    f32 change = should_animate_color? square_f(cos_f(PI * os->game_time)) : 0;
     v3 color = lerp(color_scheme->label_color1, change, color_scheme->label_color2);
     
     DebugDrawTextScreenCoord(rendering_context, text, vec2(x, y), color);
@@ -97,7 +97,7 @@ UI_Button(Game_State *game_state, s8 item_text, f32 x, f32 y, v2 hitbox)
     //DebugDrawQuadScreenCoord(rendering_context, vec3(x, y, 0), hitbox, vec3(1, 1, 1));
     if (IsInsideRect(RectCentDim(item_pos, hitbox), os->mouse_position ))
     {
-        ui_context->last_select_time = os->time;
+        ui_context->last_select_time = os->game_time;
         ui_context->selected_item = ui_context->items_count;
     }
     
@@ -110,7 +110,7 @@ UI_Button(Game_State *game_state, s8 item_text, f32 x, f32 y, v2 hitbox)
             clicked = 1;
         }
         // TODO(fakhri): maybe show some change in color when the button is clicked?
-        f32 t = os->time - ui_context->last_select_time;
+        f32 t = os->game_time - ui_context->last_select_time;
         f32 change = square_f(cos_f(PI * t));
         text_color = lerp(color_scheme->button_text_active_color1, change, color_scheme->button_text_active_color2);
         v2 shadow_offset = vec2(5, 5);
@@ -208,7 +208,7 @@ UI_InputField(Game_State *game_state, v2 item_size, f32 x, f32 y, Buffer *input_
     
     if (is_selected)
     {
-        f32 t = os->time - ui_context->last_select_time;
+        f32 t = os->game_time - ui_context->last_select_time;
         f32 change = square_f(cos_f(PI * t));
         v3 cursor_color = lerp(background_color, change, text_color);
         
