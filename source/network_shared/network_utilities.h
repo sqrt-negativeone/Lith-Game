@@ -7,5 +7,6 @@
 #include <ws2tcpip.h>
 
 #define LISTENQ 1024
+typedef SOCKET Socket_Handle;
 
 #endif //NETWORK_UTILITIES_H

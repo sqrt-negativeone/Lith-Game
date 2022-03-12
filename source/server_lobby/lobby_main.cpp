@@ -66,6 +66,7 @@ struct Connected_Host
     WSABUF wsa_buf;
     char buffer[1];
     HostOperation operation;
+    WSAOVERLAPPED Overlapped;
 };
 
 struct Connected_Host_Queue
@@ -152,8 +153,7 @@ AddHostInfo(Connected_Hosts_Storage *hosts_storage, HANDLE hosts_iocp, Connected
                 connected_host->wsa_buf.buf = connected_host->buffer;
                 connected_host->wsa_buf.len = sizeof(connected_host->buffer);
                 
-                WSAOVERLAPPED  Overlapped;
-                ZeroMemory(&Overlapped, sizeof(WSAOVERLAPPED));
+                ZeroMemory(&connected_host->Overlapped, sizeof(WSAOVERLAPPED));
                 DWORD flags = 0;
                 
                 WSARecv(connected_host->socket, 
@@ -161,7 +161,7 @@ AddHostInfo(Connected_Hosts_Storage *hosts_storage, HANDLE hosts_iocp, Connected
                         1,
                         0,
                         &flags,
-                        &Overlapped,
+                        &connected_host->Overlapped,
                         0
                         );
             }

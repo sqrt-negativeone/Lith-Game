@@ -6,12 +6,8 @@
 #include "buffer.h"
 #include "ui.h"
 #include "renderer.h"
-
+#include "entity.h"
 #include "network_shared/host_info.h"
-
-#define PLAYERS_COUNT (4)
-#define CARDS_PER_PLAYER (13)
-#define DECK_CARDS_COUNT (PLAYERS_COUNT * CARDS_PER_PLAYER)
 
 struct Input
 {
@@ -52,101 +48,28 @@ enum Game_Mode
 
 enum Game_Session_Flags
 {
-    SESSION_FLAG_HOSTING_GAME        = (1 << 0),
-    SESSION_FLAG_TRYING_CONNECT_GAME = (1 << 2),
-    SESSION_FLAG_CONNECTED_TO_GAME   = (1 << 3),
-    SESSION_FLAG_FAILED_CONNECT_GAME = (1 << 4),
-    SESSION_FLAG_TRYING_JOIN_GAME    = (1 << 5),
-    SESSION_FLAG_FAILED_JOIN_GAME    = (1 << 6),
-    SESSION_FLAG_JOINED_GAME         = (1 << 7),
-    SESSION_FLAG_SERVER_DOWN         = (1 << 8),
+    SESSION_FLAG_HOSTING_GAME                 = (1 << 0),
+    SESSION_FLAG_SERVER_DOWN                  = (1 << 1),
+    SESSION_FLAG_TRYING_CONNECT_GAME          = (1 << 2),
+    SESSION_FLAG_CONNECTED_TO_GAME            = (1 << 3),
+    SESSION_FLAG_FAILED_CONNECT_GAME          = (1 << 4),
+    SESSION_FLAG_TRYING_JOIN_GAME             = (1 << 5),
+    SESSION_FLAG_FAILED_JOIN_GAME             = (1 << 6),
+    SESSION_FLAG_JOINED_GAME                  = (1 << 7),
+    SESSION_FLAG_HOST_SPLITTING_DECK          = (1 << 8),
+    SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK = (1 << 8),
 };
 
-
-#if 1
-enum Entity_Type
-{
-    Entity_Type_Null_Entity,
-    Entity_Type_Cursor_Entity, // NOTE(fakhri): always following mouse
-    Entity_Type_Entity_Card,
-    Entity_Type_Entity_Companion,
-};
-
-enum Card_Residency
-{
-    Card_Residency_None,
-    Card_Residency_Up,
-    Card_Residency_Down,
-    Card_Residency_Left,
-    Card_Residency_Right,
-    Card_Residency_Table,
-    Card_Residency_Burnt,
-    
-    Card_Residency_Count,
-};
-#define TEST_ONE_CARD 0
-
-#if TEST_ONE_CARD
-#define CARD_WIDTH  (2.f * 3.5f)
-#define CARD_HEIGHT (2.f * 5.45f)
-#else
-#define CARD_WIDTH  (1.2f * 3.5f)
-#define CARD_HEIGHT (1.2f * 5.45f)
-#endif
-
-#define CARD_X_GAP (0.05f)
-#define CARD_Y_GAP (-5.0f)
-
-
-struct Entity
-{
-    Entity_Type type;
-    v3 residency_pos;
-    v3 center_pos;
-    v3 target_pos;
-    
-    f32 y_angle;
-    f32 target_y_angle;
-    f32 dy_angle;
-    
-    v2 current_dimension;
-    v2 target_dimension;
-    f32 dDimension;
-    
-    v2 velocity;
-    
-    // TODO(fakhri): we can have flags here instead, then each type of entity can have its own flags
-    b32 is_under_cursor;
-    b32 is_pressed;
-    
-    u32 followed_entity_index;
-    v2  offset_in_follwed_entity;
-    
-    Card_Type card_type;
-    
-    Card_Residency residency;
-    GLuint texture;
-};
 
 struct Residency
 {
     u32 entity_indices[DECK_CARDS_COUNT];
     u32 entity_count;
+    u32 controlling_player_id;
+    
+    b32 is_horizonal;
+    b32 is_stacked;
 };
-
-#else
-struct Card
-{
-    v2 size;
-    v2 postion;
-};
-
-struct Number
-{
-    u32 value;
-    u32 followed_card;
-};
-#endif
 
 struct Hosts_Storage
 {
@@ -156,14 +79,25 @@ struct Hosts_Storage
     u32 hosts_count;
 };
 
+
+struct Player
+{
+    b32 joined;
+    s8 username;
+    Card_Residency assigned_residency;
+};
+
+
 struct Game_Session
 {
-    s8 players[PLAYERS_COUNT];
-    u32 players_joined_sofar;
+    Player players[MAX_PLAYER_COUNT];
+    u32 players_joined_so_far;
     // NOTE(fakhri): indicate if we are the ones hosting the game
-    u32 session_state_flags;
-    
+    u32 flags;
     Hosts_Storage hosts_storage;
+    u32 current_player_id;
+    
+    u32 my_player_id;
 };
 
 struct Game_State
@@ -177,7 +111,8 @@ struct Game_State
     u32 entity_count;
     
     u32 card_pressed_index;
-    Residency entity_residencies[Card_Residency_Count];
+    
+    Residency residencies[Card_Residency_Count];
     
     // NOTE(fakhri): menu stuff
     Buffer host_address_buffer;

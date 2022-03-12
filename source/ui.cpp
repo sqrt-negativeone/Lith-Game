@@ -68,7 +68,7 @@ UI_EndFrame(UI_Context *ui_context, Controller *controller)
 }
 
 internal void
-UI_Label(Game_State *game_state, s8 text, f32 x, f32 y, b32 should_animate_color = 0)
+UI_Label(Game_State *game_state, s8 text, f32 x, f32 y, b32 should_animate_color = false)
 {
     UI_Context        *ui_context        = &game_state->ui_context;
     Rendering_Context *rendering_context = &game_state->rendering_context;

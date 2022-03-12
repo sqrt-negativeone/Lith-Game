@@ -1,44 +1,34 @@
+// TODO(fakhri): Message is getting huge, we probably want to switch to 
+// passing a pointer to the message we want to fill instead of return the
+// whole struct
 
-internal NetworkMessage
-CreateConnectToServerMessage(M_Arena *arena, s8 server_address)
+#if 1
+internal Message
+CreateConnectToServerMessage(s8 server_address)
 {
-    NetworkMessage result = {};
-    result.type = NetworkMessageType_From_Player_CONNECT_TO_SERVER;
-    result.server_address = StringCopy(arena, server_address);
+    Message result = {};
+    result.type = MessageType_From_Player_Connect_To_Host;
+    result.server_address = server_address;
     return result;
 }
 
-internal NetworkMessage
-CreateNewGameSessionMessage()
-{
-    NetworkMessage result = {};
-    result.type = NetworkMessageType_From_Player_NEW_GAME_SESSION;
-    // TODO(fakhri): get the server adress;
-    return result;
-}
-
-internal NetworkMessage
+internal Message
 CreateUsernameMessage(s8 username)
 {
-    NetworkMessage result = {};
-    result.type     = NetworkMessageType_From_Player_USERNAME;
-    result.player_username = username;
+    Message result = {};
+    result.type            = MessageType_From_Player_USERNAME;
+    Assert(username.size < ArrayCount(result.players[0].username));
+    MemoryCopy(result.players[0].username, username.str, username.size);
     return result;
 }
 
-internal NetworkMessage
+internal Message
 CreateFetchAvailableHostsMessage(Hosts_Storage *hosts_storage)
 {
-    NetworkMessage result = {};
-    result.type = NetworkMessageType_From_Player_FETCH_HOSTS;
+    Message result = {};
+    result.type = MessageType_From_Player_Fetch_Hosts;
     result.hosts_storage = hosts_storage;
     return result;
 }
 
-internal NetworkMessage 
-CreateCouldNotConnectToServerMessage()
-{
-    NetworkMessage result = {};
-    result.type = NetworkMessageType_From_Server_COULD_NOT_CONNECT_TO_SERVER;
-    return result;
-}
+#endif

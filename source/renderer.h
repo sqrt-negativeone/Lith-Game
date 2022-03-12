@@ -20,37 +20,6 @@ struct Font
     f32 font_height;
 };
 
-enum Card_Category
-{
-    Category_Hearts,  // red
-    Category_Tiles,   // red
-    Category_Clovers, // black
-    Category_Pikes,   // black
-};
-
-enum Card_Number
-{
-    Card_Number_Ace,
-    Card_Number_2,
-    Card_Number_3,
-    Card_Number_4,
-    Card_Number_5,
-    Card_Number_6,
-    Card_Number_7,
-    Card_Number_8,
-    Card_Number_9,
-    Card_Number_10,
-    Card_Number_Jack,
-    Card_Number_Queen,
-    Card_Number_King,
-};
-
-struct Card_Type
-{
-    Card_Category category;
-    Card_Number   number;
-};
-
 struct Frensh_Suited_Cards_Texture
 {
     GLuint card_frame_texture;

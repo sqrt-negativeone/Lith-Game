@@ -12,6 +12,8 @@ M_ArenaInitialize(void)
     return arena;
 }
 
+#define PushStruct(arena, type) (type *)M_ArenaPush(arena, sizeof(type))
+
 internal void *
 M_ArenaPush(M_Arena *arena, u64 size)
 {

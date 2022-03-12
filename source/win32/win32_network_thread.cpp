@@ -1,10 +1,7 @@
 #include "network_message.cpp"
 
-global SOCKET lobby_socket;
-global SOCKET host_socket;
-
 internal void
-FetchHostsFromLobby(Hosts_Storage *hosts_storage)
+FetchHostsFromLobby(Socket_Handle lobby_socket, Hosts_Storage *hosts_storage)
 {
     if (!ReceiveBuffer(lobby_socket, &hosts_storage->hosts_count, sizeof(hosts_storage->hosts_count)))
     {
@@ -35,28 +32,71 @@ FetchHostsFromLobby(Hosts_Storage *hosts_storage)
     
 }
 
+struct Host_IO_Context
+{
+    Socket_Handle host_socket;
+    MessageType message_type;
+    WSABUF wsa_buf;
+    WSAOVERLAPPED Overlapped;
+};
+
+global Host_IO_Context host_io_context;
+
 internal void
-HandlePlayerMessage(NetworkMessage *message)
+ReceiveNextMessageType()
+{
+    DWORD flags = 0;
+    if (WSARecv(host_io_context.host_socket,
+                &host_io_context.wsa_buf,
+                1,
+                0,
+                &flags,
+                &host_io_context.Overlapped,
+                0
+                ) == SOCKET_ERROR)
+    {
+        int error = WSAGetLastError();
+        if(error != WSA_IO_PENDING)
+        {
+            Log("Receive failed with error %d", error);
+            Assert(!"See what is the problem");
+        }
+    }
+}
+
+internal void
+HandlePlayerMessage(Message *message)
 {
     switch(message->type)
     {
-        case NetworkMessageType_From_Player_FETCH_HOSTS:
+        case MessageType_From_Player_Fetch_Hosts:
         {
             Log("fetching hosts from lobby");
-            lobby_socket = ConnectToServer(LOBBY_ADDRESS, LOBBY_PORT);
+            Socket_Handle lobby_socket = ConnectToServer(LOBBY_ADDRESS, LOBBY_PLAYER_PORT);
             if (lobby_socket == INVALID_SOCKET)
             {
                 int last_error = WSAGetLastError();
                 // TODO(fakhri): for now let's assert
                 Assert(false);
             }
-            FetchHostsFromLobby(message->hosts_storage);
+            FetchHostsFromLobby(lobby_socket, message->hosts_storage);
             MemoryBarrier();
             message->hosts_storage->is_fetching = false;
             closesocket(lobby_socket);
         } break;
-        case NetworkMessageType_From_Player_CONNECT_TO_SERVER:
+        case MessageType_From_Player_Connect_To_Host:
         {
+            char *host_address = "127.0.0.1";
+            host_io_context.host_socket = ConnectToServer(host_address, HOST_PORT);
+            if(host_io_context.host_socket != INVALID_SOCKET)
+            {
+                CreateIoCompletionPort((HANDLE)host_io_context.host_socket, network_thread_iocp_handle, SERVER_MESSAGE, 1);
+                ReceiveNextMessageType();
+            }
+            else
+            {
+                // NOTE(fakhri): probably the server is full?
+            }
 #if 0
             *connect_socket = ConnectToServer(message->server_address);
             if (*connect_socket != INVALID_SOCKET)
@@ -71,10 +111,14 @@ HandlePlayerMessage(NetworkMessage *message)
             }
 #endif
         } break;
+        case MessageType_From_Player_USERNAME:
+        {
+            SendBuffer(host_io_context.host_socket, message->players[0].username, sizeof(message->players[0].username));
+        } break;
         default:
         {
             // NOTE(fakhri): unhandled message
-            Assert(false);
+            Assert(!"MESSAGE TYPE NOT IMPLEMENTED YET");
         }
     }
 }
@@ -82,13 +126,14 @@ HandlePlayerMessage(NetworkMessage *message)
 // NOTE(fakhri): this thread is responsible for network communication with the server
 DWORD WINAPI NetworkMain(LPVOID lpParameter)
 {
-    
+    host_io_context.wsa_buf.buf = (char *)&host_io_context.message_type;
+    host_io_context.wsa_buf.len = sizeof(host_io_context.message_type);
     for(;;)
     {
         DWORD bytes_transferred;
         u64 completion_key;
         OVERLAPPED *Overlapped = 0;
-        if (GetQueuedCompletionStatus(global_iocp_handle, 
+        if (GetQueuedCompletionStatus(network_thread_iocp_handle, 
                                       &bytes_transferred,
                                       &completion_key,
                                       &Overlapped,
@@ -98,10 +143,9 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
             {
                 case GAME_MESSAGE:
                 {
-                    
-                    for(NetworkMessageResult message_result = W32_GetNextMessageIfAvailable(&global_network_sending_queue);
+                    for(MessageResult message_result = W32_GetNextMessageIfAvailable(&network_sending_queue);
                         message_result.is_available;
-                        message_result = W32_GetNextMessageIfAvailable(&global_network_sending_queue)
+                        message_result = W32_GetNextMessageIfAvailable(&network_sending_queue)
                         )
                     {
                         HandlePlayerMessage(&message_result.message);
@@ -109,10 +153,44 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                 } break;
                 case SERVER_MESSAGE:
                 {
-                    // TODO(fakhri): we have a message from the server
-                    // TODO(fakhri): handle the request
-                    // TODO(fakhri): insert the server message into the network in queue
-                    
+                    // NOTE(fakhri): receiving message type completed
+                    Message message = {};
+                    message.type = host_io_context.message_type;
+                    // NOTE(fakhri): read the message from the server
+                    switch(host_io_context.message_type)
+                    {
+                        case MessageType_From_Host_Connected_Players_List:
+                        {
+                            ReceiveBuffer(host_io_context.host_socket, &message.players_count, sizeof(message.players_count));
+                            for (u32 player_index = 0;
+                                 player_index < message.players_count;
+                                 ++player_index)
+                            {
+                                MessagePlayer *player = message.players + player_index;
+                                ReceiveBuffer(host_io_context.host_socket, player->username, sizeof(player->username));
+                            }
+                        } break;
+                        case MessageType_From_Host_New_Player_Joined:
+                        {
+                            ReceiveBuffer(host_io_context.host_socket, &message.player_id, sizeof(message.player_id));
+                            MessagePlayer *player = message.players + message.player_id;
+                            ReceiveBuffer(host_io_context.host_socket, player->username, sizeof(player->username));
+                        } break;
+                        case MessageType_From_Host_Shuffled_Deck:
+                        {
+                            ReceiveBuffer(host_io_context.host_socket, message.compact_deck, sizeof(message.compact_deck));
+                        } break;
+                        case MessageType_From_Host_Change_Player_Turn:
+                        {
+                            ReceiveBuffer(host_io_context.host_socket, &message.player_id, sizeof(message.player_id));
+                        } break;
+                        default :
+                        {
+                            Assert(!"MESSAGE TYPE NOT HANDLED YET");
+                        }
+                    }
+                    W32_PushNetworkMessageToPlayer(message);
+                    ReceiveNextMessageType();
                 } break;
             }
         }

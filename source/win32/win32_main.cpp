@@ -3,6 +3,9 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+#define _CRT_RAND_S  
+
+
 #include <windows.h>
 #include <windowsx.h>
 #define CINTERFACE
@@ -48,10 +51,13 @@ extern "C"
 #include "network_shared/host_info.cpp"
 #include "memory.c"
 #include "strings.c"
-#include "win32_game_server.cpp"
 #include "os.c"
 #include "shader.cpp"
 #include "win32_network_thread.cpp"
+
+
+#include "win32_game_server.h"
+#include "win32_game_server.cpp"
 
 // NOTE(rjf): Globals
 global char global_executable_path[256];
@@ -479,18 +485,9 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     }
     
     u32 concurrent_threads_count = 1;
-    
     network_thread_iocp_handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE,
                                                         0, 0,
                                                         concurrent_threads_count);
-    
-    HANDLE server_thread_handle  = CreateThread(0, 0, HostMain, 0, 0, 0);
-    
-    HANDLE network_thread_handle = CreateThread(0, 0, NetworkMain, 0, 0, 0);
-    
-    // NOTE(fakhri): we won't be using talking about these threads again
-    CloseHandle(network_thread_handle);
-    CloseHandle(server_thread_handle);
     
     global_instance_handle = instance;
     
@@ -639,6 +636,17 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         // NOTE(fakhri): allocate memory for game state
         global_os.game_state = (Game_State *)M_ArenaPushZero(&global_os.permanent_arena, sizeof(Game_State));
         
+    }
+    
+    // NOTE(fakhri): launch network and host server threads
+    {
+        // NOTE(fakhri): start the host thread now
+        HANDLE host_thread_handle  = CreateThread(0, 0, HostMain, 0, 0, 0);
+        CloseHandle(host_thread_handle);
+        
+        // NOTE(fakhri): start the network thread
+        HANDLE network_thread_handle = CreateThread(0, 0, NetworkMain, 0, 0, 0);
+        CloseHandle(network_thread_handle);
     }
     
     // NOTE(rjf): OpenGL initialization

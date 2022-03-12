@@ -1,8 +1,8 @@
 
 //~ NOTE(rjf): C Standard Library
 
-#include <stdint.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
@@ -53,7 +53,7 @@ typedef double   f64;
 #define Terabytes(n)  (((u64)n) << 40)
 #define PI (3.1415926535897f)
 #define SetFlag(flags, flag) ((flags) |= (flag))
-#define ClearFlag(flags, flag) ((flags) &= !(flag))
+#define ClearFlag(flags, flag) ((flags) &= ~(flag))
 #define IsFlagSet(flags, flag) ((flags) & (flag))
 #define Min(a,b) (((a) < (b))? (a):(b))
 #define Max(a,b) (((a) > (b))? (a):(b))

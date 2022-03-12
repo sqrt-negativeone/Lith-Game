@@ -1,8 +1,9 @@
 
-internal SOCKET
+
+internal Socket_Handle
 ConnectToServer(char *server_address, char *port)
 {
-    SOCKET result = INVALID_SOCKET;
+    Socket_Handle result = INVALID_SOCKET;
     struct addrinfo hints, *addrinfo_result, *p;
     hints = {};
     
@@ -35,10 +36,10 @@ ConnectToServer(char *server_address, char *port)
     return result;
 }
 
-internal SOCKET
+internal Socket_Handle
 OpenListenSocket(char *port)
 {
-    SOCKET listenfd = INVALID_SOCKET;
+    Socket_Handle listenfd = INVALID_SOCKET;
     const char optionval = 1;
     struct addrinfo hints = {}, *addrinfo_result, *p;
     
@@ -72,7 +73,7 @@ OpenListenSocket(char *port)
 }
 
 internal b32
-SendBuffer(SOCKET s, void *data, i32 len)
+SendBuffer(Socket_Handle s, void *data, i32 len)
 {
     char *buffer = (char *)data;
     b32 result = true;
@@ -97,7 +98,7 @@ SendBuffer(SOCKET s, void *data, i32 len)
 }
 
 internal b32
-ReceiveBuffer(SOCKET s, void *data, i32 len)
+ReceiveBuffer(Socket_Handle s, void *data, i32 len)
 {
     char *buffer = (char *)data;
     b32 result = true;

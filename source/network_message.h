@@ -3,44 +3,83 @@
 #ifndef NETWORK_MESSAGE_H
 #define NETWORK_MESSAGE_H
 
-enum NetworkMessageType
+enum Player_Move_Type
 {
-    NetworkMessageType_From_Player_Begin,
-    // NOTE(fakhri): server messages here
-    NetworkMessageType_From_Player_CONNECT_TO_SERVER,
-    NetworkMessageType_From_Player_NEW_GAME_SESSION,
-    NetworkMessageType_From_Player_USERNAME,
-    NetworkMessageType_From_Player_FETCH_HOSTS,
-    NetworkMessageType_From_Player_End,
-    
-    NetworkMessageType_From_Server_Begin,
+    Player_Move_None,
+    Player_Move_Play_Card,
+    Player_Move_Question_Credibility,
+};
+
+typedef u8 Compact_Card_Type;
+
+enum MessageType
+{
+    MessageType_From_Player_Begin,
     // NOTE(fakhri): player messages here
-    NetworkMessageType_From_Server_PLAYER_TURN,
-    NetworkMessageType_From_Server_PLAYER_JOINED_GAME,
-    NetworkMessageType_From_Server_INVALIDE_USERNAME,
-    NetworkMessageType_From_Server_COULD_NOT_CONNECT_TO_SERVER,
-    NetworkMessageType_From_Server_End,
+    MessageType_From_Player_Connect_To_Host,
+    MessageType_From_Player_USERNAME,
+    MessageType_From_Player_Fetch_Hosts,
+    MessageType_From_Player_Start_Host_Server,
+    MessageType_From_Player_Stop_Host_Server,
+    MessageType_From_Player_End,
+    
+    MessageType_From_Server_Begin,
+    // NOTE(fakhri): Host messages here
+    MessageType_From_Host_Invalid_Username,
+    MessageType_From_Host_Host_Full,
+    MessageType_From_Host_New_Player_Joined,
+    MessageType_From_Host_Connected_Players_List,
+    MessageType_From_Host_Shuffled_Deck,
+    MessageType_From_Host_Change_Player_Turn,
+    MessageType_From_Host_Player_Won,
+    MessageType_From_Host_End,
+    
+    MessageType_Player_Move,
 };
 
 #define IsNetworkMessageFromServer(type) ((type) > NetworkMessageType_From_Server_Begin && (type) < NetworkMessageType_From_Server_End )
 
 #define IsNetworkMessageFromPlayer(type) ((type) > NetworkMessageType_From_Player_Begin && (type) < NetworkMessageType_From_Player_End )
-struct Hosts_Storage;
 
-struct NetworkMessage
+struct Hosts_Storage;
+struct Player;
+
+struct Player_Move
 {
-    NetworkMessageType type;
-    s8 server_address;
-    
-    S8 player_username;
-    u32 player_index;
-    
-    Hosts_Storage *hosts_storage;
+    Player_Move_Type type;
+    Compact_Card_Type actual_card;
+    Compact_Card_Type claimed_card;
 };
 
-struct NetworkMessageResult
+#define MAX_PLAYER_COUNT (4u)
+#define CARDS_PER_PLAYER (13)
+#define DECK_CARDS_COUNT (MAX_PLAYER_COUNT * CARDS_PER_PLAYER)
+
+struct MessagePlayer
 {
-    NetworkMessage message;
+    char username[20];
+};
+
+struct Message
+{
+    MessageType type;
+    
+    Hosts_Storage *hosts_storage;
+    
+    s8 server_address;
+    
+    Compact_Card_Type compact_deck[DECK_CARDS_COUNT];
+    
+    Player_Move player_move;
+    MessagePlayer players[MAX_PLAYER_COUNT];
+    u32 player_id;
+    
+    u32 players_count;
+};
+
+struct MessageResult
+{
+    Message message;
     b32 is_available;
 };
 
