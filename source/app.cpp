@@ -175,6 +175,7 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
     v3 white = vec3(1, 1, 1);
     v3 red = vec3(1, 0, 0);
     
+    // TODO(fakhri): render a background
     if(IsFlagSet(game_session->flags, SESSION_FLAG_HOST_SPLITTING_DECK))
     {
         // NOTE(fakhri): we wait
@@ -230,7 +231,7 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
             }
         }
         
-        // TODO(fakhri): think about how to render the olayers usernames
+        // TODO(fakhri): think about how to render the players usernames
         for(u32 player_index = 0;
             player_index < MAX_PLAYER_COUNT;
             ++player_index)
@@ -575,11 +576,12 @@ extern "C"
             player->assigned_residency = (Card_Residency)(player_index + 1);
             player->username = PushStringF(&os->permanent_arena, "%s", "a");
         }
+        
         for (u32 card_index = 0;
              card_index < 13;
              ++card_index)
         {
-            AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Left);
+            AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
         }
         
         for (u32 card_index = 0;
@@ -593,14 +595,14 @@ extern "C"
              card_index < 13;
              ++card_index)
         {
-            AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Up);
+            AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Down);
         }
         
         for (u32 card_index = 0;
              card_index < 13;
              ++card_index)
         {
-            AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Right);
+            AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Down);
         }
         
 #endif
