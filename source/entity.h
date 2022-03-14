@@ -29,11 +29,11 @@ enum Card_Residency
 #define CARD_WIDTH  (2.f * 3.5f)
 #define CARD_HEIGHT (2.f * 5.45f)
 #else
-#define CARD_WIDTH  (1.2f * 3.5f)
-#define CARD_HEIGHT (1.2f * 5.45f)
+#define CARD_WIDTH  (1.5f * 3.5f)
+#define CARD_HEIGHT (1.5f * 5.45f)
 #endif
 
-#define CARD_X_GAP (0.05f)
+#define CARD_X_GAP (-1.5f)
 #define CARD_Y_GAP (-5.0f)
 
 

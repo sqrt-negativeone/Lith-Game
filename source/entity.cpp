@@ -45,10 +45,10 @@ InitResidencies(Game_State *game_state)
     // TODO(fakhri): think about the burnt residency
 }
 
-internal v3
+internal v2
 FindFirstPositionInResidencyRow(Game_State *game_state, Card_Residency residency_type, u32 entity_count)
 {
-    v3 result = {};
+    v2 result = {};
     f32 world_width = MAX_UNITS_PER_X;
     f32 world_height = MAX_UNITS_PER_X * game_state->rendering_context.aspect_ratio;
     
@@ -77,7 +77,7 @@ FindFirstPositionInResidencyRow(Game_State *game_state, Card_Residency residency
         } break;
         case Card_Residency_Table:
         {
-            result.xy = vec2(0.5f * world_width, 0.55f * world_height);
+            result = vec2(0.5f * world_width, 0.55f * world_height);
         } break;
 #if 0
         case Card_Residency_Burnt:
@@ -103,10 +103,11 @@ ReorganizeResidencyCards(Game_State *game_state, Card_Residency residency_type)
         Residency *residency = game_state->residencies + residency_type;
         u32 remaining_cards = residency->entity_count;
         
-#define MAX_CARDS_PER_RESIDENCY_ROW 20
+#define MAX_CARDS_PER_RESIDENCY_ROW 17
         u32 cards_per_row_remaining = MAX_CARDS_PER_RESIDENCY_ROW;
         
-        v3 residency_pos = FindFirstPositionInResidencyRow(game_state, 
+        v3 residency_pos = {};
+        residency_pos.xy = FindFirstPositionInResidencyRow(game_state, 
                                                            residency_type, 
                                                            Min(cards_per_row_remaining, remaining_cards));
         
@@ -138,10 +139,10 @@ ReorganizeResidencyCards(Game_State *game_state, Card_Residency residency_type)
                 {
                     cards_per_row_remaining = MAX_CARDS_PER_RESIDENCY_ROW;
                     f32 old_y = residency_pos.y;
-                    residency_pos = FindFirstPositionInResidencyRow(game_state,
-                                                                    residency_type, 
-                                                                    Min(cards_per_row_remaining, remaining_cards));
-                    residency_pos.y = old_y + CARD_HEIGHT + 0.5f;
+                    residency_pos.xy = FindFirstPositionInResidencyRow(game_state,
+                                                                       residency_type, 
+                                                                       Min(cards_per_row_remaining, remaining_cards));
+                    residency_pos.y = old_y + CARD_HEIGHT;
                 }
             }
             else
@@ -160,14 +161,15 @@ ReorganizeResidencyCards(Game_State *game_state, Card_Residency residency_type)
                     else
                     {
                         cards_per_row_remaining = MAX_CARDS_PER_RESIDENCY_ROW;
-                        residency_pos = FindFirstPositionInResidencyRow(game_state,
-                                                                        residency_type, 
-                                                                        Min(cards_per_row_remaining, remaining_cards));
-                        residency_pos.x += CARD_WIDTH + CARD_X_GAP;
+                        f32 old_x = residency_pos.x;
+                        residency_pos.xy = FindFirstPositionInResidencyRow(game_state,
+                                                                           residency_type, 
+                                                                           Min(cards_per_row_remaining, remaining_cards));
+                        residency_pos.x = old_x + CARD_WIDTH + CARD_X_GAP;
                     }
                 }
-                residency_pos.z += 0.3f;
             }
+            residency_pos.z += 0.3f;
         }
     }
 }

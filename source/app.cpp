@@ -165,6 +165,86 @@ StartGame(Game_State *game_state, Game_Session *game_session)
     glDepthFunc(GL_LESS);
 }
 
+internal void
+AddDebugEntites(Game_State *game_state)
+{
+    game_state->entity_count = 0;
+    for (u32 residency_index = 0;
+         residency_index < ArrayCount(game_state->residencies);
+         ++residency_index)
+    {
+        game_state->residencies[residency_index].entity_count = 0;
+    }
+    
+    AddNullEntity(game_state);
+    AddCursorEntity(game_state);
+    
+#if TEST_ONE_CARD
+    AddCardEntity(game_state, MakeCardType(Category_Hearts, Card_Number_10), Card_Residency_Down);
+#else
+    game_state->game_mode = Game_Mode_GAME;
+    SetFlag(game_state->game_session.flags, SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK);
+    for (u32 player_index = 0;
+         player_index < MAX_PLAYER_COUNT;
+         ++player_index)
+    {
+        Player *player = game_state->game_session.players + player_index;
+        player->joined = true;
+        player->assigned_residency = (Card_Residency)(player_index + 1);
+        player->username = PushStringF(&os->permanent_arena, "%s", "a");
+    }
+    
+    for (u32 card_index = 0;
+         card_index < 1;
+         ++card_index)
+    {
+        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Up);
+    }
+    
+    for (u32 card_index = 1;
+         card_index < 13;
+         ++card_index)
+    {
+        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
+    }
+    
+    for (u32 card_index = 0;
+         card_index < 1;
+         ++card_index)
+    {
+        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Left);
+    }
+    
+    for (u32 card_index = 1;
+         card_index < 13;
+         ++card_index)
+    {
+        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
+    }
+    
+    for (u32 card_index = 0;
+         card_index < 1;
+         ++card_index)
+    {
+        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Right);
+    }
+    
+    for (u32 card_index = 1;
+         card_index < 13;
+         ++card_index)
+    {
+        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
+    }
+    
+    for (u32 card_index = 0;
+         card_index < 13;
+         ++card_index)
+    {
+        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Down);
+    }
+    
+#endif
+}
 
 internal void
 UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context, Controller *controller)
@@ -263,6 +343,24 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
                 }
             }
             DebugDrawTextWorldCoord(rendering_context, player->username, render_position, white);
+        }
+    }
+    
+    // @DebugOnly
+    {
+        if (controller->right_mouse.pressed)
+        {
+            for (u32 residency_type = 0;
+                 residency_type < Card_Residency_Burnt;
+                 ++residency_type)
+            {
+                ReorganizeResidencyCards(game_state, (Card_Residency)residency_type);
+            }
+        }
+        
+        if (controller->confirm.pressed)
+        {
+            AddDebugEntites(game_state);
         }
     }
 }
@@ -557,55 +655,10 @@ extern "C"
         
         InitResidencies(game_state);
         
-        AddNullEntity(game_state);
-        AddCursorEntity(game_state);
-        
-        // TODO(fakhri): this is just for debug
+        // @DebugOnly
 #if 1
-#if TEST_ONE_CARD
-        AddCardEntity(game_state, MakeCardType(Category_Hearts, Card_Number_10), Card_Residency_Down);
-#else
-        game_state->game_mode = Game_Mode_GAME;
-        SetFlag(game_state->game_session.flags, SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK);
-        for (u32 player_index = 0;
-             player_index < MAX_PLAYER_COUNT;
-             ++player_index)
-        {
-            Player *player = game_state->game_session.players + player_index;
-            player->joined = true;
-            player->assigned_residency = (Card_Residency)(player_index + 1);
-            player->username = PushStringF(&os->permanent_arena, "%s", "a");
-        }
-        
-        for (u32 card_index = 0;
-             card_index < 13;
-             ++card_index)
-        {
-            AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
-        }
-        
-        for (u32 card_index = 0;
-             card_index < 13;
-             ++card_index)
-        {
-            AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Down);
-        }
-        
-        for (u32 card_index = 0;
-             card_index < 13;
-             ++card_index)
-        {
-            AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Down);
-        }
-        
-        for (u32 card_index = 0;
-             card_index < 13;
-             ++card_index)
-        {
-            AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Down);
-        }
-        
-#endif
+        glDepthFunc(GL_LESS);
+        AddDebugEntites(game_state);
 #endif
     }
     
