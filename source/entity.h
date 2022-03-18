@@ -7,8 +7,8 @@ enum Entity_Type
 {
     Entity_Type_Null_Entity,
     Entity_Type_Cursor_Entity, // NOTE(fakhri): always following mouse
-    Entity_Type_Entity_Card,
-    Entity_Type_Entity_Companion,
+    Entity_Type_Card,
+    Entity_Type_Companion,
 };
 
 enum Card_Residency

@@ -111,8 +111,8 @@ struct Game_State
     u32 entity_count;
     
     u32 card_pressed_index;
-    
     Residency residencies[Card_Residency_Count];
+    
     
     // NOTE(fakhri): menu stuff
     Buffer host_address_buffer;

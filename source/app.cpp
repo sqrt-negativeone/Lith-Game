@@ -60,12 +60,6 @@ AddPlayer(Game_Session *game_session, MessagePlayer *message_player, u32 player_
 }
 
 internal void
-BurnExtraCardEntities(Residency *residency, Residency *burnt_residency)
-{
-    // TODO(fakhri): implement this
-}
-
-internal void
 HandleAvailableMessages(Game_State *game_state, Game_Session *game_session)
 {
     for(MessageResult message_result = os->GetNextNetworkMessageIfAvailable();
@@ -123,7 +117,7 @@ HandleAvailableMessages(Game_State *game_state, Game_Session *game_session)
                     
                     Residency *residency       = game_state->residencies + player->assigned_residency;
                     Residency *burnt_residency = game_state->residencies + Card_Residency_Burnt;
-                    BurnExtraCardEntities(residency, burnt_residency);
+                    BurnExtraCardEntities(game_state, residency, burnt_residency);
                 }
                 SetFlag(game_session->flags, SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK);
             } break;
@@ -141,14 +135,14 @@ HandleAvailableMessages(Game_State *game_state, Game_Session *game_session)
     }
 }
 
-inline void
+internal inline void
 FetchHosts(Hosts_Storage *hosts_storage)
 {
     os->PushNetworkMessage(CreateFetchAvailableHostsMessage(hosts_storage));
     hosts_storage->is_fetching = true;
 }
 
-inline void
+internal inline void
 OpenMenu(Game_State *game_state, Game_Mode menu_mode)
 {
     Assert(Game_Mode_MENU_BEGIN < menu_mode && menu_mode < Game_Mode_MENU_END);
@@ -166,89 +160,11 @@ StartGame(Game_State *game_state, Game_Session *game_session)
 }
 
 internal void
-AddDebugEntites(Game_State *game_state)
-{
-    game_state->entity_count = 0;
-    for (u32 residency_index = 0;
-         residency_index < ArrayCount(game_state->residencies);
-         ++residency_index)
-    {
-        game_state->residencies[residency_index].entity_count = 0;
-    }
-    
-    AddNullEntity(game_state);
-    AddCursorEntity(game_state);
-    
-#if TEST_ONE_CARD
-    AddCardEntity(game_state, MakeCardType(Category_Hearts, Card_Number_10), Card_Residency_Down);
-#else
-    game_state->game_mode = Game_Mode_GAME;
-    SetFlag(game_state->game_session.flags, SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK);
-    for (u32 player_index = 0;
-         player_index < MAX_PLAYER_COUNT;
-         ++player_index)
-    {
-        Player *player = game_state->game_session.players + player_index;
-        player->joined = true;
-        player->assigned_residency = (Card_Residency)(player_index + 1);
-        player->username = PushStringF(&os->permanent_arena, "%s", "a");
-    }
-    
-    for (u32 card_index = 0;
-         card_index < 1;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Up);
-    }
-    
-    for (u32 card_index = 1;
-         card_index < 13;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
-    }
-    
-    for (u32 card_index = 0;
-         card_index < 1;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Left);
-    }
-    
-    for (u32 card_index = 1;
-         card_index < 13;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
-    }
-    
-    for (u32 card_index = 0;
-         card_index < 1;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Right);
-    }
-    
-    for (u32 card_index = 1;
-         card_index < 13;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
-    }
-    
-    for (u32 card_index = 0;
-         card_index < 13;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Down);
-    }
-    
-#endif
-}
-
-internal void
 UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context, Controller *controller)
 {
+    // TODO(fakhri): we need to have a concept of stuff taking sometime to happen
+    // and not just instantaneous
+    // TODO(fakhri): how should we display the message?
     Game_Session *game_session = &game_state->game_session;
     glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -280,9 +196,8 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
                 case Entity_Type_Cursor_Entity:
                 {
                     UpdateCursorEntity(game_state, entity);
-                    // TODO(fakhri): render the cursor here?
                 } break;
-                case Entity_Type_Entity_Card:
+                case Entity_Type_Card:
                 {
                     UpdateCardEntity(game_state, entity_index);
                     if (entity->is_pressed)
@@ -297,7 +212,7 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
                                                card_back_pos, entity->current_dimension, PI - entity->y_angle);
                     
                 } break;
-                case Entity_Type_Entity_Companion:
+                case Entity_Type_Companion:
                 {
                     UpdateCompanionEntity(game_state, entity);
                     Entity *followed_entity = game_state->entities + entity->followed_entity_index;
@@ -350,8 +265,8 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
     {
         if (controller->right_mouse.pressed)
         {
-            for (u32 residency_type = 0;
-                 residency_type < Card_Residency_Burnt;
+            for (u32 residency_type = Card_Residency_Left;
+                 residency_type <= Card_Residency_Burnt;
                  ++residency_type)
             {
                 ReorganizeResidencyCards(game_state, (Card_Residency)residency_type);
