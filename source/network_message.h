@@ -54,6 +54,7 @@ struct Player_Move
 #define MAX_PLAYER_COUNT (4u)
 #define CARDS_PER_PLAYER (13)
 #define DECK_CARDS_COUNT (MAX_PLAYER_COUNT * CARDS_PER_PLAYER)
+#define InvalidePlayerID MAX_PLAYER_COUNT
 
 struct MessagePlayer
 {

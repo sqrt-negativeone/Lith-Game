@@ -117,6 +117,9 @@ struct Game_State
     // NOTE(fakhri): menu stuff
     Buffer host_address_buffer;
     Buffer username_buffer;
+    
+    b32 should_burn_cards;
+    f32 time_to_burn_cards;
 };
 
 struct Compile_Shader_Result

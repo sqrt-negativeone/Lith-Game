@@ -23,6 +23,7 @@ enum Card_Residency
     
     Card_Residency_Count,
 };
+
 #define TEST_ONE_CARD 0
 
 #if TEST_ONE_CARD
@@ -123,6 +124,8 @@ struct Entity
     
     Card_Residency residency;
     GLuint texture;
+    
+    b32 marked_for_burning;
 };
 
 #endif //ENTITY_H

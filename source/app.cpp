@@ -115,9 +115,6 @@ HandleAvailableMessages(Game_State *game_state, Game_Session *game_session)
                         AddCardEntity(game_state, card_type, player->assigned_residency, is_flipped);
                     }
                     
-                    Residency *residency       = game_state->residencies + player->assigned_residency;
-                    Residency *burnt_residency = game_state->residencies + Card_Residency_Burnt;
-                    BurnExtraCardEntities(game_state, residency, burnt_residency);
                 }
                 SetFlag(game_session->flags, SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK);
             } break;
@@ -185,6 +182,7 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
     }
     else
     {
+        // TODO(fakhri): block user control when there are cards that should get burnt
         // NOTE(fakhri): loop over all the entities and update them
         for (u32 entity_index = 1;
              entity_index < game_state->entity_count;
@@ -223,6 +221,35 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
                 {
                     BreakDebugger();
                 } break;
+            }
+        }
+        
+        if (game_state->should_burn_cards)
+        {
+            game_state->time_to_burn_cards -= os->game_dt;
+            if(game_state->time_to_burn_cards <= 0)
+            {
+                game_state->should_burn_cards = false;
+                
+                // NOTE(fakhri): burn the marked cards
+                Assert(Card_Residency_Down - Card_Residency_Left + 1  == MAX_PLAYER_COUNT);
+                for(u32 residency_index = Card_Residency_Left;
+                    residency_index <= Card_Residency_Down;
+                    ++residency_index)
+                {
+                    Residency *residency = game_state->residencies + residency_index;
+                    for(u32 index_in_residency = 0;
+                        index_in_residency < residency->entity_count;
+                        ++index_in_residency)
+                    {
+                        u32 entity_index = residency->entity_indices[index_in_residency];
+                        Entity *entity = game_state->entities + entity_index;
+                        if(entity->marked_for_burning)
+                        {
+                            ChangeResidency(game_state, entity_index, Card_Residency_Burnt);
+                        }
+                    }
+                }
             }
         }
         
@@ -573,6 +600,12 @@ extern "C"
         // @DebugOnly
 #if 1
         glDepthFunc(GL_LESS);
+        for(u32 residency_index = Card_Residency_Left;
+            residency_index <= Card_Residency_Down;
+            ++residency_index)
+        {
+            game_state->residencies[residency_index].controlling_player_id = 0;
+        }
         AddDebugEntites(game_state);
 #endif
     }

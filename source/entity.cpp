@@ -7,7 +7,7 @@ InitResidencies(Game_State *game_state)
         Residency *residency = game_state->residencies + Card_Residency_Up;
         residency->is_horizonal = true;
         residency->is_stacked = false;
-        residency->controlling_player_id = MAX_PLAYER_COUNT;
+        residency->controlling_player_id = InvalidePlayerID;
     }
     
     // NOTE(fakhri): down residency
@@ -15,7 +15,7 @@ InitResidencies(Game_State *game_state)
         Residency *residency = game_state->residencies + Card_Residency_Down;
         residency->is_horizonal = true;
         residency->is_stacked = false;
-        residency->controlling_player_id = MAX_PLAYER_COUNT;
+        residency->controlling_player_id = InvalidePlayerID;
     }
     
     // NOTE(fakhri): left residency
@@ -23,7 +23,7 @@ InitResidencies(Game_State *game_state)
         Residency *residency = game_state->residencies + Card_Residency_Left;
         residency->is_horizonal = false;
         residency->is_stacked = false;
-        residency->controlling_player_id = MAX_PLAYER_COUNT;
+        residency->controlling_player_id = InvalidePlayerID;
     }
     
     // NOTE(fakhri): right residency
@@ -31,7 +31,7 @@ InitResidencies(Game_State *game_state)
         Residency *residency = game_state->residencies + Card_Residency_Right;
         residency->is_horizonal = false;
         residency->is_stacked = false;
-        residency->controlling_player_id = MAX_PLAYER_COUNT;
+        residency->controlling_player_id = InvalidePlayerID;
     }
     
     // NOTE(fakhri): table residency
@@ -39,7 +39,7 @@ InitResidencies(Game_State *game_state)
         Residency *residency = game_state->residencies + Card_Residency_Table;
         residency->is_horizonal = false;
         residency->is_stacked = true;
-        residency->controlling_player_id = MAX_PLAYER_COUNT;
+        residency->controlling_player_id = InvalidePlayerID;
     }
     
     // NOTE(fakhri): burnt residency
@@ -47,9 +47,51 @@ InitResidencies(Game_State *game_state)
         Residency *residency = game_state->residencies + Card_Residency_Burnt;
         residency->is_horizonal = false;
         residency->is_stacked = true;
-        residency->controlling_player_id = MAX_PLAYER_COUNT;
+        residency->controlling_player_id = InvalidePlayerID;
     }
     
+}
+
+internal void
+BurnExtraCardEntities(Game_State *game_state, Card_Residency card_residency)
+{
+    Residency *residency = game_state->residencies + card_residency;
+    Assert(residency->controlling_player_id != InvalidePlayerID);
+    
+    // TODO(fakhri): card_number_frequencies can be a field in the Residency
+    // this way we don't have to recompute it each time we call this function
+    // NOTE(fakhri): count the frequency of each card number
+    u32 card_number_freq[Card_Number_Count] = {};
+    for(u32 entity_index_in_residency = 0;
+        entity_index_in_residency< residency->entity_count;
+        ++entity_index_in_residency)
+    {
+        u32 entity_index = residency->entity_indices[entity_index_in_residency];
+        Entity *card_entity = game_state->entities + entity_index;
+        ++card_number_freq[card_entity->card_type.number];
+    }
+    
+    // NOTE(fakhri): mark the cards to be removed
+    for(u32 entity_index_in_residency = 0;
+        entity_index_in_residency< residency->entity_count;
+        ++entity_index_in_residency)
+    {
+        u32 entity_index = residency->entity_indices[entity_index_in_residency];
+        Entity *card_entity = game_state->entities + entity_index;
+        
+        if(card_number_freq[card_entity->card_type.number] == Category_Count)
+        {
+            card_entity->marked_for_burning = true;
+            game_state->should_burn_cards = true;
+        }
+    }
+    
+    if(game_state->should_burn_cards)
+    {
+        // NOTE(fakhri): we don't burn the cards right away, we rather wait a 
+        // little bit and then burn them.
+        game_state->time_to_burn_cards = Seconds(1.f);
+    }
 }
 
 internal v2
@@ -219,6 +261,11 @@ ChangeResidency(Game_State *game_state, u32 entity_index, Card_Residency residen
         
         ReorganizeResidencyCards(game_state, old_residency);
         ReorganizeResidencyCards(game_state, residency);
+        
+        if (entity_residency->controlling_player_id != InvalidePlayerID)
+        {
+            BurnExtraCardEntities(game_state, residency);
+        }
     }
 }
 
@@ -626,7 +673,7 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
     {
         if (!entity->is_pressed)
         {
-            if(os->controller.left_mouse.pressed && entity->residency == Card_Residency_Down)
+            if(os->controller.left_mouse.pressed)
             {
                 // NOTE(fakhri): make sure we are not pressing another card
                 if (game_state->card_pressed_index == 0)
@@ -649,6 +696,8 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
         
         v2 table_center = vec2(0.5f * world_width, 0.55f * world_height);
         b32 can_move_to_table = false;
+        // TODO(fakhri): allow the player to only play his own cards, but allow him to move any card
+        // cuz why not LOL
         if (IsInsideRect(RectCentDim(table_center, vec2(20, 20)), entity->center_pos.xy))
         {
             
@@ -699,40 +748,6 @@ UpdateCompanionEntity(Game_State *game_state, Entity *entity)
 }
 
 
-internal void
-BurnExtraCardEntities(Game_State *game_state, Residency *residency, Residency *burnt_residency)
-{
-    // NOTE(fakhri): count the frequency of each card
-    u32 card_number_freq[Card_Number_Count] = {};
-    for(u32 entity_index_in_residency = 0;
-        entity_index_in_residency< residency->entity_count;
-        ++entity_index_in_residency)
-    {
-        u32 entity_index = residency->entity_indices[entity_index_in_residency];
-        Entity *card_entity = game_state->entities + entity_index;
-        ++card_number_freq[card_entity->card_type.number];
-    }
-    
-    // NOTE(fakhri): mark the cards to be removed
-    for(u32 entity_index_in_residency = 0;
-        entity_index_in_residency< residency->entity_count;
-        ++entity_index_in_residency)
-    {
-        u32 entity_index = residency->entity_indices[entity_index_in_residency];
-        Entity *card_entity = game_state->entities + entity_index;
-        
-        if(card_number_freq[card_entity->card_type.number] == Category_Count)
-        {
-            // TODO(fakhri): benchmark this, it can be optimazed if it turned out it is slowing us
-            // we can just mark the cards to be removed and remove them later in a single pass
-            // like we did in the server, but probably the number cards in each residency is so small
-            // that we won't care?
-            ChangeResidency(game_state, entity_index, Card_Residency_Burnt);
-            card_entity->target_y_angle = 0;
-        }
-    }
-}
-
 
 internal void
 AddDebugEntites(Game_State *game_state)
@@ -781,45 +796,37 @@ AddDebugEntites(Game_State *game_state)
          card_index < 1;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Left);
+        AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Left);
     }
     
     for (u32 card_index = 1;
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
+        AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Down);
     }
     
     for (u32 card_index = 0;
          card_index < 1;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Right);
+        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Right);
     }
     
     for (u32 card_index = 1;
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
+        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Down);
     }
     
     for (u32 card_index = 0;
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Down);
+        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Down);
     }
     
     Residency *burnt_residency = game_state->residencies + Card_Residency_Burnt;
-    
-    for(u32 residency_index = Card_Residency_Left;
-        residency_index <= Card_Residency_Down;
-        ++residency_index)
-    {
-        Residency *residency = game_state->residencies + residency_index;
-        BurnExtraCardEntities(game_state, residency, burnt_residency);
-    }
 #endif
 }
