@@ -85,7 +85,7 @@ UI_Button(Game_State *game_state, s8 item_text, f32 x, f32 y, v2 hitbox)
 {
     UI_Context        *ui_context        = &game_state->ui_context;
     Rendering_Context *rendering_context = &game_state->rendering_context;
-    Controller        *controller        = &os->controller;
+    Controller        *controller        = &game_state->controller;
     UI_ColorScheme    *color_scheme      = &ui_context->color_scheme;
     
     b32 clicked = 0;
@@ -173,7 +173,7 @@ UI_InputField(Game_State *game_state, v2 item_size, f32 x, f32 y, Buffer *input_
     UI_Context        *ui_context        = &game_state->ui_context;
     Rendering_Context *rendering_context = &game_state->rendering_context;
     UI_ColorScheme    *color_scheme      = &ui_context->color_scheme;
-    Controller        *controller        = &os->controller;
+    Controller        *controller        = &game_state->controller;
     
     v3 background_color;
     v3 text_color;

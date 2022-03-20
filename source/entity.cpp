@@ -673,7 +673,7 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
     {
         if (!entity->is_pressed)
         {
-            if(os->controller.left_mouse.pressed)
+            if(game_state->controller.left_mouse.pressed)
             {
                 // NOTE(fakhri): make sure we are not pressing another card
                 if (game_state->card_pressed_index == 0)
@@ -706,7 +706,7 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
             can_move_to_table = 1;
         }
         
-        if (os->controller.left_mouse.released)
+        if (game_state->controller.left_mouse.released)
         {
             entity->is_pressed = false;
             entity->target_pos = entity->residency_pos;

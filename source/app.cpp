@@ -625,10 +625,79 @@ extern "C"
         Game_Session *game_session = &game_state->game_session;
         Rendering_Context *rendering_context = &game_state->rendering_context;
         UI_Context *ui_context = &game_state->ui_context;
-        Controller *controller = &os->controller;
+        game_state->controller = {};
+        Controller *controller = &game_state->controller;
         
         HandleAvailableMessages(game_state, game_session);
         UpdateScreenSize(rendering_context);
+        
+        // NOTE(fakhri): handle input
+        {
+            OS_Event *event = 0;
+            while(OS_GetNextEvent(&event))
+            {
+                if (OS_EventIsMouse(event))
+                {
+                    switch(event->type)
+                    {
+                        case OS_EventType_MousePress:
+                        {
+                            switch(event->mouse_button)
+                            {
+                                case MouseButton_Left: controller->left_mouse.pressed  = true; break;
+                                case MouseButton_Right:controller->right_mouse.pressed = true; break;
+                                default: break;
+                            }
+                        } break;
+                        case OS_EventType_MouseRelease:
+                        {
+                            switch(event->mouse_button)
+                            {
+                                case MouseButton_Left: controller->left_mouse.released  = true; break;
+                                case MouseButton_Right:controller->right_mouse.released = true; break;
+                                default: break;
+                            }
+                        } break;
+                        default: break;
+                    }
+                }
+                else
+                {
+                    switch(event->type)
+                    {
+                        case OS_EventType_KeyPress:
+                        {
+                            switch(event->key)
+                            {
+                                case Key_Esc:   controller->escape_key.pressed        = true; break;
+                                case Key_Enter: controller->confirm.pressed           = true; break;
+                                case Key_Up:    controller->move_up.pressed           = true; break;
+                                case Key_Down:  controller->move_down.pressed         = true; break;
+                                case Key_Left:  controller->move_left.pressed         = true; break;
+                                case Key_Right: controller->move_right.pressed        = true; break;
+                                case Key_F1:    controller->toggle_fullscreen.pressed = true; break;
+                                default: break;
+                            }
+                        } break;
+                        case OS_EventType_KeyRelease:
+                        {
+                            switch(event->key)
+                            {
+                                case Key_Esc:   controller->escape_key.released        = true; break;
+                                case Key_Enter: controller->confirm.released           = true; break;
+                                case Key_Up:    controller->move_up.released           = true; break;
+                                case Key_Down:  controller->move_down.released         = true; break;
+                                case Key_Left:  controller->move_left.released         = true; break;
+                                case Key_Right: controller->move_right.released        = true; break;
+                                case Key_Space: controller->toggle_fullscreen.released = true; break;
+                                default: break;
+                            }
+                        } break;
+                        default: break;
+                    }
+                }
+            }
+        }
         
         switch(game_state->game_mode)
         {
@@ -667,7 +736,7 @@ extern "C"
         DebugDrawTextScreenCoord(rendering_context, frame_time, vec2(400, 60), vec3(1,1,1));
 #endif
         
-        if (os->controller.toggle_fullscreen.pressed)
+        if (game_state->controller.toggle_fullscreen.pressed)
         {
             os->fullscreen ^= 1;
         }

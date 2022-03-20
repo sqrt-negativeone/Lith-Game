@@ -106,6 +106,7 @@ struct Game_State
     UI_Context ui_context;
     Rendering_Context rendering_context;
     Game_Session game_session;
+    Controller controller;
     
     Entity entities[1024];
     u32 entity_count;

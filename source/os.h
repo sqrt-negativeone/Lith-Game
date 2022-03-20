@@ -247,9 +247,6 @@ struct OS_State
     
     // NOTE(fakhri): shader hotreload
     Shader_Array shaders_array;
-    
-    // NOTE(fakhri): inputs
-    Controller controller;
 };
 
 global OS_State *os = 0;
