@@ -3,8 +3,6 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#define MAX_UNITS_PER_X (100)
-
 struct Character
 {
     GLuint texture_id;  // ID handle of the glyph texture
@@ -58,7 +56,6 @@ struct Rendering_Context
     GLuint text_vbo;
     
     v2 screen;
-    
     
     Font arial_font;
     Font menu_title_font;

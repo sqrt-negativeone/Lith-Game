@@ -204,7 +204,7 @@ UI_InputField(Game_State *game_state, v2 item_size, f32 x, f32 y, Buffer *input_
     // NOTE(fakhri): render input field background
     DebugDrawQuadScreenCoord(rendering_context, vec3(item_pos, 0), item_size, background_color);
     
-    DebugDrawTextScreenCoord(rendering_context, input_buffer->buffer, item_pos, text_color);
+    DebugDrawTextScreenCoord(rendering_context, input_buffer->content, item_pos, text_color);
     
     if (is_selected)
     {
@@ -212,7 +212,7 @@ UI_InputField(Game_State *game_state, v2 item_size, f32 x, f32 y, Buffer *input_
         f32 change = square_f(cos_f(PI * t));
         v3 cursor_color = lerp(background_color, change, text_color);
         
-        v2 cursor_pos = vec2(item_pos.x +  0.5f * GetActiveFontWidth(rendering_context, input_buffer->buffer),
+        v2 cursor_pos = vec2(item_pos.x +  0.5f * GetActiveFontWidth(rendering_context, input_buffer->content),
                              item_pos.y);
         
         v2 cursor_size = vec2(2, 1.1f * GetActiveFontHeight(rendering_context));

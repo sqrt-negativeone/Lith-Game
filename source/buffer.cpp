@@ -9,7 +9,7 @@ InitBuffer(M_Arena *arena, u32 buffer_size)
     if (data)
     {
         result.max_size = buffer_size;
-        result.buffer.data = data;
+        result.content.data = data;
     }
     return result;
 }
@@ -19,7 +19,7 @@ IsBufferFull(Buffer *buffer)
 {
     Assert(buffer);
     
-    b32 result = (buffer->max_size == buffer->buffer.size);
+    b32 result = (buffer->max_size == buffer->content.size);
     return result;
 }
 
@@ -28,7 +28,7 @@ IsBufferEmpty(Buffer *buffer)
 {
     Assert(buffer);
     
-    b32 result = (buffer->buffer.size == 0);
+    b32 result = (buffer->content.size == 0);
     return result;
 }
 
@@ -37,22 +37,33 @@ InsertCharacterToBuffer(Buffer *buffer, char c)
 {
     Assert(buffer);
     
-    u64 len = buffer->buffer.size;
-    buffer->buffer.str[len] = c;
-    buffer->buffer.size = len + 1;
+    u64 len = buffer->content.size;
+    buffer->content.str[len] = c;
+    buffer->content.size = len + 1;
 }
 
 inline void
 RemoveLastCharacterFromBuffer(Buffer *buffer)
 {
     Assert(buffer);
-    u64 len = buffer->buffer.size;
-    --buffer->buffer.size;
+    u64 len = buffer->content.size;
+    --buffer->content.size;
 }
 
 internal void
 EmptyBuffer(Buffer *buffer)
 {
     Assert(buffer);
-    buffer->buffer.size = 0;
+    buffer->content.size = 0;
+}
+
+internal void
+CopyStringToBuffer(Buffer *buffer, s8 string)
+{
+    Assert(string.size <= buffer->max_size);
+    if (string.size <= buffer->max_size)
+    {
+        MemoryCopy(buffer->content.data, string.data, string.size);
+        buffer->content.size = string.size;
+    }
 }

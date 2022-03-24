@@ -117,7 +117,7 @@ struct Entity
     b32 is_under_cursor;
     b32 is_pressed;
     
-    u32 followed_entity_index;
+    u32 entity_index_to_follow;
     v2  offset_in_follwed_entity;
     
     Card_Type card_type;

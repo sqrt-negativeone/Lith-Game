@@ -114,13 +114,17 @@ struct Game_State
     u32 card_pressed_index;
     Residency residencies[Card_Residency_Count];
     
-    
     // NOTE(fakhri): menu stuff
     Buffer host_address_buffer;
     Buffer username_buffer;
     
     b32 should_burn_cards;
     f32 time_to_burn_cards;
+    
+    Buffer message_to_display;
+    f32 message_duration;
+    
+    v2 world_dim;
 };
 
 struct Compile_Shader_Result

@@ -25,7 +25,6 @@
 #include "network_message.cpp"
 #include "entity.cpp"
 
-
 internal void
 AssignResidencyToPlayers(Game_State *game_state, Game_Session *game_session)
 {
@@ -213,9 +212,9 @@ UpdateAndRenderGame(Game_State *game_state, Rendering_Context *rendering_context
                 case Entity_Type_Companion:
                 {
                     UpdateCompanionEntity(game_state, entity);
-                    Entity *followed_entity = game_state->entities + entity->followed_entity_index;
-                    Assert(followed_entity);
-                    DebugDrawTextureWorldCoord(rendering_context, entity->texture, vec3(entity->center_pos.xy, followed_entity->center_pos.z + 0.01f), entity->current_dimension, followed_entity->y_angle);
+                    Entity *entity_to_follow = game_state->entities + entity->entity_index_to_follow;
+                    Assert(entity_to_follow);
+                    DebugDrawTextureWorldCoord(rendering_context, entity->texture, vec3(entity->center_pos.xy, entity_to_follow->center_pos.z + 0.01f), entity->current_dimension, entity_to_follow->y_angle);
                 } break;
                 default:
                 {
@@ -453,7 +452,7 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state,  Rendering_Context *ren
     {
         if (UI_Button(game_state, S8Lit("Join"), x, y, vec2(half_screen.width, 1.1f * rendering_context->active_font->font_height)))
         {
-            s8 username =  game_state->username_buffer.buffer;
+            s8 username =  game_state->username_buffer.content;
             
             if(username.size)
             {
@@ -587,7 +586,7 @@ extern "C"
         Game_State *game_state = os->game_state;
         *game_state = {};
         
-        InitRenderer(&game_state->rendering_context);
+        InitRenderer(game_state, &game_state->rendering_context);
         UI_Init(&game_state->ui_context, &os->permanent_arena);
         
         game_state->host_address_buffer = InitBuffer(&os->permanent_arena, SERVER_ADDRESS_BUFFER_SIZE);
@@ -596,6 +595,8 @@ extern "C"
         OpenMenu(game_state, Game_Mode_MENU_MAIN);
         
         InitResidencies(game_state);
+        
+        game_state->message_to_display = InitBuffer(&os->permanent_arena, Kilobytes(1));
         
         // @DebugOnly
 #if 1
@@ -723,6 +724,17 @@ extern "C"
             } break;
         }
         
+        // NOTE(fakhri): display a message if there is any
+        {
+            if (game_state->message_duration > 0)
+            {
+                game_state->message_duration -= os->game_dt;
+                // TODO(fakhri): display the message
+                DebugDrawTextWorldCoord(rendering_context, game_state->message_to_display.content, vec2(0.5f * game_state->world_dim.width, 0.7f *game_state->world_dim.height), 0 * vec3(1,1,1));
+            }
+        }
+        
+        // NOTE(fakhri): render the mouse cursor
         DebugDrawQuadScreenCoord(rendering_context, vec3(os->mouse_position, 99), vec2(10, 10), vec3(1, .3f, .5f));
         
 #if 0

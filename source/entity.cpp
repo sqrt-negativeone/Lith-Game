@@ -52,6 +52,19 @@ InitResidencies(Game_State *game_state)
     
 }
 
+internal inline void
+DisplayMessageForDuration(Game_State *game_state, s8 message, f32 duration_in_seconds)
+{
+    CopyStringToBuffer(&game_state->message_to_display, message);
+    game_state->message_duration = duration_in_seconds;
+}
+
+internal inline void
+StopMessageDisplay(Game_State *game_state)
+{
+    game_state->message_duration = 0;
+}
+
 internal void
 BurnExtraCardEntities(Game_State *game_state, Card_Residency card_residency)
 {
@@ -91,6 +104,7 @@ BurnExtraCardEntities(Game_State *game_state, Card_Residency card_residency)
         // NOTE(fakhri): we don't burn the cards right away, we rather wait a 
         // little bit and then burn them.
         game_state->time_to_burn_cards = Seconds(1.f);
+        DisplayMessageForDuration(game_state, S8Lit("Burning Extra cards"), Seconds(2));
     }
 }
 
@@ -98,9 +112,8 @@ internal v2
 FindFirstPositionInResidencyRow(Game_State *game_state, Card_Residency residency_type, u32 entity_count)
 {
     v2 result = {};
-    f32 world_width = MAX_UNITS_PER_X;
-    f32 world_height = MAX_UNITS_PER_X * game_state->rendering_context.aspect_ratio;
-    
+    f32 world_width = game_state->world_dim.width;
+    f32 world_height = game_state->world_dim.height;
     
     switch(residency_type)
     {
@@ -170,7 +183,7 @@ ReorganizeResidencyCards(Game_State *game_state, Card_Residency residency_type)
             Entity *entity = game_state->entities + entity_index;
             
             entity->residency_pos = residency_pos;
-            if (!entity->followed_entity_index)
+            if (!entity->entity_index_to_follow)
             {
                 // NOTE(fakhri): go to the residency position if i'm not already following an entitiy
                 entity->target_pos = entity->residency_pos;
@@ -294,17 +307,17 @@ AddCursorEntity(Game_State *game_state)
 }
 
 internal void
-AddCompanionEntity(Game_State *game_state, GLuint texture, v2 companion_dimensions, u32 followed_entity_index, v2 followed_offset)
+AddCompanionEntity(Game_State *game_state, GLuint texture, v2 companion_dimensions, u32 entity_index_to_follow, v2 followed_offset)
 {
     u32 companion_entity_index = AddEntity(game_state);
     Entity *companion_entity = game_state->entities + companion_entity_index;
-    Entity *card_entitiy = game_state->entities + followed_entity_index;
+    Entity *card_entitiy = game_state->entities + entity_index_to_follow;
     *companion_entity = {};
     companion_entity->type = Entity_Type_Companion;
     companion_entity->center_pos = card_entitiy->center_pos;
     companion_entity->target_pos = card_entitiy->center_pos;
     companion_entity->current_dimension = companion_dimensions;
-    companion_entity->followed_entity_index = followed_entity_index;
+    companion_entity->entity_index_to_follow = entity_index_to_follow;
     companion_entity->offset_in_follwed_entity = followed_offset;
     companion_entity->texture = texture;
 }
@@ -595,9 +608,8 @@ AddCardEntity(Game_State *game_state, Card_Type card_type, Card_Residency card_r
     card->target_dimension   = vec2(CARD_WIDTH, CARD_HEIGHT);
     card->current_dimension  = vec2(CARD_WIDTH, CARD_HEIGHT);
     ChangeResidency(game_state, card_entity_index, card_residency);
-    f32 world_width = MAX_UNITS_PER_X;
-    f32 world_height = MAX_UNITS_PER_X * game_state->rendering_context.aspect_ratio;
-    card->center_pos.xy = 0.5f * vec2(world_width, world_height);
+    f32 world_width = game_state->world_dim.width;
+    f32 world_height = game_state->world_dim.height;
     
     card->dy_angle = 4 * PI;
     
@@ -624,9 +636,9 @@ AddCardEntity(Game_State *game_state, Card_Type card_type, Card_Residency card_r
 internal void
 MoveEntity(Game_State *game_state, Entity *entity, f32 spring_constant, f32 friction, f32 mass)
 {
-    if (entity->followed_entity_index)
+    if (entity->entity_index_to_follow)
     {
-        Entity *followed_entity = game_state->entities + entity->followed_entity_index;
+        Entity *followed_entity = game_state->entities + entity->entity_index_to_follow;
         f32 following_trigger_distance = 0.0f;
         if (LengthSquaredVec2(followed_entity->center_pos.xy - entity->center_pos.xy) > following_trigger_distance)
         {
@@ -679,7 +691,7 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
                 if (game_state->card_pressed_index == 0)
                 {
                     entity->is_pressed = true;
-                    entity->followed_entity_index = Entity_Type_Cursor_Entity;
+                    entity->entity_index_to_follow = Entity_Type_Cursor_Entity;
                     game_state->card_pressed_index = entity_index;
                     entity->target_pos.z = 50.f;
                 }
@@ -690,8 +702,9 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
     if (entity->is_pressed)
     {
         
-        f32 world_width = MAX_UNITS_PER_X;
-        f32 world_height = MAX_UNITS_PER_X * game_state->rendering_context.aspect_ratio;
+        f32 world_width = game_state->world_dim.width;
+        f32 world_height = game_state->world_dim.height;
+        
         v2 world_dimension = vec2(world_width, world_height);
         
         v2 table_center = vec2(0.5f * world_width, 0.55f * world_height);
@@ -710,7 +723,7 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
         {
             entity->is_pressed = false;
             entity->target_pos = entity->residency_pos;
-            entity->followed_entity_index = 0;
+            entity->entity_index_to_follow = 0;
             game_state->card_pressed_index = 0;
             entity->target_pos.z =  entity->residency_pos.z;
             
@@ -736,12 +749,12 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index)
 internal void
 UpdateCompanionEntity(Game_State *game_state, Entity *entity)
 {
-    Assert(entity->followed_entity_index);
+    Assert(entity->entity_index_to_follow);
     
     MoveEntity(game_state, entity, 85.f, 0.5f, 0.1f);
     
 #if 0    
-    Entity *followed_entity = game_state->entities + entity->followed_entity_index;
+    Entity *followed_entity = game_state->entities + entity->entity_index_to_follow;
     entity->center_pos.xy = ClampInsideRect(RectCentDim(followed_entity->center_pos.xy, followed_entity->current_dimension), entity->center_pos.xy);
 #endif
     

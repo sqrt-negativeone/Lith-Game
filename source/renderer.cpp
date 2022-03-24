@@ -93,6 +93,8 @@ UpdateScreenSize(Rendering_Context *rendering_context)
         
         // NOTE(fakhri): adjust view port
         glViewport(0, 0, os->window_size.width, os->window_size.height);
+        
+        // TODO(fakhri): what to do to aspect ratio?
     }
 }
 
@@ -199,7 +201,7 @@ LoadFrenshSuitedDeck(Frensh_Suited_Cards_Texture *deck_textures)
 }
 
 internal void
-InitRenderer(Rendering_Context *rendering_context)
+InitRenderer(Game_State *game_state, Rendering_Context *rendering_context)
 {
     // NOTE(fakhri): load shaders
     InitShaderProgram(&rendering_context->quad_shader, S8Lit("shaders/quad_shader.glsl"));
@@ -288,8 +290,11 @@ InitRenderer(Rendering_Context *rendering_context)
         LogError("Couldn't initialize free type library");
     }
     
-    rendering_context->normalized_width_unit_per_world_unit = 1.0f / MAX_UNITS_PER_X;
     rendering_context->aspect_ratio = 1.0f / (16.0f / 9.0f);
+    game_state->world_dim.width = 100;
+    game_state->world_dim.height = game_state->world_dim.x * rendering_context->aspect_ratio;
+    rendering_context->normalized_width_unit_per_world_unit = 1.0f / game_state->world_dim.width;
+    
 }
 
 internal void

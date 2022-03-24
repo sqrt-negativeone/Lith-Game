@@ -5,7 +5,7 @@
 
 struct Buffer
 {
-    s8 buffer;
+    s8 content;
     u32 max_size;
 };
 
