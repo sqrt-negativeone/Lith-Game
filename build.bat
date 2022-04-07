@@ -19,14 +19,5 @@ start /b /wait "" "cl.exe"  %build_options% %compile_flags% ../source/app.cpp /L
 
 start /b /wait "" "cl.exe"  %build_options% %compile_flags% ../source/win32/win32_main.cpp /link %platform_link_flags% /out:%application_name%.exe
 
-copy /Y %application_name%.exe game 
-copy /Y %application_name%_code.dll game 
-
-copy /Y %application_name%.exe game2 
-copy /Y %application_name%_code.dll game2
-
-copy /Y %application_name%.exe game3
-copy /Y %application_name%_code.dll game3
-
 popd
 
