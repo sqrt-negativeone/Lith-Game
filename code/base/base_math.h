@@ -1142,21 +1142,33 @@ union vec4f32
                 f32 X, Y, Z;
             };
         };
-        
-        f32 W;
+        union
+        {
+            f32 W;
+            f32 w;
+        };
     };
     struct
     {
         union
         {
             vec3f32 RGB;
+            vec3f32 rgb;
             struct
             {
                 f32 R, G, B;
             };
+            struct
+            {
+                f32 r, g, b;
+            };
         };
         
-        f32 A;
+        union
+        {
+            f32 A;
+            f32 a;
+        };
     };
     
     struct
@@ -1208,6 +1220,14 @@ Vec4(f32 X, f32 Y, f32 Z, f32 W)
     Result.Z = Z;
     Result.W = W;
 #endif
+    
+    return (Result);
+}
+
+internal inline vec4f32 
+Vec4(vec3f32 v, f32 w)
+{
+    vec4f32 Result = Vec4(v.x, v.y, v.z, w);
     
     return (Result);
 }

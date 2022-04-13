@@ -41,8 +41,9 @@ UI_InitColorScheme(UI_ColorScheme *color_scheme)
 }
 
 internal void
-UI_Init(UI_Context *ui_context, M_Arena *arena)
+UI_Init(UI_Context *ui_context, Render_Context *render_context)
 {
+    ui_context->render_context = render_context;
     UI_InitColorScheme(&ui_context->color_scheme);
 }
 
@@ -68,23 +69,20 @@ UI_EndFrame(UI_Context *ui_context, Controller *controller)
 }
 
 internal void
-UI_Label(Game_State *game_state, String8 text, f32 x, f32 y, b32 should_animate_color = false)
+UI_Label(UI_Context *ui_context, String8 text, f32 x, f32 y, b32 should_animate_color = false, Font_Kind font_to_use = FontKind_None, Coordinate_Type coord_type = CoordinateType_None)
 {
-    UI_Context        *ui_context        = &game_state->ui_context;
-    UI_ColorScheme    *color_scheme      = &ui_context->color_scheme;
+    UI_ColorScheme *color_scheme = &ui_context->color_scheme;
     
     f32 change = should_animate_color? Square(CosF(PI32 * os->time.game_time)) : 0;
     v3 color = Lerp(color_scheme->label_color1, change, color_scheme->label_color2);
     
-    DrawTextScreenCoord(game_state, text, Vec2(x, y), color);
+    Render_PushTextRequest(ui_context->render_context, text, Vec3(x, y, 0), Vec4(color, 1), font_to_use, coord_type);
 }
 
 internal b32
-UI_Button(Game_State *game_state, String8 item_text, f32 x, f32 y, v2 hitbox)
+UI_Button(UI_Context *ui_context, String8 item_text, f32 x, f32 y, v2 hitbox, Font_Kind font_to_use = FontKind_None, Coordinate_Type coord_type = CoordinateType_None)
 {
-    UI_Context        *ui_context        = &game_state->ui_context;
-    Controller        *controller        = &game_state->controller;
-    UI_ColorScheme    *color_scheme      = &ui_context->color_scheme;
+    UI_ColorScheme    *color_scheme = &ui_context->color_scheme;
     
     b32 clicked = 0;
     
@@ -92,7 +90,7 @@ UI_Button(Game_State *game_state, String8 item_text, f32 x, f32 y, v2 hitbox)
     
     v3 text_color;
     
-    //DrawQuadScreenCoord(game_state, Vec3(x, y, 0), hitbox, Vec3(1, 1, 1));
+    //DrawQuadScreenCoord(ui_context, Vec3(x, y, 0), hitbox, Vec3(1, 1, 1));
     if (IsInsideRect(RectCentDim(item_pos, hitbox), os->mouse_position ))
     {
         ui_context->last_select_time = os->time.game_time;
@@ -103,7 +101,7 @@ UI_Button(Game_State *game_state, String8 item_text, f32 x, f32 y, v2 hitbox)
     
     if (is_selected)
     {
-        if (controller->confirm.pressed || controller->left_mouse.pressed)
+        if (ui_context->controller->confirm.pressed || ui_context->controller->left_mouse.pressed)
         {
             clicked = 1;
         }
@@ -112,14 +110,15 @@ UI_Button(Game_State *game_state, String8 item_text, f32 x, f32 y, v2 hitbox)
         f32 change = Square(CosF(PI32 * t));
         text_color = Lerp(color_scheme->button_text_active_color1, change, color_scheme->button_text_active_color2);
         v2 shadow_offset = Vec2(5, 5);
-        DrawTextScreenCoord(game_state, item_text, item_pos + shadow_offset, color_scheme->button_text_shadow_color);
+        Render_PushTextRequest(ui_context->render_context, item_text, Vec3(item_pos + shadow_offset, 0), Vec4(text_color, 1), font_to_use, coord_type);
+        
     }
     else
     {
         text_color = color_scheme->button_text_color;
     }
     
-    DrawTextScreenCoord(game_state, item_text, item_pos, text_color);
+    Render_PushTextRequest(ui_context->render_context, item_text, Vec3(item_pos, 0), Vec4(text_color, 1), font_to_use, coord_type);
     
     ++ui_context->items_count;
     return clicked;
@@ -169,11 +168,9 @@ HandleInputFieldKeyboardInput(Buffer *input_buffer)
 }
 
 internal void
-UI_InputField(Game_State *game_state, v2 item_size, f32 x, f32 y, Buffer *input_buffer)
+UI_InputField(UI_Context *ui_context, v2 item_size, f32 x, f32 y, Buffer *input_buffer, Font_Kind font_to_use = FontKind_None, Coordinate_Type coord_type = CoordinateType_None)
 {
-    UI_Context        *ui_context        = &game_state->ui_context;
     UI_ColorScheme    *color_scheme      = &ui_context->color_scheme;
-    Controller        *controller        = &game_state->controller;
     
     v3 background_color;
     v3 text_color;
@@ -202,9 +199,9 @@ UI_InputField(Game_State *game_state, v2 item_size, f32 x, f32 y, Buffer *input_
     }
     
     // NOTE(fakhri): render input field background
-    DrawQuadScreenCoord(game_state, Vec3(item_pos, 0), item_size, background_color);
+    Render_PushQuadRequest(ui_context->render_context, Vec3(item_pos, 0), item_size, Vec4(background_color, 1), coord_type);
     
-    DrawTextScreenCoord(game_state, input_buffer->content, item_pos, text_color);
+    Render_PushTextRequest(ui_context->render_context, input_buffer->content, Vec3(item_pos, 0), Vec4(text_color, 1), font_to_use, coord_type);
     
     if (is_selected)
     {
@@ -212,11 +209,13 @@ UI_InputField(Game_State *game_state, v2 item_size, f32 x, f32 y, Buffer *input_
         f32 change = Square(CosF(PI32 * t));
         v3 cursor_color = Lerp(background_color, change, text_color);
         
-        v2 cursor_pos = Vec2(item_pos.x +  0.5f * GetFontWidth(game_state->active_font, input_buffer->content),
+        v2 cursor_pos = Vec2(item_pos.x +  0.5f * GetFontWidth(ui_context->render_context, font_to_use, input_buffer->content),
                              item_pos.y);
         
-        v2 cursor_size = Vec2(2, 1.1f * GetFontHeight(game_state->active_font));
-        DrawQuadScreenCoord(game_state, Vec3(cursor_pos, 0), cursor_size, cursor_color);
+        v2 cursor_size = Vec2(2, 1.1f * GetFontHeight(ui_context->render_context, font_to_use));
+        
+        Render_PushQuadRequest(ui_context->render_context, Vec3(cursor_pos, 0), cursor_size, Vec4(cursor_color, 1), coord_type);
+        
     }
     
     ++ui_context->items_count;

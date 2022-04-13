@@ -42,7 +42,6 @@ global char w32_temp_app_dll_path[256];
 exported DWORD NvOptimusEnablement = 1;
 exported int AmdPowerXpressRequestHighPerformance = 1;
 
-
 ////////////////////////////////
 //~ NOTE(fakhri): application options
 #define Application_Name             "Lith"
@@ -52,29 +51,6 @@ exported int AmdPowerXpressRequestHighPerformance = 1;
 #define W32_GraphicalWindowHeight    720u 
 
 //~
-
-typedef enum W32_CursorStyle
-{
-    W32_CursorStyle_Normal,
-    W32_CursorStyle_HorizontalResize,
-    W32_CursorStyle_VerticalResize,
-    W32_CursorStyle_IBar,
-}
-W32_CursorStyle;
-
-global W32_CursorStyle global_cursor_style;
-
-internal v2
-W32_GetMousePosition(HWND window)
-{
-    v2 result = {0};
-    POINT mouse;
-    GetCursorPos(&mouse);
-    ScreenToClient(window, &mouse);
-    result.x = (f32)(mouse.x);
-    result.y = (f32)(mouse.y);
-    return result;
-}
 
 internal LRESULT
 W32_WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param)
@@ -258,40 +234,6 @@ W32_WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param)
     return result;
 }
 
-internal f32
-W32_GetTime(void)
-{
-    W32_Timer *timer = &w32_timer;
-    LARGE_INTEGER current_time;
-    QueryPerformanceCounter(&current_time);
-    return w32_os.time.wall_time + (f32)(current_time.QuadPart - timer->begin_frame.QuadPart) / (f32)timer->counts_per_second.QuadPart;
-}
-
-internal u64
-W32_GetCycles(void)
-{
-    u64 result = __rdtsc();
-    return result;
-}
-
-internal void
-W32_ResetCursor(void)
-{
-    global_cursor_style = W32_CursorStyle_Normal;
-}
-
-internal void
-W32_SetCursorToHorizontalResize(void)
-{
-    global_cursor_style = W32_CursorStyle_HorizontalResize;
-}
-
-internal void
-W32_SetCursorToVerticalResize(void)
-{
-    global_cursor_style = W32_CursorStyle_VerticalResize;
-}
-
 int
 WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_show_cmd)
 {
@@ -460,7 +402,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     W32_AppCode w32_game_code = {};
     //- NOTE(fakhri): Load and init app code
     {
-        game_state = PushStruct(w32_os.permanent_arena, Game_State);
+        game_state = PushStructZero(w32_os.permanent_arena, Game_State);
         W32_AppCodeLoad(&w32_game_code);
         w32_game_code.PermanentLoad(&w32_os, game_state);
     }
@@ -474,13 +416,6 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     
     ShowWindow(w32_window_handle, n_show_cmd);
     UpdateWindow(w32_window_handle);
-    
-    glEnable(GL_CULL_FACE); 
-    
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
     
     while(!w32_os.quit)
     {

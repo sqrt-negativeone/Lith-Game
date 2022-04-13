@@ -26,17 +26,15 @@ enum Card_Residency
 
 #define TEST_ONE_CARD 0
 
-#if TEST_ONE_CARD
-#define CARD_WIDTH  (2.f * 3.5f)
-#define CARD_HEIGHT (2.f * 5.45f)
-#else
-#define CARD_WIDTH  (1.5f * 3.5f)
-#define CARD_HEIGHT (1.5f * 5.45f)
-#endif
 
-#define CARD_X_GAP (-1.5f)
-#define CARD_Y_GAP (-5.0f)
+#define CARD_WIDTH  (MiliMeter(57.0f))
+#define CARD_HEIGHT (MiliMeter(88.7f))
 
+#define CARD_HORIZONTAL_GAP (-MiliMeter(10))
+#define CARD_VIRTICAL_GAP (-CentiMeter(10))
+
+#define CARD_HORIZONTAL_ADVANCE (CARD_WIDTH + CARD_HORIZONTAL_GAP)
+#define CARD_VIRTICAL_ADVANCE (CARD_HEIGHT - MiliMeter(30))
 
 enum Card_Category
 {

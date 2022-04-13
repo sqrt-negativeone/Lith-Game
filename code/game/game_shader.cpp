@@ -97,7 +97,7 @@ CompileShader(String8 shader_name)
 }
 
 internal void
-SetupShader(Game_State *game_state, Shader_Kind kind)
+SetupShader(Render_Context *render_context, Shader_Kind kind)
 {
     local_persist f32 quad_vertices[] = {
         // position
@@ -121,11 +121,11 @@ SetupShader(Game_State *game_state, Shader_Kind kind)
         +0.5f, -0.5f, 	 1.0f, 0.0f,
     };
     
-    Shader_Program *program = game_state->shaders + kind;
+    Shader_Program *program = render_context->shaders + kind;
     glUseProgram(program->id);
     
     // NOTE(fakhri): per shader kind init
-    if (!game_state->shaders[kind].previously_loaded)
+    if (!render_context->shaders[kind].previously_loaded)
     {
         // NOTE(fakhri): stuff that only need to happen the first time we load the shader
         program->previously_loaded = true;
@@ -164,12 +164,6 @@ SetupShader(Game_State *game_state, Shader_Kind kind)
         }
     }
     
-    m4 ortho_projection = Orthographic(0.0f, game_state->screen.width, 
-                                       game_state->screen.height, 0.0f,
-                                       -100.f, 100.f);
-    
-    glUniformMatrix4fv(glGetUniformLocation(program->id, "projection"), 1, GL_FALSE, (f32*)&ortho_projection);
-    
     glUseProgram(0);
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -190,7 +184,7 @@ ComputeHashShaderPath(String8 shader_path)
 }
 
 internal void
-LoadShader(Game_State *game_state, Shader_Kind shader_kind)
+LoadShader(Render_Context *render_context, Shader_Kind shader_kind)
 {
     if (shader_kind == ShaderKind_None) return;
     
@@ -219,22 +213,22 @@ LoadShader(Game_State *game_state, Shader_Kind shader_kind)
     
     // NOTE(fakhri): find the shader hash slot
     u32 hash_index  = ComputeHashShaderPath(shader_name);
-    hash_index %= ArrayCount(game_state->shaders_hash.shader_slots);
+    hash_index %= ArrayCount(render_context->shaders_hash.shader_slots);
     
     // NOTE(fakhri): create new slot and add the hash table
     Shader_Hash_Slot *new_shader_slot = PushStruct(os->permanent_arena, Shader_Hash_Slot);
     Assert(new_shader_slot);
     new_shader_slot->shader_name = PushStr8Copy(os->permanent_arena, shader_name);
     new_shader_slot->kind = shader_kind;
-    new_shader_slot->next_in_hash = game_state->shaders_hash.shader_slots[hash_index];
-    game_state->shaders_hash.shader_slots[hash_index] = new_shader_slot;
+    new_shader_slot->next_in_hash = render_context->shaders_hash.shader_slots[hash_index];
+    render_context->shaders_hash.shader_slots[hash_index] = new_shader_slot;
     
     // NOTE(fakhri): compile the shader
     Compile_Shader_Result shader_result = CompileShader(shader_name);
     if (shader_result.is_valid)
     {
-        game_state->shaders[shader_kind].id = shader_result.program_id;
-        SetupShader(game_state, shader_kind);
+        render_context->shaders[shader_kind].id = shader_result.program_id;
+        SetupShader(render_context, shader_kind);
     }
     else
     {

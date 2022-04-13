@@ -19,8 +19,9 @@ void main()
 
 in vec2 tex_coord;
 uniform sampler2D font_texture;
+
 uniform vec4 glyph_src;
-uniform vec3 color;
+uniform vec4 color;
 out vec4 frag_color;
 
 
@@ -31,9 +32,9 @@ void main()
     
     vec2 glyph_position = mix(glyph_start, glyph_end, tex_coord);
     
-    frag_color = texture(font_texture, glyph_position);
-    frag_color.rgb = color;
+    frag_color = color * texture(font_texture, glyph_position);
     
+    if (frag_color.a < 0.001) discard;
 }
 
 #endif

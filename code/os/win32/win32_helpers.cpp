@@ -148,3 +148,33 @@ W32_WriteWholeBlock(HANDLE file, String8List data)
     }
     fail_out:;
 }
+
+
+internal v2
+W32_GetMousePosition(HWND window)
+{
+    v2 result = {0};
+    POINT mouse;
+    GetCursorPos(&mouse);
+    ScreenToClient(window, &mouse);
+    result.x = (f32)(mouse.x);
+    result.y = (f32)(mouse.y);
+    return result;
+}
+
+internal f32
+W32_GetTime(void)
+{
+    W32_Timer *timer = &w32_timer;
+    LARGE_INTEGER current_time;
+    QueryPerformanceCounter(&current_time);
+    return w32_os.time.wall_time + (f32)(current_time.QuadPart - timer->begin_frame.QuadPart) / (f32)timer->counts_per_second.QuadPart;
+}
+
+internal u64
+W32_GetCycles(void)
+{
+    u64 result = __rdtsc();
+    return result;
+}
+

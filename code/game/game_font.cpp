@@ -4,7 +4,7 @@
 
 
 internal void
-LoadFont(Game_State *game_state, M_Arena *arena, Font_Kind font_kind)
+LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
 {
     if (font_kind == FontKind_None) return;
     
@@ -16,19 +16,19 @@ LoadFont(Game_State *game_state, M_Arena *arena, Font_Kind font_kind)
         case FontKind_Arial:
         {
             path = Str8Lit("data/fonts/arial.ttf");
-            font = game_state->fonts + font_kind;
+            font = render_context->fonts + font_kind;
             scale = 50;
         } break;
         case FontKind_MenuTitle:
         {
             path = Str8Lit("data/fonts/arial.ttf");
             scale = 50;
-            font = game_state->fonts + font_kind;
+            font = render_context->fonts + font_kind;
         } break;
         case FontKind_MenuItem:
         {
             path = Str8Lit("data/fonts/arial.ttf");
-            font = game_state->fonts + font_kind;
+            font = render_context->fonts + font_kind;
             scale = 50;
         } break;
         default:
@@ -112,18 +112,25 @@ LoadFont(Game_State *game_state, M_Arena *arena, Font_Kind font_kind)
     ReleaseScratch(scratch);
 }
 
-internal void
-ChangeActiveFont(Game_State *game_state, Font_Kind font_kind)
+internal Font *
+GetFontOrActiveIfNone(Render_Context *render_context, Font_Kind font_kind)
 {
-    Assert(FontKind_None < font_kind && font_kind < FontKind_Count);
-    game_state->active_font = game_state->fonts + font_kind;
+    if (font_kind == FontKind_None)
+    {
+        font_kind = render_context->active_font;
+    }
+    Assert(font_kind > FontKind_None && font_kind < FontKind_Count);
+    Font *font = render_context->fonts + font_kind;
+    return font;
 }
 
-
 internal f32
-GetFontWidth(Font *font, String8 text)
+GetFontWidth(Render_Context *render_context, Font_Kind font_kind, String8 text)
 {
     f32 text_width = 0;
+    
+    Font *font = GetFontOrActiveIfNone(render_context, font_kind);
+    
     for (u32 ch_index = 0;
          ch_index < text.size;
          ++ch_index)
@@ -136,25 +143,17 @@ GetFontWidth(Font *font, String8 text)
     return text_width;
 }
 
-internal f32
-GetFontNormalizedWidth(Font *font, String8 text)
-{
-    f32 result = GetFontWidth(font, text);
-    result *= 1.f / os->window_size.width;
-    return result;
-}
-
 internal inline f32
-GetFontHeight(Font *font)
+GetFontHeight(Render_Context *render_context, Font_Kind font_kind)
 {
+    Font *font = GetFontOrActiveIfNone(render_context, font_kind);
     f32 result = font->ascent - font->descent;
     return result;
 }
 
-internal inline f32
-GetFontNormalizedHeight(Font *font)
+internal inline void
+ChangeActiveFont(Render_Context *render_context, Font_Kind font_kind)
 {
-    f32 result = GetFontHeight(font);
-    result *= 1.f / os->window_size.height;
-    return result;
+    Assert(font_kind < FontKind_Count);
+    render_context->active_font = font_kind;
 }

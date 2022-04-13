@@ -114,6 +114,10 @@
 #define MinutesInSeconds(n) (n / 60.0)
 #define HourseInSeconds(n) (MinutesInSeconds(n) / 60.0)
 
+#define Meter(x) (x)
+#define CentiMeter(x) ((x) / 100.0f)
+#define MiliMeter(x) ((x) / 1000.0f)
+
 #define HasFlag(fl,fi) ((fl)&(fi))
 #define SetFlag(fl,fi) ((fl)|=(fi))
 #define RemoveFlag(fl,fi) ((fl)&=~(fi))

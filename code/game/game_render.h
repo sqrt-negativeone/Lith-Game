@@ -26,4 +26,77 @@ struct Frensh_Suited_Cards_Texture
     Texture2D kings[4];
 };
 
+enum Render_Kind
+{
+    RenderKind_None,
+    RenderKind_Quad,
+    RenderKind_Image,
+    RenderKind_Text,
+    
+    RenderKind_Count,
+};
+
+enum Coordinate_Type
+{
+    CoordinateType_None,
+    CoordinateType_Screen,
+    CoordinateType_World,
+    
+    CoordinateType_Count,
+};
+
+struct Render_Quad_Request
+{
+    v4 color;
+    v2 size;
+    f32 y_angle;
+};
+
+struct Render_Text_Request
+{
+    String text;
+    Font_Kind font_to_use;
+    v4 color;
+};
+
+struct Render_Image_Request
+{
+    Texture2D texture;
+    v2 size;
+    f32 y_angle;
+};
+
+struct Render_Request
+{
+    Render_Kind kind;
+    v3 screen_coords;
+    
+    union
+    {
+        Render_Quad_Request quad_request;
+        Render_Text_Request text_request;
+        Render_Image_Request image_request;
+    };
+};
+
+
+struct Render_Context
+{
+    M_Arena *arena;
+    
+    Shaders_Hash shaders_hash;
+    Shader_Program shaders[ShaderKind_Count];
+    
+    Font fonts[FontKind_Count];
+    Font_Kind active_font;
+    
+    u32 requests_count;
+    Render_Request render_requests[65536];
+    
+    v2 screen;
+    f32 pixels_per_meter;
+    
+    Coordinate_Type active_coordinates_type;
+};
+
 #endif //GAME_RENDER_H

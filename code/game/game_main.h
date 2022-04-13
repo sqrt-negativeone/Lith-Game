@@ -94,24 +94,17 @@ struct Game_Session
     u32 my_player_id;
 };
 
+
 struct Game_State
 {
-    Shaders_Hash shaders_hash;
-    Shader_Program shaders[ShaderKind_Count];
-    
-    Font fonts[FontKind_Count];
-    Font *active_font;
-    
-    Frensh_Suited_Cards_Texture frensh_deck;
-    
-    f32 normalized_width_unit_per_world_unit;
-    f32 aspect_ratio;
-    
+    Render_Context render_context;
     
     Game_Mode game_mode;
     UI_Context ui_context;
     Game_Session game_session;
     Controller controller;
+    
+    Frensh_Suited_Cards_Texture frensh_deck;
     
     Entity entities[1024];
     u32 entity_count;
@@ -130,7 +123,6 @@ struct Game_State
     f32 message_duration;
     
     v2 world_dim;
-    
     v2 screen;
 };
 

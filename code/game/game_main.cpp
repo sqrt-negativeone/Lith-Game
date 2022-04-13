@@ -150,21 +150,21 @@ StartGame(Game_State *game_state, Game_Session *game_session)
 internal void
 UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
 {
+    
     // TODO(fakhri): we need to have a concept of stuff taking sometime to happen
     // and not just instantaneous
     // TODO(fakhri): how should we display the message?
     Game_Session *game_session = &game_state->game_session;
-    glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    v3 white = Vec3(1, 1, 1);
-    v3 red = Vec3(1, 0, 0);
+    v4 white = Vec4(1, 1, 1,1);
+    v4 red = Vec4(1, 0, 0, 1);
     
     // TODO(fakhri): render a background
     if(HasFlag(game_session->flags, SESSION_FLAG_HOST_SPLITTING_DECK))
     {
         // NOTE(fakhri): we wait
-        ChangeActiveFont(game_state, FontKind_Arial);
-        DrawTextScreenCoord(game_state, Str8Lit("host splitting the deck"), 0.5f * game_state->screen, Vec3(1,1,1));
+        ChangeActiveFont(&game_state->render_context, FontKind_Arial);
+        
+        Render_PushTextRequest(&game_state->render_context, Str8Lit("host splitting the deck"), Vec3(0.5f * game_state->screen, 60), Vec4(1,0,1,1), FontKind_Arial, CoordinateType_Screen);
         
         if(HasFlag(game_session->flags, SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK))
         {
@@ -191,14 +191,30 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
                     UpdateCardEntity(game_state, entity_index, dt);
                     if (entity->is_pressed)
                     {
-                        DrawQuadWorldCoord(game_state, Vec3(entity->center_pos.xy, entity->center_pos.z - 0.01f), 1.05f * entity->current_dimension, red, entity->y_angle);
+                        Render_PushQuadRequest(&game_state->render_context, 
+                                               Vec3(entity->center_pos.xy, entity->center_pos.z - 0.01f),
+                                               1.05f * entity->current_dimension, red, CoordinateType_World, entity->y_angle);
+                        
+#if 0                        
+                        DrawQuadWorldCoord(game_state, Vec3(entity->center_pos.xy, entity->center_pos.z - 0.01f), 1.05f * entity->current_dimension, red.rgb, entity->y_angle);
+#endif
+                        
                     }
                     
+                    Render_PushImageRequest(&game_state->render_context, entity->texture, entity->center_pos, entity->current_dimension, CoordinateType_World);
+                    
+#if 0                    
                     DrawTextureWorldCoord(game_state, entity->texture, entity->center_pos, entity->current_dimension, entity->y_angle);
+#endif
                     
                     v3 card_back_pos = entity->center_pos;
+                    
+#if 0                    
                     DrawTextureWorldCoord(game_state, game_state->frensh_deck.card_back_texture,
                                           card_back_pos, entity->current_dimension, PI32 - entity->y_angle);
+#endif
+                    
+                    Render_PushImageRequest(&game_state->render_context, game_state->frensh_deck.card_back_texture, entity->center_pos, entity->current_dimension, CoordinateType_World, PI32 - entity->y_angle);
                     
                 } break;
                 case Entity_Type_Companion:
@@ -206,7 +222,13 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
                     UpdateCompanionEntity(game_state, entity, dt);
                     Entity *entity_to_follow = game_state->entities + entity->entity_index_to_follow;
                     Assert(entity_to_follow);
+                    
+                    Render_PushImageRequest(&game_state->render_context, entity->texture, Vec3(entity->center_pos.xy, entity_to_follow->center_pos.z + 0.01f), entity->current_dimension, CoordinateType_World, PI32 - entity->y_angle);
+                    
+#if 0                    
                     DrawTextureWorldCoord(game_state, entity->texture, Vec3(entity->center_pos.xy, entity_to_follow->center_pos.z + 0.01f), entity->current_dimension, entity_to_follow->y_angle);
+#endif
+                    
                 } break;
                 default:
                 {
@@ -243,40 +265,6 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
                 }
             }
         }
-        
-        // TODO(fakhri): think about how to render the players usernames
-        for(u32 player_index = 0;
-            player_index < MAX_PLAYER_COUNT;
-            ++player_index)
-        {
-            Player *player = game_session->players + player_index;
-            v2 render_position;
-            switch(player->assigned_residency)
-            {
-                case Card_Residency_Left:
-                {
-                    render_position = Vec2(0,0);
-                } break;
-                case Card_Residency_Right:
-                {
-                    render_position = Vec2(0,0);
-                } break;
-                case Card_Residency_Up:
-                {
-                    render_position = Vec2(0, 0);
-                } break;
-                case Card_Residency_Down:
-                {
-                    render_position = Vec2(0, 0);
-                } break;
-                default:
-                {
-                    Assert(!"PLAYER SHOULD NOT BE ASSIGNED THIS RESIDENCY");
-                    render_position = Vec2(0, 0);
-                }
-            }
-            DrawTextWorldCoord(game_state, player->username, render_position, white);
-        }
     }
     
     // @DebugOnly
@@ -299,6 +287,7 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
 }
 
 
+#if 0
 internal
 void UpdateAndRenderMainMenu(Game_State *game_state, UI_Context *ui_context, Controller *controller)
 {
@@ -566,6 +555,7 @@ void UpdateAndRenderWaitingPlayersMenu(Game_State *game_state, UI_Context *ui_co
     
 #endif
 }
+#endif
 
 
 exported
@@ -586,32 +576,17 @@ APP_PermanantLoad(PermanentLoad)
 {
     HotLoad(_os);
     
-    *game_state = {};
+    glEnable(GL_CULL_FACE); 
     
-    // NOTE(fakhri): load shaders
-    for (u32 shader_type_index = ShaderKind_None;
-         shader_type_index < ShaderKind_Count;
-         ++shader_type_index)
-    {
-        LoadShader(game_state, (Shader_Kind)shader_type_index);
-    }
+    glEnable(GL_DEPTH_TEST);
     
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    InitRenderer(&game_state->render_context);
     LoadFrenshSuitedDeck(&game_state->frensh_deck);
     
-    // NOTE(fakhri): load fonts
-    for (u32 font_index = FontKind_None;
-         font_index < FontKind_Count;
-         ++font_index)
-    {
-        LoadFont(game_state, os->permanent_arena, (Font_Kind)font_index);
-    }
-    
-    game_state->aspect_ratio = 1.0f / (16.0f / 9.0f);
-    game_state->world_dim.width = 100;
-    game_state->world_dim.height = game_state->world_dim.x * game_state->aspect_ratio;
-    game_state->normalized_width_unit_per_world_unit = 1.0f / game_state->world_dim.width;
-    
-    UI_Init(&game_state->ui_context, os->permanent_arena);
+    UI_Init(&game_state->ui_context, &game_state->render_context);
     
     game_state->host_address_buffer = InitBuffer(os->permanent_arena, SERVER_ADDRESS_BUFFER_SIZE);
     game_state->username_buffer = InitBuffer(os->permanent_arena, USERNAME_BUFFER_SIZE);
@@ -640,10 +615,10 @@ APP_HotLoadShader(HotLoadShader)
 {
     // NOTE(fakhri): compute hash
     u32 hash_index  = ComputeHashShaderPath(shader_name);
-    hash_index %= ArrayCount(game_state->shaders_hash.shader_slots);
+    hash_index %= ArrayCount(game_state->render_context.shaders_hash.shader_slots);
     
     b32 found = false;
-    for (Shader_Hash_Slot *shader_hash_slot = game_state->shaders_hash.shader_slots[hash_index];
+    for (Shader_Hash_Slot *shader_hash_slot = game_state->render_context.shaders_hash.shader_slots[hash_index];
          shader_hash_slot;
          shader_hash_slot = shader_hash_slot->next_in_hash)
     {
@@ -652,13 +627,13 @@ APP_HotLoadShader(HotLoadShader)
             found = true;
             // NOTE(fakhri): recompile the shader
             Compile_Shader_Result compile_result = CompileShader(shader_name);
-            Assert(shader_hash_slot->kind < ArrayCount(game_state->shaders));
+            Assert(shader_hash_slot->kind < ArrayCount(game_state->render_context.shaders));
             Shader_Kind shader_kind = shader_hash_slot->kind;
             if (compile_result.is_valid)
             {
-                glDeleteProgram(game_state->shaders[shader_kind].id);
-                game_state->shaders[shader_kind].id = compile_result.program_id;
-                SetupShader(game_state, shader_kind);
+                glDeleteProgram(game_state->render_context.shaders[shader_kind].id);
+                game_state->render_context.shaders[shader_kind].id = compile_result.program_id;
+                SetupShader(&game_state->render_context, shader_kind);
             }
             else
             {
@@ -685,13 +660,16 @@ APP_HotUnload(HotUnload)
 exported
 APP_UpdateAndRender(UpdateAndRender)
 {
+    glClearColor(0.4f, 0.4f, 0.4f, 1.f); 
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
     Game_Session *game_session = &game_state->game_session;
     UI_Context *ui_context = &game_state->ui_context;
     game_state->controller = {};
     Controller *controller = &game_state->controller;
     
     HandleAvailableMessages(game_state, game_session);
-    UpdateScreenSize(game_state);
+    Render_Begin(&game_state->render_context, OS_FrameArena());
     
     // NOTE(fakhri): handle input
     {
@@ -711,8 +689,8 @@ APP_UpdateAndRender(UpdateAndRender)
                         case OS_Key_Left:      controller->move_left.pressed         = true; break;
                         case OS_Key_Right:     controller->move_right.pressed        = true; break;
                         case OS_Key_F1:        controller->toggle_fullscreen.pressed = true; break;
-                        case OS_Key_MouseLeft: controller->left_mouse.pressed  = true; break;
-                        case OS_Key_MouseRight:controller->right_mouse.pressed = true; break;
+                        case OS_Key_MouseLeft: controller->left_mouse.pressed        = true; break;
+                        case OS_Key_MouseRight:controller->right_mouse.pressed       = true; break;
                         default: break;
                     }
                 } break;
@@ -727,8 +705,8 @@ APP_UpdateAndRender(UpdateAndRender)
                         case OS_Key_Left:      controller->move_left.released         = true; break;
                         case OS_Key_Right:     controller->move_right.released        = true; break;
                         case OS_Key_Space:     controller->toggle_fullscreen.released = true; break;
-                        case OS_Key_MouseLeft: controller->left_mouse.released  = true; break;
-                        case OS_Key_MouseRight:controller->right_mouse.released = true; break;
+                        case OS_Key_MouseLeft: controller->left_mouse.released        = true; break;
+                        case OS_Key_MouseRight:controller->right_mouse.released       = true; break;
                         default: break;
                     }
                 } break;
@@ -744,6 +722,8 @@ APP_UpdateAndRender(UpdateAndRender)
         {
             UpdateAndRenderGame(game_state, controller, dt);
         } break;
+        
+#if 0        
         case Game_Mode_MENU_USERNAME:
         {
             UpdateAndRenderUserNameMenu(game_state, ui_context, controller);
@@ -760,6 +740,8 @@ APP_UpdateAndRender(UpdateAndRender)
         {
             UpdateAndRenderJoinSessionMenu(game_state, ui_context, controller); 
         } break;
+#endif
+        
     }
     
     // NOTE(fakhri): display a message if there is any
@@ -767,27 +749,18 @@ APP_UpdateAndRender(UpdateAndRender)
         if (game_state->message_duration > 0)
         {
             game_state->message_duration -= dt;
-            DrawTextWorldCoord(game_state, game_state->message_to_display.content, Vec3(0.5f * game_state->world_dim.width, 0.7f *game_state->world_dim.height, 90), 0 * Vec3(1,1,1));
+            
+            Render_PushTextRequest(&game_state->render_context, game_state->message_to_display.content, Vec3(0, 0, CentiMeter(60)), Vec4(1,1,1,1), FontKind_Arial, CoordinateType_World);
+            
         }
     }
     
     // NOTE(fakhri): render the mouse cursor
-    DrawQuadScreenCoord(game_state, Vec3(os->mouse_position, 99), Vec2(10, 10), Vec3(1, .3f, .5f));
+    Render_PushQuadRequest(&game_state->render_context, 
+                           Vec3(os->mouse_position, 99),
+                           Vec2(MiliMeter(5.f), MiliMeter(5.f)), Vec4(1, .3f, .5f, 1.f), CoordinateType_Screen);
     
-#if 0
-    ChangeActiveFont(game_state, FontKind_Arial);
-    char buffer[64];
-    sprintf(buffer, "frame time : %f", os->real_dt);
-    String8 frame_time = String8{buffer, CalculateCStringLength(buffer)};
-    DrawTextScreenCoord(game_state, frame_time, Vec2(400, 20), Vec3(1,1,1));
-    sprintf(buffer, "frame fps : %f", 1.0f / os->real_dt);
-    String8 frame_fps = String8{buffer, CalculateCStringLength(buffer)};
-    DrawTextScreenCoord(game_state, frame_time, Vec2(400, 60), Vec3(1,1,1));
-#endif
-    
-#if 0    
-    DrawTextScreenCoord(game_state, Str8Lit("release your mouse"), Vec3(os->mouse_position, 90), Vec3(1, 1, 1));
-#endif
+    Render_End(&game_state->render_context);
     
     if (game_state->controller.toggle_fullscreen.pressed)
     {

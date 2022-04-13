@@ -30,6 +30,9 @@ struct UI_ColorScheme
 
 struct UI_Context
 {
+    Render_Context *render_context;
+    struct Controller     *controller;
+    
     i32 selected_item;
     i32 items_count;
     

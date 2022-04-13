@@ -1,33 +1,5 @@
 
 internal void
-UpdateScreenSize(Game_State *game_state)
-{
-    v2 new_screen = Vec2f32FromVec2i32(os->window_size);
-    if (new_screen != game_state->screen)
-    {
-        game_state->screen = new_screen;
-        
-        m4 ortho_projection = Orthographic(0.0f, game_state->screen.width, 
-                                           game_state->screen.height, 0.0f,
-                                           -100.f, 100.f);
-        
-        for(u32 program_index = 1;
-            program_index < ShaderKind_Count;
-            ++program_index)
-        {
-            Shader_Program *program = game_state->shaders + program_index;
-            glUseProgram(program->id);
-            
-            glUniformMatrix4fv(glGetUniformLocation(program->id, "projection"), 1, GL_FALSE, (f32*)&ortho_projection);
-            
-        }
-        
-        glUseProgram(0);
-        // TODO(fakhri): aspect ratio
-    }
-}
-
-internal void
 LoadFrenshSuitedDeck(Frensh_Suited_Cards_Texture *deck_textures)
 {
     deck_textures->card_frame_texture    = LoadTexture(Str8Lit("data/images/card_frame.png"));
@@ -46,12 +18,16 @@ LoadFrenshSuitedDeck(Frensh_Suited_Cards_Texture *deck_textures)
     {
         u32 number = number_index + 1;
         char buffer[50];
+        
         sprintf(buffer, "data/images/%d_black_up.png", number);
         deck_textures->black_numbers_up[number_index]    = LoadTexture(Str8C(buffer));
+        
         sprintf(buffer, "data/images/%d_black_down.png", number);
         deck_textures->black_numbers_down[number_index]  = LoadTexture(Str8C(buffer));
+        
         sprintf(buffer, "data/images/%d_red_up.png", number);
         deck_textures->red_numbers_up[number_index]      = LoadTexture(Str8C(buffer));
+        
         sprintf(buffer, "data/images/%d_red_down.png", number);
         deck_textures->red_numbers_down[number_index]    = LoadTexture(Str8C(buffer));
     }
@@ -95,234 +71,276 @@ LoadFrenshSuitedDeck(Frensh_Suited_Cards_Texture *deck_textures)
 }
 
 internal void
-InitRenderer(Game_State *game_state)
+InitRenderer(Render_Context *render_context)
 {
-    
-}
-
-internal void
-DrawQuadScreenCoord(Game_State *game_state, v3 pos, v2 size, v3 color, f32 y_angle = 0.0f)
-{
-    m4 trans = Translate(pos);
-    m4 scale = Scale(Vec3(size, 1.0f));
-    m4 rotat = Rotate(y_angle, Vec3(0,1,0));
-    
-    m4 model = trans * rotat * scale;
-    
-    Shader_ID quad_shader = game_state->shaders[ShaderKind_Quad].id;
-    glUseProgram(quad_shader);
-    GLint model_location = glGetUniformLocation(quad_shader, "model");
-    glUniformMatrix4fv(model_location, 1, GL_FALSE, (f32*)&model);
-    GLint color_location = glGetUniformLocation(quad_shader, "color");
-    glUniform4f(color_location, color.r, color.g, color.b, 1.0f);
-    
-    glBindVertexArray(game_state->shaders[ShaderKind_Quad].vao);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glUseProgram(0);
-    glBindVertexArray(0);
-    
-}
-
-internal void
-DrawQuadNormalizedCoord(Game_State *game_state, v3 pos, v2 size, v3 color, f32 y_angle = 0.0f)
-{
-    f32 window_width = (f32)os->window_size.width;
-    f32 window_height = (f32)os->window_size.height;
-    pos.xy = Vec2(pos.x * window_width, pos.y * window_height);
-    size = Vec2(size.width * window_width, size.height * window_height);
-    
-    DrawQuadScreenCoord(game_state, pos, size, color, y_angle);
-}
-
-internal void
-DrawQuadWorldCoord(Game_State *game_state, v3 pos, v2 size, v3 color, f32 y_angle = 0.0f)
-{
-    f32 x_correction = game_state->normalized_width_unit_per_world_unit;
-    f32 y_correction = (1.0f / game_state->aspect_ratio) * x_correction;
-    pos.xy = Vec2(pos.x * x_correction,
-                  1.0f - pos.y * y_correction);
-    size = Vec2(size.x * x_correction,
-                size.y * y_correction);
-    
-    DrawQuadNormalizedCoord(game_state, pos, size, color, y_angle);
-}
-
-internal void
-DrawTextureScreenCoord(Game_State *game_state, Texture2D tex, v3 pos, v2 size, f32 y_angle = 0.0f, v3 rotation_axe = Vec3(0, 1, 0))
-{
-    m4 trans = Translate(pos);
-    m4 scale = Scale(Vec3(size, 1.0f));
-    m4 rotat = Rotate(y_angle, rotation_axe);
-    
-    m4 model = trans * rotat * scale;
-    
-    glUseProgram(game_state->shaders[ShaderKind_Texture].id);
-    GLint model_location = glGetUniformLocation(game_state->shaders[ShaderKind_Texture].id, "model");
-    glUniformMatrix4fv(model_location, 1, GL_FALSE, (f32*)&model);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, tex.id);
-    glBindVertexArray(game_state->shaders[ShaderKind_Texture].vao);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    
-    glUseProgram(0);
-}
-
-internal void 
-DrawTextureNormalizedCoord(Game_State *game_state, Texture2D tex, v3 pos, v2 size, f32 y_angle = 0.0f)
-{
-    f32 window_width = (f32)os->window_size.width;
-    f32 window_height = (f32)os->window_size.height;
-    pos.xy = Vec2(pos.x * window_width, pos.y * window_height);
-    size = Vec2(size.width * window_width, size.height * window_height);
-    
-    DrawTextureScreenCoord(game_state, tex, pos, size, y_angle);
-}
-
-internal void
-DrawTextureWorldCoord(Game_State *game_state, Texture2D tex, v3 pos, v2 size, f32 y_angle = 0.0f)
-{
-    f32 x_correction = game_state->normalized_width_unit_per_world_unit;
-    f32 y_correction = (1.0f / game_state->aspect_ratio) * x_correction;
-    pos.xy = Vec2(pos.x * x_correction,
-                  1.0f - pos.y * y_correction);
-    size = Vec2(size.x * x_correction,
-                size.y * y_correction);
-    
-    DrawTextureNormalizedCoord(game_state, tex, pos, size, y_angle);
-}
-
-internal void
-DrawTextScreenCoord(Game_State *game_state, String8 string, v3 pos, v3 color, Font_Kind font_kind = FontKind_None)
-{
-    // NOTE(fakhri): select the font
-    Font *font = 0;
-    if (font_kind == FontKind_None)
+    // NOTE(fakhri): load shaders
+    for (u32 shader_type_index = ShaderKind_None;
+         shader_type_index < ShaderKind_Count;
+         ++shader_type_index)
     {
-        Assert(game_state->active_font);
-        font = game_state->active_font;
-    }
-    else
-    {
-        Assert(font_kind < FontKind_Count);
-        font = game_state->fonts + font_kind;
+        LoadShader(render_context, (Shader_Kind)shader_type_index);
     }
     
-    if (string.len > 1)
+    // NOTE(fakhri): load fonts
+    for (u32 font_index = FontKind_None;
+         font_index < FontKind_Count;
+         ++font_index)
     {
-        int break_here = 1;
+        LoadFont(render_context, os->permanent_arena, (Font_Kind)font_index);
     }
     
-    f32 text_width = GetFontWidth(font, string);
-    pos.x -= 0.5f * text_width;
-    Shader_Program *program = game_state->shaders + ShaderKind_Font;
+}
+
+internal v3
+ScreenCoordsFromWorldCoords(Render_Context *render_context, v3 world_coords)
+{
+    v3 result;
     
-    glUseProgram(program->id);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, font->texture.id);
-    glBindVertexArray(program->vao);
-    glUniform3f(glGetUniformLocation(program->id, "color"), color.r, color.g, color.b);
+    result.xy = render_context->pixels_per_meter * world_coords.xy;
+    result.z = world_coords.z;
+    // NOTE(fakhri): world origin is at the center of the screen, and Y is up
+    result.xy += 0.5f * render_context->screen;
+    result.y = render_context->screen.height - result.y;
+    return result;
+}
+
+internal v3
+WorldCoordsFromScreenCoords(Render_Context *render_context, v2 screen_coords)
+{
+    v3 result = {};
+    screen_coords.y = render_context->screen.height - screen_coords.y;
+    screen_coords -= 0.5f * render_context->screen;
+    result.xy = screen_coords / render_context->pixels_per_meter;
+    return result;
+}
+
+internal void
+Render_PushQuadRequest(Render_Context *render_context, v3 pos, v2 size_in_milimeter, v4 color, Coordinate_Type coord_type = CoordinateType_None, f32 y_angle = 0.0f)
+{
+    Assert(coord_type < CoordinateType_Count);
+    Assert(render_context->requests_count < ArrayCount(render_context->render_requests));
     
-    // NOTE(fakhri): render the text
+    if (coord_type == CoordinateType_None)
     {
-        v2 current_point = pos.xy;
-        for (u32 ch_index = 0;
-             ch_index < string.len;
-             ++ch_index)
+        Assert(render_context->active_coordinates_type > CoordinateType_None && render_context->active_coordinates_type < CoordinateType_Count);
+        coord_type = render_context->active_coordinates_type;
+    }
+    
+    if (coord_type == CoordinateType_World)
+    {
+        pos = ScreenCoordsFromWorldCoords(render_context, pos);
+    }
+    
+    Render_Quad_Request quad_request = {};
+    
+    quad_request.size = render_context->pixels_per_meter * size_in_milimeter;
+    quad_request.color = color;
+    quad_request.y_angle = y_angle;
+    
+    Render_Request *request = render_context->render_requests + render_context->requests_count;
+    ++render_context->requests_count;
+    
+    request->kind = RenderKind_Quad;
+    request->screen_coords = pos;
+    request->quad_request = quad_request;
+}
+
+internal void
+Render_PushImageRequest(Render_Context *render_context, Texture2D texture, v3 pos, v2 size_in_milimeter, Coordinate_Type coord_type = CoordinateType_None, f32 y_angle = 0)
+{
+    Assert(coord_type < CoordinateType_Count);
+    Assert(render_context->requests_count < ArrayCount(render_context->render_requests));
+    
+    if (coord_type == CoordinateType_None)
+    {
+        Assert(render_context->active_coordinates_type > CoordinateType_None && render_context->active_coordinates_type < CoordinateType_Count);
+        coord_type = render_context->active_coordinates_type;
+    }
+    
+    if (coord_type == CoordinateType_World)
+    {
+        pos = ScreenCoordsFromWorldCoords(render_context, pos);
+    }
+    Render_Image_Request image_request = {};
+    
+    image_request.texture = texture;
+    image_request.size = render_context->pixels_per_meter * size_in_milimeter;
+    image_request.y_angle = y_angle;
+    
+    Render_Request *request = render_context->render_requests + render_context->requests_count;
+    ++render_context->requests_count;
+    
+    request->kind = RenderKind_Image;
+    request->screen_coords = pos;
+    request->image_request = image_request;
+}
+
+internal void
+Render_PushTextRequest(Render_Context *render_context, String text, v3 pos, v4 color, Font_Kind font_to_use = FontKind_None, Coordinate_Type coord_type = CoordinateType_None)
+{
+    Assert(coord_type < CoordinateType_Count);
+    Assert(render_context->requests_count < ArrayCount(render_context->render_requests));
+    Assert(font_to_use > FontKind_None && font_to_use < FontKind_Count);
+    
+    if (coord_type == CoordinateType_None)
+    {
+        Assert(render_context->active_coordinates_type > CoordinateType_None && render_context->active_coordinates_type < CoordinateType_Count);
+        coord_type = render_context->active_coordinates_type;
+    }
+    
+    if (coord_type == CoordinateType_World)
+    {
+        pos = ScreenCoordsFromWorldCoords(render_context, pos);
+    }
+    
+    if (font_to_use == FontKind_None)
+    {
+        Assert(render_context->active_font > FontKind_None && render_context->active_font < FontKind_Count);
+        font_to_use = render_context->active_font;
+    }
+    
+    pos.x -= 0.5f * GetFontWidth(render_context, font_to_use, text);
+    Render_Text_Request text_request = {};
+    
+    text_request.text = PushStr8Copy(render_context->arena, text);
+    text_request.font_to_use = font_to_use;
+    text_request.color = color;
+    
+    Render_Request *request = render_context->render_requests + render_context->requests_count;
+    ++render_context->requests_count;
+    
+    request->kind = RenderKind_Text;
+    request->screen_coords = pos;
+    request->text_request = text_request;
+}
+
+internal void
+Render_Begin(Render_Context *render_context, M_Arena *arena)
+{
+    render_context->requests_count = 0;
+    render_context->arena = arena;
+    
+    v2 new_screen = Vec2f32FromVec2i32(os->window_size);
+    if (new_screen != render_context->screen)
+    {
+        render_context->screen = new_screen;
+        
+        f32 meters_in_half_screen_width = Meter(0.5f);
+        render_context->pixels_per_meter = render_context->screen.width / (2 * meters_in_half_screen_width);
+        
+        // TODO(fakhri): aspect ratio
+    }
+    
+}
+
+
+internal void
+Render_End(Render_Context *render_context)
+{
+    // TODO(fakhri): sort the requests from back to front
+    
+    m4 ortho_projection = Orthographic(0.0f, render_context->screen.width, 
+                                       render_context->screen.height, 0.0f,
+                                       -100.f, 100.f);
+    
+    for(u32 request_index = 0;
+        request_index < render_context->requests_count;
+        ++request_index)
+    {
+        Render_Request *request = render_context->render_requests + request_index;
+        switch(request->kind)
         {
-            u8 ch = string.str[ch_index];
-            Assert(font->map_first <= ch && ch < font->map_opl);
-            Glyph glyph = font->map[ch - font->map_first];
-            
-            v2 glyph_pos = current_point + 0.5f * glyph.size + glyph.offset;
-            m4 trans = Translate(Vec3(glyph_pos, pos.z));
-            m4 scale = Scale(Vec3(glyph.size, 1.0f));
-            m4 model = trans * scale;
-            
-            glUniformMatrix4fv(glGetUniformLocation(program->id, "model"), 1, GL_FALSE, (f32*)&model);
-            glUniform4fv(glGetUniformLocation(program->id, "glyph_src"), 1, (f32 *)&glyph.src);
-            
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            
-            current_point.x += glyph.advance;
+            case RenderKind_Quad:
+            {
+                m4 trans = Translate(request->screen_coords);
+                m4 scale = Scale(Vec3(request->quad_request.size, 1.0f));
+                m4 rotat = Rotate(request->quad_request.y_angle, Vec3(0,1,0));
+                
+                m4 model = trans * rotat * scale;
+                
+                Shader_Program *program = render_context->shaders + ShaderKind_Quad;
+                glUseProgram(program->id);
+                
+                glUniformMatrix4fv(glGetUniformLocation(program->id, "projection"), 1, GL_FALSE, (f32*)&ortho_projection);
+                glUniformMatrix4fv(glGetUniformLocation(program->id, "model"), 1, GL_FALSE, (f32*)&model);
+                glUniform4fv(glGetUniformLocation(program->id, "color"), 1, (f32*)&request->quad_request.color);
+                
+                glBindVertexArray(program->vao);
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+                
+            } break;
+            case RenderKind_Image:
+            {
+                m4 trans = Translate(request->screen_coords);
+                m4 scale = Scale(Vec3(request->image_request.size, 1.0f));
+                request->image_request.y_angle = 0;
+                m4 rotat = Rotate(request->image_request.y_angle, Vec3(0,1,0));
+                
+                m4 model = trans * rotat * scale;
+                
+                Shader_Program *program = render_context->shaders + ShaderKind_Texture;
+                
+                glUseProgram(program->id);
+                
+                glUniformMatrix4fv(glGetUniformLocation(program->id, "projection"), 1, GL_FALSE, (f32*)&ortho_projection);
+                glUniformMatrix4fv(glGetUniformLocation(program->id, "model"), 1, GL_FALSE, (f32*)&model);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, request->image_request.texture.id);
+                glBindVertexArray(program->vao);
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+                
+            } break;
+            case RenderKind_Text:
+            {
+                // NOTE(fakhri): select the font
+                Assert(request->text_request.font_to_use < FontKind_Count);
+                Font *font = render_context->fonts + request->text_request.font_to_use;
+                
+                
+                Shader_Program *program = render_context->shaders + ShaderKind_Font;
+                
+                glUseProgram(program->id);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, font->texture.id);
+                glBindVertexArray(program->vao);
+                glUniformMatrix4fv(glGetUniformLocation(program->id, "projection"), 1, GL_FALSE, (f32*)&ortho_projection);
+                glUniform4fv(glGetUniformLocation(program->id, "color"), 1, (f32 *)&request->text_request.color);
+                
+                // NOTE(fakhri): render the text
+                {
+                    v2 current_point = request->screen_coords.xy;
+                    for (u32 ch_index = 0;
+                         ch_index < request->text_request.text.len;
+                         ++ch_index)
+                    {
+                        u8 ch = request->text_request.text.str[ch_index];
+                        Assert(font->map_first <= ch && ch < font->map_opl);
+                        Glyph glyph = font->map[ch - font->map_first];
+                        
+                        v2 glyph_pos = current_point + 0.5f * glyph.size + glyph.offset;
+                        
+                        m4 trans = Translate(Vec3(glyph_pos, request->screen_coords.z));
+                        m4 scale = Scale(Vec3(glyph.size, 1.0f));
+                        m4 model = trans * scale;
+                        
+                        glUniformMatrix4fv(glGetUniformLocation(program->id, "model"), 1, GL_FALSE, (f32*)&model);
+                        glUniform4fv(glGetUniformLocation(program->id, "glyph_src"), 1, (f32 *)&glyph.src);
+                        
+                        glDrawArrays(GL_TRIANGLES, 0, 6);
+                        
+                        current_point.x += glyph.advance;
+                    }
+                }
+            } break;
+            default :
+            {
+                Assert(request->kind < RenderKind_Count);
+                NotImplemented;
+            } break;
         }
+        
+        glUseProgram(0);
+        glBindVertexArray(0);
+        glBindTexture(GL_TEXTURE_2D, 0);
     }
-    
-    glBindVertexArray(0);
-    glUseProgram(0);
-    
-}
-
-internal void
-DrawTextNormalizedCoord(Game_State *game_state, String8 text, v3 pos, v3 text_color)
-{
-    f32 window_width = (f32)os->window_size.width;
-    f32 window_height = (f32)os->window_size.height;
-    pos.xy = v2{pos.x * window_width, pos.y * window_height};
-    DrawTextScreenCoord(game_state, text, pos, text_color);
-}
-
-internal void
-DrawTextWorldCoord(Game_State *game_state, String8 string, v3 pos, v3 color, Font_Kind font_kind = FontKind_None)
-{
-    f32 x_correction = game_state->normalized_width_unit_per_world_unit;
-    f32 y_correction = (1.0f / game_state->aspect_ratio) * x_correction;
-    pos.xy = Vec2(pos.x * x_correction,
-                  1.0f - pos.y * y_correction);
-    
-    DrawTextNormalizedCoord(game_state, string, pos, color);
-}
-
-internal void
-DrawTextScreenCoord(Game_State *game_state, String8 string, v2 pos, v3 color, Font_Kind font_kind = FontKind_None)
-{
-    DrawTextScreenCoord(game_state, string, Vec3(pos, 0), color, font_kind);
-}
-
-internal void
-DrawTextWorldCoord(Game_State *game_state, String8 string, v2 pos, v3 color, Font_Kind font_kind = FontKind_None)
-{
-    DrawTextWorldCoord(game_state, string, Vec3(pos, 0), color, font_kind);
-}
-
-internal inline v2
-ScreenToWorldCoord(Game_State *game_state, v2 pos)
-{
-    pos.x *= 1.0f / game_state->screen.width;
-    pos.y *= 1.0f / game_state->screen.height;
-    
-    f32 x_correction = (1.0f / game_state->normalized_width_unit_per_world_unit);
-    f32 y_correction = x_correction * game_state->aspect_ratio;
-    
-    pos.x = pos.x *  x_correction;
-    pos.y = (1.0f - pos.y) * y_correction;
-    
-    return pos;
-}
-
-internal inline v2
-NormalizedToScreenCoords(Game_State *game_state, v2 pos)
-{
-    f32 window_width  = game_state->screen.width;
-    f32 window_height = game_state->screen.height;
-    pos = Vec2(pos.x * window_width, pos.y * window_height);
-    return pos;
-}
-
-internal inline v2
-WorldToNormalizedCoords(Game_State *game_state, v2 pos)
-{
-    f32 x_correction = game_state->normalized_width_unit_per_world_unit;
-    f32 y_correction = (1.0f / game_state->aspect_ratio) * x_correction;
-    pos = Vec2(pos.x * x_correction,
-               1.0f - pos.y * y_correction);
-    
-}
-
-
-internal inline v2
-WorldToScreenCoords(Game_State *game_state, v2 pos)
-{
-    pos = WorldToNormalizedCoords(game_state, pos);
-    pos = NormalizedToScreenCoords(game_state, pos);
-    return pos;
 }
