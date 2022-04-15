@@ -94,6 +94,9 @@ struct Render_Context
     Render_Request render_requests[65536];
     
     v2 screen;
+    
+    v2 camera_position;
+    
     f32 pixels_per_meter;
     
     Coordinate_Type active_coordinates_type;

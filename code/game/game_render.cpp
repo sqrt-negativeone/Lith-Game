@@ -99,7 +99,7 @@ ScreenCoordsFromWorldCoords(Render_Context *render_context, v3 world_coords)
     result.xy = render_context->pixels_per_meter * world_coords.xy;
     result.z = world_coords.z;
     // NOTE(fakhri): world origin is at the center of the screen, and Y is up
-    result.xy += 0.5f * render_context->screen;
+    result.xy += render_context->camera_position;
     result.y = render_context->screen.height - result.y;
     return result;
 }
@@ -109,7 +109,7 @@ WorldCoordsFromScreenCoords(Render_Context *render_context, v2 screen_coords)
 {
     v3 result = {};
     screen_coords.y = render_context->screen.height - screen_coords.y;
-    screen_coords -= 0.5f * render_context->screen;
+    screen_coords -= render_context->camera_position;
     result.xy = screen_coords / render_context->pixels_per_meter;
     return result;
 }
@@ -231,6 +231,12 @@ Render_Begin(Render_Context *render_context, M_Arena *arena)
         // TODO(fakhri): aspect ratio
     }
     
+    v2 camera_center = 0.5f * render_context->screen;
+    
+    // NOTE(fakhri): mouse influence should be zero at the cetner of the camera
+    v2 camera_offset = 0.1f * (os->mouse_position - 0.5f * render_context->screen);
+    
+    render_context->camera_position = Vec2(camera_center.x - camera_offset.x, camera_center.y + camera_offset.y);
 }
 
 

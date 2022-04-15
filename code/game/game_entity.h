@@ -31,10 +31,10 @@ enum Card_Residency
 #define CARD_HEIGHT (MiliMeter(88.7f))
 
 #define CARD_HORIZONTAL_GAP (-MiliMeter(10))
-#define CARD_VIRTICAL_GAP (-CentiMeter(10))
+#define CARD_VIRTICAL_GAP (-MiliMeter(50))
 
 #define CARD_HORIZONTAL_ADVANCE (CARD_WIDTH + CARD_HORIZONTAL_GAP)
-#define CARD_VIRTICAL_ADVANCE (CARD_HEIGHT - MiliMeter(30))
+#define CARD_VIRTICAL_ADVANCE (CARD_HEIGHT + CARD_VIRTICAL_GAP)
 
 enum Card_Category
 {

@@ -164,7 +164,7 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
         // NOTE(fakhri): we wait
         ChangeActiveFont(&game_state->render_context, FontKind_Arial);
         
-        Render_PushTextRequest(&game_state->render_context, Str8Lit("host splitting the deck"), Vec3(0.5f * game_state->screen, 60), Vec4(1,0,1,1), FontKind_Arial, CoordinateType_Screen);
+        Render_PushTextRequest(&game_state->render_context, Str8Lit("host splitting the deck"), Vec3(0, 0, 60), Vec4(1,0,1,1), FontKind_Arial, CoordinateType_World);
         
         if(HasFlag(game_session->flags, SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK))
         {
@@ -759,6 +759,18 @@ APP_UpdateAndRender(UpdateAndRender)
     Render_PushQuadRequest(&game_state->render_context, 
                            Vec3(os->mouse_position, 99),
                            Vec2(MiliMeter(5.f), MiliMeter(5.f)), Vec4(1, .3f, .5f, 1.f), CoordinateType_Screen);
+    
+    
+    // NOTE(fakhri): World coords axix
+    {
+        Render_PushQuadRequest(&game_state->render_context, 
+                               Vec3(0, 0, 0),
+                               Vec2(Meter(2.0f), MiliMeter(1.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
+        
+        Render_PushQuadRequest(&game_state->render_context, 
+                               Vec3(0, 0, 0),
+                               Vec2(MiliMeter(1.0f), Meter(2.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
+    }
     
     Render_End(&game_state->render_context);
     

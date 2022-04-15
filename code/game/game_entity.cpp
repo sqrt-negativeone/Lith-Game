@@ -113,11 +113,6 @@ FindFirstPositionInResidencyRow(Game_State *game_state, Card_Residency residency
 {
     v2 result = {};
     
-#if 1
-    f32 world_width = game_state->world_dim.width;
-    f32 world_height = game_state->world_dim.height;
-#endif
-    
     v2 start_point = Vec2(CentiMeter(40), CentiMeter(20));
     switch(residency_type)
     {
@@ -134,12 +129,12 @@ FindFirstPositionInResidencyRow(Game_State *game_state, Card_Residency residency
         case Card_Residency_Left:
         {
             result.x = -start_point.x;
-            result.y = 0.5f * (entity_count * CARD_HEIGHT + (entity_count - 1) * CARD_VIRTICAL_GAP);
+            result.y = 0.5f * (entity_count - 1) * (CARD_HEIGHT + CARD_VIRTICAL_GAP);
         } break;
         case Card_Residency_Right:
         {
             result.x = +start_point.x;
-            result.y = 0.5f * (entity_count * CARD_HEIGHT + (entity_count - 1) * CARD_VIRTICAL_GAP);
+            result.y = 0.5f * (entity_count - 1) * (CARD_HEIGHT + CARD_VIRTICAL_GAP);
         } break;
         case Card_Residency_Table:
         {
@@ -170,12 +165,12 @@ ReorganizeResidencyCards(Game_State *game_state, Card_Residency residency_type)
         u32 remaining_cards = residency->entity_count;
         
 #define MAX_CARDS_PER_RESIDENCY_ROW 15
-        u32 cards_per_row_remaining = MAX_CARDS_PER_RESIDENCY_ROW;
+        u32 remaining_cards_per_row = MAX_CARDS_PER_RESIDENCY_ROW;
         
         v3 residency_pos = {};
         residency_pos.xy = FindFirstPositionInResidencyRow(game_state, 
                                                            residency_type, 
-                                                           Min(cards_per_row_remaining, remaining_cards));
+                                                           Min(remaining_cards_per_row, remaining_cards));
         
         for (u32 entity_index_in_residency = 0;
              entity_index_in_residency< residency->entity_count;
@@ -191,24 +186,23 @@ ReorganizeResidencyCards(Game_State *game_state, Card_Residency residency_type)
                 entity->target_pos = entity->residency_pos;
             }
             
-            --cards_per_row_remaining;
+            --remaining_cards_per_row;
             --remaining_cards;
             // NOTE(fakhri): update the residency position for the next card
-            
             if(residency->is_horizonal)
             {
-                if(cards_per_row_remaining)
+                if(remaining_cards_per_row)
                 {
                     residency_pos.x += CARD_HORIZONTAL_ADVANCE;
                     residency_pos.z += MiliMeter(20);
                 }
                 else
                 {
-                    cards_per_row_remaining = MAX_CARDS_PER_RESIDENCY_ROW;
+                    remaining_cards_per_row = MAX_CARDS_PER_RESIDENCY_ROW;
                     f32 old_y = residency_pos.y;
                     residency_pos.xy = FindFirstPositionInResidencyRow(game_state,
                                                                        residency_type, 
-                                                                       Min(cards_per_row_remaining, remaining_cards));
+                                                                       Min(remaining_cards_per_row, remaining_cards));
                     residency_pos.y = old_y + CARD_VIRTICAL_ADVANCE;
                     
                     residency_pos.z -= CentiMeter(20);
@@ -223,17 +217,17 @@ ReorganizeResidencyCards(Game_State *game_state, Card_Residency residency_type)
                 }
                 else
                 {
-                    if (cards_per_row_remaining)
+                    if (remaining_cards_per_row)
                     {
-                        residency_pos.y += CARD_VIRTICAL_ADVANCE;
+                        residency_pos.y -= CARD_VIRTICAL_ADVANCE;
                     }
                     else
                     {
-                        cards_per_row_remaining = MAX_CARDS_PER_RESIDENCY_ROW;
+                        remaining_cards_per_row = MAX_CARDS_PER_RESIDENCY_ROW;
                         f32 old_x = residency_pos.x;
                         residency_pos.xy = FindFirstPositionInResidencyRow(game_state,
                                                                            residency_type, 
-                                                                           Min(cards_per_row_remaining, remaining_cards));
+                                                                           Min(remaining_cards_per_row, remaining_cards));
                         residency_pos.x = old_x + CARD_HORIZONTAL_ADVANCE;
                     }
                 }
@@ -605,8 +599,6 @@ AddCardEntity(Game_State *game_state, Card_Type card_type, Card_Residency card_r
     card->target_dimension   = Vec2(CARD_WIDTH, CARD_HEIGHT);
     card->current_dimension  = Vec2(CARD_WIDTH, CARD_HEIGHT);
     ChangeResidency(game_state, card_entity_index, card_residency);
-    f32 world_width = game_state->world_dim.width;
-    f32 world_height = game_state->world_dim.height;
     
     card->dy_angle = 4 * PI32;
     
@@ -698,17 +690,10 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index, f32 dt)
     
     if (entity->is_pressed)
     {
-        
-        f32 world_width = game_state->world_dim.width;
-        f32 world_height = game_state->world_dim.height;
-        
-        v2 world_dimension = Vec2(world_width, world_height);
-        
-        v2 table_center = Vec2(0.5f * world_width, 0.5f * world_height);
         b32 can_move_to_table = false;
         // TODO(fakhri): allow the player to only play his own cards, but allow him to move any card
         // cuz why not LOL
-        if (IsInsideRect(RectCentDim(table_center, Vec2(CentiMeter(30), CentiMeter(30))), entity->center_pos.xy))
+        if (IsInsideRect(RectCentDim(Vec2(0, 0), Vec2(CentiMeter(30), CentiMeter(30))), entity->center_pos.xy))
         {
             
             Render_PushTextRequest(&game_state->render_context, Str8Lit("release your mouse to play the card"), Vec3(0, 0, CentiMeter(60)), Vec4(1,0,1,1), FontKind_Arial, CoordinateType_World);
@@ -791,46 +776,52 @@ AddDebugEntites(Game_State *game_state)
     }
     
     for (u32 card_index = 0;
-         card_index < 1;
+         card_index < 13;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Up);
     }
     
+#if 0    
     for (u32 card_index = 1;
          card_index < 13;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
     }
+#endif
     
     for (u32 card_index = 0;
-         card_index < 1;
+         card_index < 12;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Left);
     }
     
+#if 0    
     for (u32 card_index = 1;
          card_index < 13;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Down);
     }
+#endif
     
     for (u32 card_index = 0;
-         card_index < 1;
+         card_index < 13;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Right);
     }
     
+#if 0    
     for (u32 card_index = 1;
          card_index < 13;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Down);
     }
+#endif
     
     for (u32 card_index = 0;
          card_index < 13;

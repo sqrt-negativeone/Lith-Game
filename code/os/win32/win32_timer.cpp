@@ -27,7 +27,7 @@ W32_TimerEndFrame(W32_Timer *timer)
     
     QueryPerformanceCounter(&end_frame);
     
-#if 1
+#if 0
     i64 elapsed_counts = end_frame.QuadPart - timer->begin_frame.QuadPart;
     i64 desired_counts = (i64)(os->time.game_dt_for_frame * timer->counts_per_second.QuadPart);
     i64 counts_to_wait = desired_counts - elapsed_counts;

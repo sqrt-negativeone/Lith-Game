@@ -122,8 +122,6 @@ struct Game_State
     Buffer message_to_display;
     f32 message_duration;
     
-    v2 world_dim;
-    v2 screen;
 };
 
 #endif //GAME_MAIN_H
