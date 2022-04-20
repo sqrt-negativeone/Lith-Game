@@ -22,6 +22,7 @@ struct Controller
     Input confirm;
     Input escape_key;
     Input toggle_fullscreen;
+    
 };
 
 enum Game_Mode
@@ -122,6 +123,7 @@ struct Game_State
     Buffer message_to_display;
     f32 message_duration;
     
+    f32 time_scale_factor;
 };
 
 #endif //GAME_MAIN_H

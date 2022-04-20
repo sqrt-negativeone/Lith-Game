@@ -110,6 +110,9 @@ SetupShader(Render_Context *render_context, Shader_Kind kind)
         +0.5f, -0.5f,
     };
     
+    f32 min_x = 0.0f, min_y = 0.0f;
+    f32 max_x = 1.0f, max_y = 1.0f;
+    
     local_persist f32 texture_vertices[] = {
         // position         texture
         -0.5f, -0.5f, 	 0.0f, 0.0f,
@@ -148,7 +151,6 @@ SetupShader(Render_Context *render_context, Shader_Kind kind)
                 glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(f32), (void*)0);
                 
             } break;
-            case ShaderKind_Font:
             case ShaderKind_Texture:
             {
                 glBufferData(GL_ARRAY_BUFFER, sizeof(texture_vertices), texture_vertices, GL_STATIC_DRAW);
@@ -199,10 +201,6 @@ LoadShader(Render_Context *render_context, Shader_Kind shader_kind)
         case ShaderKind_Texture:
         {
             shader_name = Str8Lit("texture_shader.glsl");
-        } break;
-        case ShaderKind_Font:
-        {
-            shader_name = Str8Lit("font_shader.glsl");
         } break;
         default:
         {

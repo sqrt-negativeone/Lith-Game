@@ -164,7 +164,7 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
         // NOTE(fakhri): we wait
         ChangeActiveFont(&game_state->render_context, FontKind_Arial);
         
-        Render_PushTextRequest(&game_state->render_context, Str8Lit("host splitting the deck"), Vec3(0, 0, 60), Vec4(1,0,1,1), FontKind_Arial, CoordinateType_World);
+        Render_PushTextRequest(&game_state->render_context, Str8Lit("host splitting the deck"), Vec3(0, 0, 60), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
         
         if(HasFlag(game_session->flags, SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK))
         {
@@ -195,24 +195,12 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
                                                Vec3(entity->center_pos.xy, entity->center_pos.z - 0.01f),
                                                1.05f * entity->current_dimension, red, CoordinateType_World, entity->y_angle);
                         
-#if 0                        
-                        DrawQuadWorldCoord(game_state, Vec3(entity->center_pos.xy, entity->center_pos.z - 0.01f), 1.05f * entity->current_dimension, red.rgb, entity->y_angle);
-#endif
-                        
                     }
                     
-                    Render_PushImageRequest(&game_state->render_context, entity->texture, entity->center_pos, entity->current_dimension, CoordinateType_World);
-                    
-#if 0                    
-                    DrawTextureWorldCoord(game_state, entity->texture, entity->center_pos, entity->current_dimension, entity->y_angle);
-#endif
+                    Render_PushImageRequest(&game_state->render_context, entity->texture, entity->center_pos, entity->current_dimension, CoordinateType_World,
+                                            entity->y_angle);
                     
                     v3 card_back_pos = entity->center_pos;
-                    
-#if 0                    
-                    DrawTextureWorldCoord(game_state, game_state->frensh_deck.card_back_texture,
-                                          card_back_pos, entity->current_dimension, PI32 - entity->y_angle);
-#endif
                     
                     Render_PushImageRequest(&game_state->render_context, game_state->frensh_deck.card_back_texture, entity->center_pos, entity->current_dimension, CoordinateType_World, PI32 - entity->y_angle);
                     
@@ -223,11 +211,8 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
                     Entity *entity_to_follow = game_state->entities + entity->entity_index_to_follow;
                     Assert(entity_to_follow);
                     
-                    Render_PushImageRequest(&game_state->render_context, entity->texture, Vec3(entity->center_pos.xy, entity_to_follow->center_pos.z + 0.01f), entity->current_dimension, CoordinateType_World, PI32 - entity->y_angle);
-                    
-#if 0                    
-                    DrawTextureWorldCoord(game_state, entity->texture, Vec3(entity->center_pos.xy, entity_to_follow->center_pos.z + 0.01f), entity->current_dimension, entity_to_follow->y_angle);
-#endif
+                    Render_PushImageRequest(&game_state->render_context, entity->texture, Vec3(entity->center_pos.xy, entity_to_follow->center_pos.z + 0.01f), entity->current_dimension, CoordinateType_World,
+                                            entity_to_follow->y_angle);
                     
                 } break;
                 default:
@@ -578,7 +563,7 @@ APP_PermanantLoad(PermanentLoad)
     
     glEnable(GL_CULL_FACE); 
     
-    glEnable(GL_DEPTH_TEST);
+    //glEnable(GL_DEPTH_TEST);
     
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -594,12 +579,12 @@ APP_PermanantLoad(PermanentLoad)
     OpenMenu(game_state, Game_Mode_MENU_MAIN);
     
     InitResidencies(game_state);
-    
+    game_state->time_scale_factor = 1.f;
     game_state->message_to_display = InitBuffer(os->permanent_arena, Kilobytes(1));
     
     // @DebugOnly
 #if 1
-    glDepthFunc(GL_LESS);
+    //glDepthFunc(GL_LESS);
     for(u32 residency_index = Card_Residency_Left;
         residency_index <= Card_Residency_Down;
         ++residency_index)
@@ -710,11 +695,19 @@ APP_UpdateAndRender(UpdateAndRender)
                         default: break;
                     }
                 } break;
+                case OS_EventKind_MouseScroll:
+                {
+                    // NOTE(fakhri): scale time
+                    game_state->time_scale_factor += 0.0001f * event->scroll.y;
+                    if (game_state->time_scale_factor < 0) game_state->time_scale_factor = 0;
+                } break;
                 default: break;
             }
             event = event->next;
         }
     }
+    
+    dt = game_state->time_scale_factor * dt;
     
     switch(game_state->game_mode)
     {
@@ -750,7 +743,7 @@ APP_UpdateAndRender(UpdateAndRender)
         {
             game_state->message_duration -= dt;
             
-            Render_PushTextRequest(&game_state->render_context, game_state->message_to_display.content, Vec3(0, 0, CentiMeter(60)), Vec4(1,1,1,1), FontKind_Arial, CoordinateType_World);
+            Render_PushTextRequest(&game_state->render_context, game_state->message_to_display.content, Vec3(0, 0, CentiMeter(60)), Vec4(1,1,1,1), CoordinateType_World, FontKind_Arial);
             
         }
     }
@@ -760,16 +753,30 @@ APP_UpdateAndRender(UpdateAndRender)
                            Vec3(os->mouse_position, 99),
                            Vec2(MiliMeter(5.f), MiliMeter(5.f)), Vec4(1, .3f, .5f, 1.f), CoordinateType_Screen);
     
-    
-    // NOTE(fakhri): World coords axix
+    // NOTE(fakhri): Debug UI
     {
-        Render_PushQuadRequest(&game_state->render_context, 
-                               Vec3(0, 0, 0),
-                               Vec2(Meter(2.0f), MiliMeter(1.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
+        M_Temp scratch = GetScratch(0, 0);
         
-        Render_PushQuadRequest(&game_state->render_context, 
-                               Vec3(0, 0, 0),
-                               Vec2(MiliMeter(1.0f), Meter(2.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
+        // NOTE(fakhri): World coords axix
+        {
+            Render_PushQuadRequest(&game_state->render_context, 
+                                   Vec3(0, 0, 0),
+                                   Vec2(Meter(2.0f), MiliMeter(1.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
+            
+            Render_PushQuadRequest(&game_state->render_context, 
+                                   Vec3(0, 0, 0),
+                                   Vec2(MiliMeter(1.0f), Meter(2.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
+        }
+        
+        
+        // NOTE(fakhri): time scale
+        {
+            String8 msg = {};
+            msg = PushStr8F(scratch.arena, "time scale factor: %f", game_state->time_scale_factor);
+            Render_PushTextRequest(&game_state->render_context, msg, Vec3(300, 50, CentiMeter(60)), Vec4(0,0,0,1), CoordinateType_World, FontKind_Arial);
+        }
+        
+        ReleaseScratch(scratch);
     }
     
     Render_End(&game_state->render_context);

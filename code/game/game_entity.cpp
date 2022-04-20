@@ -188,6 +188,7 @@ ReorganizeResidencyCards(Game_State *game_state, Card_Residency residency_type)
             
             --remaining_cards_per_row;
             --remaining_cards;
+            
             // NOTE(fakhri): update the residency position for the next card
             if(residency->is_horizonal)
             {
@@ -696,7 +697,7 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index, f32 dt)
         if (IsInsideRect(RectCentDim(Vec2(0, 0), Vec2(CentiMeter(30), CentiMeter(30))), entity->center_pos.xy))
         {
             
-            Render_PushTextRequest(&game_state->render_context, Str8Lit("release your mouse to play the card"), Vec3(0, 0, CentiMeter(60)), Vec4(1,0,1,1), FontKind_Arial, CoordinateType_World);
+            Render_PushTextRequest(&game_state->render_context, Str8Lit("release your mouse to play the card"), Vec3(0, 0, CentiMeter(60)), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
             
             can_move_to_table = 1;
         }
@@ -782,7 +783,14 @@ AddDebugEntites(Game_State *game_state)
         AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Up);
     }
     
-#if 0    
+    for (u32 card_index = 0;
+         card_index < 1;
+         ++card_index)
+    {
+        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Up);
+    }
+    
+#if 1    
     for (u32 card_index = 1;
          card_index < 13;
          ++card_index)
@@ -792,13 +800,13 @@ AddDebugEntites(Game_State *game_state)
 #endif
     
     for (u32 card_index = 0;
-         card_index < 12;
+         card_index < 1;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Left);
     }
     
-#if 0    
+#if 1    
     for (u32 card_index = 1;
          card_index < 13;
          ++card_index)
@@ -808,13 +816,13 @@ AddDebugEntites(Game_State *game_state)
 #endif
     
     for (u32 card_index = 0;
-         card_index < 13;
+         card_index < 1;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Right);
     }
     
-#if 0    
+#if 1    
     for (u32 card_index = 1;
          card_index < 13;
          ++card_index)

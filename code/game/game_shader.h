@@ -12,7 +12,6 @@ enum Shader_Kind
     ShaderKind_None,
     ShaderKind_Quad,
     ShaderKind_Texture,
-    ShaderKind_Font,
     
     ShaderKind_Count
 };
