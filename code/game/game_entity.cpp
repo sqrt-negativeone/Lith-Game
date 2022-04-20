@@ -697,7 +697,7 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index, f32 dt)
         if (IsInsideRect(RectCentDim(Vec2(0, 0), Vec2(CentiMeter(30), CentiMeter(30))), entity->center_pos.xy))
         {
             
-            Render_PushTextRequest(&game_state->render_context, Str8Lit("release your mouse to play the card"), Vec3(0, 0, CentiMeter(60)), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
+            Render_PushText(&game_state->render_context, Str8Lit("release your mouse to play the card"), Vec3(0, 0, CentiMeter(60)), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
             
             can_move_to_table = 1;
         }

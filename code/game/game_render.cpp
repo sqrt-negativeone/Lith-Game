@@ -131,7 +131,7 @@ _Render_PushRequest(Push_Buffer *push_buffer, u32 size)
 
 
 internal void
-Render_PushQuadRequest(Render_Context *render_context, v3 pos, v2 size_in_meter, v4 color, Coordinate_Type coord_type, f32 y_angle = 0.0f)
+Render_PushQuad(Render_Context *render_context, v3 pos, v2 size_in_meter, v4 color, Coordinate_Type coord_type, f32 y_angle = 0.0f)
 {
     Assert(coord_type < CoordinateType_Count);
     if (coord_type == CoordinateType_World)
@@ -150,10 +150,10 @@ Render_PushQuadRequest(Render_Context *render_context, v3 pos, v2 size_in_meter,
 }
 
 internal void
-Render_PushImageRequest(Render_Context *render_context, Texture2D texture,
-                        v3 pos, v2 size, 
-                        Coordinate_Type coord_type, 
-                        f32 y_angle = 0, b32 is_size_in_meter = true, v4 color = Vec4(1, 1, 1, 1), v4 src = Vec4(0, 0, 1, 1))
+Render_PushImage(Render_Context *render_context, Texture2D texture,
+                 v3 pos, v2 size, 
+                 Coordinate_Type coord_type, 
+                 f32 y_angle = 0, b32 is_size_in_meter = true, v4 color = Vec4(1, 1, 1, 1), v4 src = Vec4(0, 0, 1, 1))
 {
     Assert(coord_type < CoordinateType_Count);
     if (coord_type == CoordinateType_World)
@@ -173,7 +173,7 @@ Render_PushImageRequest(Render_Context *render_context, Texture2D texture,
 }
 
 internal void
-Render_PushTextRequest(Render_Context *render_context, String text, v3 pos, v4 color, Coordinate_Type coord_type, Font_Kind font_to_use = FontKind_None)
+Render_PushText(Render_Context *render_context, String text, v3 pos, v4 color, Coordinate_Type coord_type, Font_Kind font_to_use = FontKind_None)
 {
     Assert(font_to_use < FontKind_Count);
     if (font_to_use == FontKind_None)
@@ -202,10 +202,10 @@ Render_PushTextRequest(Render_Context *render_context, String text, v3 pos, v4 c
             
             v2 glyph_pos = current_point + 0.5f * glyph.size + glyph.offset;
             pos.xy = glyph_pos;
-            Render_PushImageRequest(render_context, font->texture, 
-                                    pos, glyph.size, 
-                                    CoordinateType_Screen,
-                                    0, 0, color, glyph.src.compact_rect);
+            Render_PushImage(render_context, font->texture, 
+                             pos, glyph.size, 
+                             CoordinateType_Screen,
+                             0, 0, color, glyph.src.compact_rect);
             
             current_point.x += glyph.advance;
         }

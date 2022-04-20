@@ -76,7 +76,7 @@ UI_Label(UI_Context *ui_context, String8 text, f32 x, f32 y, b32 should_animate_
     f32 change = should_animate_color? Square(CosF(PI32 * os->time.game_time)) : 0;
     v3 color = Lerp(color_scheme->label_color1, change, color_scheme->label_color2);
     
-    Render_PushTextRequest(ui_context->render_context, text, Vec3(x, y, 0), Vec4(color, 1), coord_type, font_to_use);
+    Render_PushText(ui_context->render_context, text, Vec3(x, y, 0), Vec4(color, 1), coord_type, font_to_use);
 }
 
 internal b32
@@ -110,7 +110,7 @@ UI_Button(UI_Context *ui_context, String8 item_text, f32 x, f32 y, v2 hitbox, Fo
         f32 change = Square(CosF(PI32 * t));
         text_color = Lerp(color_scheme->button_text_active_color1, change, color_scheme->button_text_active_color2);
         v2 shadow_offset = Vec2(5, 5);
-        Render_PushTextRequest(ui_context->render_context, item_text, Vec3(item_pos + shadow_offset, 0), Vec4(text_color, 1), coord_type, font_to_use);
+        Render_PushText(ui_context->render_context, item_text, Vec3(item_pos + shadow_offset, 0), Vec4(text_color, 1), coord_type, font_to_use);
         
     }
     else
@@ -118,7 +118,7 @@ UI_Button(UI_Context *ui_context, String8 item_text, f32 x, f32 y, v2 hitbox, Fo
         text_color = color_scheme->button_text_color;
     }
     
-    Render_PushTextRequest(ui_context->render_context, item_text, Vec3(item_pos, 0), Vec4(text_color, 1), coord_type, font_to_use);
+    Render_PushText(ui_context->render_context, item_text, Vec3(item_pos, 0), Vec4(text_color, 1), coord_type, font_to_use);
     
     ++ui_context->items_count;
     return clicked;
@@ -199,9 +199,9 @@ UI_InputField(UI_Context *ui_context, v2 item_size, f32 x, f32 y, Buffer *input_
     }
     
     // NOTE(fakhri): render input field background
-    Render_PushQuadRequest(ui_context->render_context, Vec3(item_pos, 0), item_size, Vec4(background_color, 1), coord_type);
+    Render_PushQuad(ui_context->render_context, Vec3(item_pos, 0), item_size, Vec4(background_color, 1), coord_type);
     
-    Render_PushTextRequest(ui_context->render_context, input_buffer->content, Vec3(item_pos, 0), Vec4(text_color, 1), coord_type, font_to_use);
+    Render_PushText(ui_context->render_context, input_buffer->content, Vec3(item_pos, 0), Vec4(text_color, 1), coord_type, font_to_use);
     
     if (is_selected)
     {
@@ -214,7 +214,7 @@ UI_InputField(UI_Context *ui_context, v2 item_size, f32 x, f32 y, Buffer *input_
         
         v2 cursor_size = Vec2(2, 1.1f * GetFontHeight(ui_context->render_context, font_to_use));
         
-        Render_PushQuadRequest(ui_context->render_context, Vec3(cursor_pos, 0), cursor_size, Vec4(cursor_color, 1), coord_type);
+        Render_PushQuad(ui_context->render_context, Vec3(cursor_pos, 0), cursor_size, Vec4(cursor_color, 1), coord_type);
         
     }
     

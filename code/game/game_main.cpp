@@ -16,7 +16,6 @@
 
 global Thread_Ctx game_tctx;
 
-
 internal void
 AssignResidencyToPlayers(Game_State *game_state, Game_Session *game_session)
 {
@@ -164,7 +163,7 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
         // NOTE(fakhri): we wait
         ChangeActiveFont(&game_state->render_context, FontKind_Arial);
         
-        Render_PushTextRequest(&game_state->render_context, Str8Lit("host splitting the deck"), Vec3(0, 0, 60), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
+        Render_PushText(&game_state->render_context, Str8Lit("host splitting the deck"), Vec3(0, 0, 60), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
         
         if(HasFlag(game_session->flags, SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK))
         {
@@ -191,18 +190,18 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
                     UpdateCardEntity(game_state, entity_index, dt);
                     if (entity->is_pressed)
                     {
-                        Render_PushQuadRequest(&game_state->render_context, 
-                                               Vec3(entity->center_pos.xy, entity->center_pos.z - 0.01f),
-                                               1.05f * entity->current_dimension, red, CoordinateType_World, entity->y_angle);
+                        Render_PushQuad(&game_state->render_context, 
+                                        Vec3(entity->center_pos.xy, entity->center_pos.z - 0.01f),
+                                        1.05f * entity->current_dimension, red, CoordinateType_World, entity->y_angle);
                         
                     }
                     
-                    Render_PushImageRequest(&game_state->render_context, entity->texture, entity->center_pos, entity->current_dimension, CoordinateType_World,
-                                            entity->y_angle);
+                    Render_PushImage(&game_state->render_context, entity->texture, entity->center_pos, entity->current_dimension, CoordinateType_World,
+                                     entity->y_angle);
                     
                     v3 card_back_pos = entity->center_pos;
                     
-                    Render_PushImageRequest(&game_state->render_context, game_state->frensh_deck.card_back_texture, entity->center_pos, entity->current_dimension, CoordinateType_World, PI32 - entity->y_angle);
+                    Render_PushImage(&game_state->render_context, game_state->frensh_deck.card_back_texture, entity->center_pos, entity->current_dimension, CoordinateType_World, PI32 - entity->y_angle);
                     
                 } break;
                 case Entity_Type_Companion:
@@ -211,8 +210,8 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
                     Entity *entity_to_follow = game_state->entities + entity->entity_index_to_follow;
                     Assert(entity_to_follow);
                     
-                    Render_PushImageRequest(&game_state->render_context, entity->texture, Vec3(entity->center_pos.xy, entity_to_follow->center_pos.z + 0.01f), entity->current_dimension, CoordinateType_World,
-                                            entity_to_follow->y_angle);
+                    Render_PushImage(&game_state->render_context, entity->texture, Vec3(entity->center_pos.xy, entity_to_follow->center_pos.z + 0.01f), entity->current_dimension, CoordinateType_World,
+                                     entity_to_follow->y_angle);
                     
                 } break;
                 default:
@@ -743,15 +742,15 @@ APP_UpdateAndRender(UpdateAndRender)
         {
             game_state->message_duration -= dt;
             
-            Render_PushTextRequest(&game_state->render_context, game_state->message_to_display.content, Vec3(0, 0, CentiMeter(60)), Vec4(1,1,1,1), CoordinateType_World, FontKind_Arial);
+            Render_PushText(&game_state->render_context, game_state->message_to_display.content, Vec3(0, 0, CentiMeter(60)), Vec4(1,1,1,1), CoordinateType_World, FontKind_Arial);
             
         }
     }
     
     // NOTE(fakhri): render the mouse cursor
-    Render_PushQuadRequest(&game_state->render_context, 
-                           Vec3(os->mouse_position, 99),
-                           Vec2(MiliMeter(5.f), MiliMeter(5.f)), Vec4(1, .3f, .5f, 1.f), CoordinateType_Screen);
+    Render_PushQuad(&game_state->render_context, 
+                    Vec3(os->mouse_position, 99),
+                    Vec2(MiliMeter(5.f), MiliMeter(5.f)), Vec4(1, .3f, .5f, 1.f), CoordinateType_Screen);
     
     // NOTE(fakhri): Debug UI
     {
@@ -759,13 +758,13 @@ APP_UpdateAndRender(UpdateAndRender)
         
         // NOTE(fakhri): World coords axix
         {
-            Render_PushQuadRequest(&game_state->render_context, 
-                                   Vec3(0, 0, 0),
-                                   Vec2(Meter(2.0f), MiliMeter(1.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
+            Render_PushQuad(&game_state->render_context, 
+                            Vec3(0, 0, 0),
+                            Vec2(Meter(2.0f), MiliMeter(1.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
             
-            Render_PushQuadRequest(&game_state->render_context, 
-                                   Vec3(0, 0, 0),
-                                   Vec2(MiliMeter(1.0f), Meter(2.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
+            Render_PushQuad(&game_state->render_context, 
+                            Vec3(0, 0, 0),
+                            Vec2(MiliMeter(1.0f), Meter(2.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
         }
         
         
@@ -773,7 +772,7 @@ APP_UpdateAndRender(UpdateAndRender)
         {
             String8 msg = {};
             msg = PushStr8F(scratch.arena, "time scale factor: %f", game_state->time_scale_factor);
-            Render_PushTextRequest(&game_state->render_context, msg, Vec3(300, 50, CentiMeter(60)), Vec4(0,0,0,1), CoordinateType_World, FontKind_Arial);
+            Render_PushText(&game_state->render_context, msg, Vec3(300, 50, CentiMeter(60)), Vec4(0,0,0,1), CoordinateType_World, FontKind_Arial);
         }
         
         ReleaseScratch(scratch);
