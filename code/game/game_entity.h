@@ -35,6 +35,7 @@ enum Card_Residency
 
 #define CARD_HORIZONTAL_ADVANCE (CARD_WIDTH + CARD_HORIZONTAL_GAP)
 #define CARD_VIRTICAL_ADVANCE (CARD_HEIGHT + CARD_VIRTICAL_GAP)
+#define THRESHOLD_FOR_BURNING Category_Count
 
 enum Card_Category
 {

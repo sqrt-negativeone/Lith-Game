@@ -24,6 +24,21 @@ struct Frensh_Suited_Cards_Texture
     Texture2D jacks[4];
     Texture2D queens[4];
     Texture2D kings[4];
+    
+    
+#if 0    
+    // // TODO(fakhri): we can do something like this
+    Texture2D black_numbers[Card_Number_Count];
+    Texture2D red_numbers[Card_Number_Count];
+    
+    Texture2D category_black[Category_Count];
+    Texture2D category_red[Category_Count];
+    
+    Texture2D jacks[Category_Count];
+    Texture2D queens[Category_Count];
+    Texture2D kings[Category_Count];
+#endif
+    
 };
 
 enum Render_Kind
@@ -77,7 +92,6 @@ struct Push_Buffer
 
 struct Render_Context
 {
-    
     M_Arena *frame_arena;
     
     Shaders_Hash shaders_hash;

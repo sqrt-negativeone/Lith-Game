@@ -6,6 +6,7 @@
 #undef far
 
 
+#include "game_event.h"
 #include "game_texture.h"
 #include "game_font.h"
 #include "game_shader.h"

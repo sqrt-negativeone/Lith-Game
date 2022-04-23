@@ -51,8 +51,8 @@ enum Game_Session_Flags
     SESSION_FLAG_TRYING_JOIN_GAME             = (1 << 5),
     SESSION_FLAG_FAILED_JOIN_GAME             = (1 << 6),
     SESSION_FLAG_JOINED_GAME                  = (1 << 7),
-    SESSION_FLAG_HOST_SPLITTING_DECK          = (1 << 8),
-    SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK = (1 << 8),
+    SessionFlag_WaitingForCards  = (1 << 8),
+    SessionFlag_ReceivedCards    = (1 << 9),
 };
 
 
@@ -64,6 +64,9 @@ struct Residency
     
     b32 is_horizonal;
     b32 is_stacked;
+    
+    b32 needs_reorganizing;
+    b32 burnable;
 };
 
 struct Hosts_Storage
@@ -91,13 +94,12 @@ struct Game_Session
     u32 flags;
     Hosts_Storage hosts_storage;
     u32 current_player_id;
-    
     u32 my_player_id;
 };
 
-
 struct Game_State
 {
+    Game_Event_Buffer event_buffer;
     Render_Context render_context;
     
     Game_Mode game_mode;
@@ -119,9 +121,6 @@ struct Game_State
     
     b32 should_burn_cards;
     f32 time_to_burn_cards;
-    
-    Buffer message_to_display;
-    f32 message_duration;
     
     f32 time_scale_factor;
 };

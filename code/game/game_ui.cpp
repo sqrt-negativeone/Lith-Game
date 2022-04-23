@@ -48,10 +48,12 @@ UI_Init(UI_Context *ui_context, Render_Context *render_context)
 }
 
 internal void 
-UI_BeginFrame(UI_Context *ui_context)
+UI_BeginFrame(UI_Context *ui_context, Controller *controller, Render_Context *render_context)
 {
     Assert(ui_context);
     ui_context->items_count = 0;
+    ui_context->controller = controller;
+    ui_context->render_context = render_context;
 }
 
 internal void
@@ -69,18 +71,18 @@ UI_EndFrame(UI_Context *ui_context, Controller *controller)
 }
 
 internal void
-UI_Label(UI_Context *ui_context, String8 text, f32 x, f32 y, b32 should_animate_color = false, Font_Kind font_to_use = FontKind_None, Coordinate_Type coord_type = CoordinateType_None)
+UI_Label(UI_Context *ui_context, String8 text, f32 x, f32 y, Font_Kind font_to_use, b32 should_animate_color = false)
 {
     UI_ColorScheme *color_scheme = &ui_context->color_scheme;
     
     f32 change = should_animate_color? Square(CosF(PI32 * os->time.game_time)) : 0;
     v3 color = Lerp(color_scheme->label_color1, change, color_scheme->label_color2);
     
-    Render_PushText(ui_context->render_context, text, Vec3(x, y, 0), Vec4(color, 1), coord_type, font_to_use);
+    Render_PushText(ui_context->render_context, text, Vec3(x, y, 0), Vec4(color, 1), CoordinateType_World, font_to_use);
 }
 
 internal b32
-UI_Button(UI_Context *ui_context, String8 item_text, f32 x, f32 y, v2 hitbox, Font_Kind font_to_use = FontKind_None, Coordinate_Type coord_type = CoordinateType_None)
+UI_Button(UI_Context *ui_context, String8 item_text, f32 x, f32 y, Font_Kind font_to_use)
 {
     UI_ColorScheme    *color_scheme = &ui_context->color_scheme;
     
@@ -90,8 +92,11 @@ UI_Button(UI_Context *ui_context, String8 item_text, f32 x, f32 y, v2 hitbox, Fo
     
     v3 text_color;
     
-    //DrawQuadScreenCoord(ui_context, Vec3(x, y, 0), hitbox, Vec3(1, 1, 1));
-    if (IsInsideRect(RectCentDim(item_pos, hitbox), os->mouse_position ))
+    v2 hitbox = 1.2f * Vec2(GetFontWidth(ui_context->render_context, font_to_use, item_text), 
+                            GetFontHeight(ui_context->render_context, font_to_use));
+    
+    hitbox = SizeFromScreenCoordsToWorldCoords(ui_context->render_context, hitbox);
+    if (IsInsideRect(RectCentDim(item_pos, hitbox), WorldCoordsFromScreenCoords(ui_context->render_context, os->mouse_position).xy))
     {
         ui_context->last_select_time = os->time.game_time;
         ui_context->selected_item = ui_context->items_count;
@@ -109,8 +114,8 @@ UI_Button(UI_Context *ui_context, String8 item_text, f32 x, f32 y, v2 hitbox, Fo
         f32 t = os->time.game_time - ui_context->last_select_time;
         f32 change = Square(CosF(PI32 * t));
         text_color = Lerp(color_scheme->button_text_active_color1, change, color_scheme->button_text_active_color2);
-        v2 shadow_offset = Vec2(5, 5);
-        Render_PushText(ui_context->render_context, item_text, Vec3(item_pos + shadow_offset, 0), Vec4(text_color, 1), coord_type, font_to_use);
+        v2 shadow_offset = Vec2(MiliMeter(2), -MiliMeter(1));
+        Render_PushText(ui_context->render_context, item_text, Vec3(item_pos + shadow_offset, 0), Vec4(text_color, 1), CoordinateType_World, font_to_use);
         
     }
     else
@@ -118,7 +123,7 @@ UI_Button(UI_Context *ui_context, String8 item_text, f32 x, f32 y, v2 hitbox, Fo
         text_color = color_scheme->button_text_color;
     }
     
-    Render_PushText(ui_context->render_context, item_text, Vec3(item_pos, 0), Vec4(text_color, 1), coord_type, font_to_use);
+    Render_PushText(ui_context->render_context, item_text, Vec3(item_pos, 0), Vec4(text_color, 1), CoordinateType_World, font_to_use);
     
     ++ui_context->items_count;
     return clicked;
@@ -129,46 +134,47 @@ HandleInputFieldKeyboardInput(Buffer *input_buffer)
 {
     // TODO(fakhri): support ctr+v
     // TODO(fakhri): support moving cursor with arrow keys
-    NotImplemented;
-#if 0
-    OS_Event *event = 0;
-    while(OS_GetNextEvent(&event))
+    
+    OS_Event *event = os->events.first;
+    while(event)
     {
-        if (event->type == OS_EventType_CharacterInput)
+        switch(event->kind)
         {
-            char c = (char)event->character;
-            if (!IsBufferFull(input_buffer))
+            case OS_EventKind_Text:
             {
-                InsertCharacterToBuffer(input_buffer, c);
-            }
-            OS_EatEvent(event);
-        }
-        else if (event->type == OS_EventType_KeyPress)
-        {
-            if (event->key == Key_Backspace && 
-                !IsBufferEmpty(input_buffer))
+                char c = (char)event->character;
+                if (!IsBufferFull(input_buffer))
+                {
+                    InsertCharacterToBuffer(input_buffer, c);
+                }
+            } break;
+            case OS_EventKind_Press:
             {
-                if (event->modifiers & KeyModifier_Ctrl)
+                if (event->key == OS_Key_Backspace && 
+                    !IsBufferEmpty(input_buffer))
                 {
-                    EmptyBuffer(input_buffer);
+                    if (event->modifiers & OS_Modifier_Ctrl)
+                    {
+                        EmptyBuffer(input_buffer);
+                    }
+                    else
+                    {
+                        RemoveLastCharacterFromBuffer(input_buffer);
+                    }
                 }
-                else
+                else if (event->key == OS_Key_V && (event->modifiers & OS_Modifier_Ctrl))
                 {
-                    RemoveLastCharacterFromBuffer(input_buffer);
+                    // TODO(fakhri): insert the content of the clipboad into the buffer
+                    Log("Pasting clipboad content to the buffer");
                 }
-            }
+            } break;
         }
-        else if (event->key == Key_V && (event->modifiers & KeyModifier_Ctrl))
-        {
-            // TODO(fakhri): insert the content of the clipboad into the buffer
-            Log("Pasting clipboad content to the buffer");
-        }
+        event = event->next;
     }
-#endif
 }
 
 internal void
-UI_InputField(UI_Context *ui_context, v2 item_size, f32 x, f32 y, Buffer *input_buffer, Font_Kind font_to_use = FontKind_None, Coordinate_Type coord_type = CoordinateType_None)
+UI_InputField(UI_Context *ui_context, v2 item_size, f32 x, f32 y, Buffer *input_buffer, Font_Kind font_to_use)
 {
     UI_ColorScheme    *color_scheme      = &ui_context->color_scheme;
     
@@ -177,7 +183,7 @@ UI_InputField(UI_Context *ui_context, v2 item_size, f32 x, f32 y, Buffer *input_
     
     v2 item_pos = Vec2(x, y);
     
-    if (IsInsideRect(RectCentDim(item_pos, item_size), os->mouse_position ))
+    if (IsInsideRect(RectCentDim(item_pos, item_size), WorldCoordsFromScreenCoords(ui_context->render_context, os->mouse_position).xy))
     {
         ui_context->selected_item = ui_context->items_count;
     }
@@ -199,9 +205,9 @@ UI_InputField(UI_Context *ui_context, v2 item_size, f32 x, f32 y, Buffer *input_
     }
     
     // NOTE(fakhri): render input field background
-    Render_PushQuad(ui_context->render_context, Vec3(item_pos, 0), item_size, Vec4(background_color, 1), coord_type);
+    Render_PushQuad(ui_context->render_context, Vec3(item_pos, 0), item_size, Vec4(background_color, 1), CoordinateType_World);
     
-    Render_PushText(ui_context->render_context, input_buffer->content, Vec3(item_pos, 0), Vec4(text_color, 1), coord_type, font_to_use);
+    Render_PushText(ui_context->render_context, input_buffer->content, Vec3(item_pos, 0), Vec4(text_color, 1), CoordinateType_World, font_to_use);
     
     if (is_selected)
     {
@@ -209,13 +215,11 @@ UI_InputField(UI_Context *ui_context, v2 item_size, f32 x, f32 y, Buffer *input_
         f32 change = Square(CosF(PI32 * t));
         v3 cursor_color = Lerp(background_color, change, text_color);
         
-        v2 cursor_pos = Vec2(item_pos.x +  0.5f * GetFontWidth(ui_context->render_context, font_to_use, input_buffer->content),
-                             item_pos.y);
-        
-        v2 cursor_size = Vec2(2, 1.1f * GetFontHeight(ui_context->render_context, font_to_use));
-        
-        Render_PushQuad(ui_context->render_context, Vec3(cursor_pos, 0), cursor_size, Vec4(cursor_color, 1), coord_type);
-        
+        f32 meter_per_pixel = 1.0f / ui_context->render_context->pixels_per_meter;
+        f32 font_half_width_in_pixels = 0.5f * GetFontWidth(ui_context->render_context, font_to_use, input_buffer->content);
+        v2 cursor_size = Vec2(MiliMeter(2), CentiMeter(4));
+        v2 cursor_pos = Vec2(item_pos.x + meter_per_pixel * font_half_width_in_pixels, item_pos.y);
+        Render_PushQuad(ui_context->render_context, Vec3(cursor_pos, 0), cursor_size, Vec4(cursor_color, 1), CoordinateType_World);
     }
     
     ++ui_context->items_count;

@@ -6,7 +6,8 @@ InitResidencies(Game_State *game_state)
     {
         Residency *residency = game_state->residencies + Card_Residency_Up;
         residency->is_horizonal = true;
-        residency->is_stacked = false;
+        residency->is_stacked   = false;
+        residency->burnable     = true;
         residency->controlling_player_id = InvalidePlayerID;
     }
     
@@ -14,7 +15,8 @@ InitResidencies(Game_State *game_state)
     {
         Residency *residency = game_state->residencies + Card_Residency_Down;
         residency->is_horizonal = true;
-        residency->is_stacked = false;
+        residency->is_stacked   = false;
+        residency->burnable     = true;
         residency->controlling_player_id = InvalidePlayerID;
     }
     
@@ -22,7 +24,8 @@ InitResidencies(Game_State *game_state)
     {
         Residency *residency = game_state->residencies + Card_Residency_Left;
         residency->is_horizonal = false;
-        residency->is_stacked = false;
+        residency->is_stacked   = false;
+        residency->burnable     = true;
         residency->controlling_player_id = InvalidePlayerID;
     }
     
@@ -30,7 +33,8 @@ InitResidencies(Game_State *game_state)
     {
         Residency *residency = game_state->residencies + Card_Residency_Right;
         residency->is_horizonal = false;
-        residency->is_stacked = false;
+        residency->is_stacked   = false;
+        residency->burnable     = true;
         residency->controlling_player_id = InvalidePlayerID;
     }
     
@@ -38,7 +42,8 @@ InitResidencies(Game_State *game_state)
     {
         Residency *residency = game_state->residencies + Card_Residency_Table;
         residency->is_horizonal = false;
-        residency->is_stacked = true;
+        residency->is_stacked   = true;
+        residency->burnable     = false;
         residency->controlling_player_id = InvalidePlayerID;
     }
     
@@ -46,34 +51,26 @@ InitResidencies(Game_State *game_state)
     {
         Residency *residency = game_state->residencies + Card_Residency_Burnt;
         residency->is_horizonal = false;
-        residency->is_stacked = true;
+        residency->is_stacked   = true;
+        residency->burnable     = false;
         residency->controlling_player_id = InvalidePlayerID;
     }
     
 }
 
-internal inline void
-DisplayMessageForDuration(Game_State *game_state, String8 message, f32 duration_in_seconds)
-{
-    CopyStringToBuffer(&game_state->message_to_display, message);
-    game_state->message_duration = duration_in_seconds;
-}
-
-internal inline void
-StopMessageDisplay(Game_State *game_state)
-{
-    game_state->message_duration = 0;
-}
-
-internal void
+#if 0
+internal b32
 BurnExtraCardEntities(Game_State *game_state, Card_Residency card_residency)
 {
+    b32 should_burn_cards = false;
     Residency *residency = game_state->residencies + card_residency;
-    Assert(residency->controlling_player_id != InvalidePlayerID);
+    Assert(residency->burnable);
     
     // TODO(fakhri): card_number_frequencies can be a field in the Residency
     // this way we don't have to recompute it each time we call this function
-    // NOTE(fakhri): count the frequency of each card number
+    // but then the complexity of maintaining this frequency table
+    // will leak to change residency for example
+    // NOTE(fakhri): count the frequency of each card number in the residency
     u32 card_number_freq[Card_Number_Count] = {};
     for(u32 entity_index_in_residency = 0;
         entity_index_in_residency< residency->entity_count;
@@ -95,18 +92,24 @@ BurnExtraCardEntities(Game_State *game_state, Card_Residency card_residency)
         if(card_number_freq[card_entity->card_type.number] == Category_Count)
         {
             card_entity->marked_for_burning = true;
-            game_state->should_burn_cards = true;
+            should_burn_cards = true;
         }
     }
     
+    return should_burn_cards;
+    
+#if 0    
     if(game_state->should_burn_cards)
     {
         // NOTE(fakhri): we don't burn the cards right away, we rather wait a 
         // little bit and then burn them.
         game_state->time_to_burn_cards = Seconds(1.f);
-        DisplayMessageForDuration(game_state, Str8Lit("Burning Extra cards"), Seconds(2));
+        GameEvent_PushDisplayMessageEvent(os->permanent_arena, &game_state->event_buffer, Str8Lit("Burning Extra cards"), Seconds(2));
     }
+#endif
+    
 }
+#endif
 
 internal v2
 FindFirstPositionInResidencyRow(Game_State *game_state, Card_Residency residency_type, u32 entity_count)
@@ -118,12 +121,12 @@ FindFirstPositionInResidencyRow(Game_State *game_state, Card_Residency residency
     {
         case Card_Residency_Up:
         {
-            result.x = -0.5f * (entity_count * CARD_WIDTH + (entity_count - 1) * CARD_HORIZONTAL_GAP);
+            result.x = -0.5f * (entity_count - 1) * (CARD_WIDTH + CARD_HORIZONTAL_GAP);
             result.y = start_point.y;
         } break;
         case Card_Residency_Down:
         {
-            result.x = -0.5f * (entity_count * CARD_WIDTH + (entity_count - 1) * CARD_HORIZONTAL_GAP);
+            result.x = -0.5f * (entity_count - 1) * (CARD_WIDTH + CARD_HORIZONTAL_GAP);
             result.y = -start_point.y;
         } break;
         case Card_Residency_Left:
@@ -138,7 +141,6 @@ FindFirstPositionInResidencyRow(Game_State *game_state, Card_Residency residency
         } break;
         case Card_Residency_Table:
         {
-            // TODO(fakhri): think about how we will position the cards in this residency
             result = Vec2(-CentiMeter(5), 0);
         } break;
         
@@ -234,11 +236,10 @@ ReorganizeResidencyCards(Game_State *game_state, Card_Residency residency_type)
                 }
                 residency_pos.z += MiliMeter(20);
             }
-            
         }
+        residency->needs_reorganizing = false;
     }
 }
-
 
 internal void
 ChangeResidency(Game_State *game_state, u32 entity_index, Card_Residency residency)
@@ -250,36 +251,33 @@ ChangeResidency(Game_State *game_state, u32 entity_index, Card_Residency residen
         if (old_residency != Card_Residency_None)
         {
             // NOTE(fakhri): remove the entity from the old residency
-            Residency *entity_residency = game_state->residencies + old_residency;
+            Residency *old_entity_residency = game_state->residencies + old_residency;
             for (u32 residency_index = 0;
-                 residency_index < entity_residency->entity_count;
+                 residency_index < old_entity_residency->entity_count;
                  ++residency_index)
             {
-                if (entity_residency->entity_indices[residency_index] == entity_index)
+                if (old_entity_residency->entity_indices[residency_index] == entity_index)
                 {
-                    for (; residency_index < entity_residency->entity_count; ++residency_index)
+                    old_entity_residency->needs_reorganizing = true;
+                    for (; residency_index + 1 < old_entity_residency->entity_count; ++residency_index)
                     {
-                        entity_residency->entity_indices[residency_index] = entity_residency->entity_indices[residency_index + 1];
+                        old_entity_residency->entity_indices[residency_index] = old_entity_residency->entity_indices[residency_index + 1];
                     }
-                    --entity_residency->entity_count;
+                    --old_entity_residency->entity_count;
                     break;
                 }
             }
+            // NOTE(fakhri): make sure that we found the entity in the old residency
+            Assert(old_entity_residency->needs_reorganizing);
         }
         
         // NOTE(fakhri): add entity to the new residency
         Residency *entity_residency = game_state->residencies + residency;
         Assert(entity_residency->entity_count < ArrayCount(entity_residency->entity_indices));
-        entity_residency->entity_indices[entity_residency->entity_count++] = entity_index;
+        entity_residency->entity_indices[entity_residency->entity_count] = entity_index;
+        ++entity_residency->entity_count;
         entity->residency = residency;
-        
-        ReorganizeResidencyCards(game_state, old_residency);
-        ReorganizeResidencyCards(game_state, residency);
-        
-        if (entity_residency->controlling_player_id != InvalidePlayerID)
-        {
-            BurnExtraCardEntities(game_state, residency);
-        }
+        entity_residency->needs_reorganizing = true;
     }
 }
 
@@ -760,7 +758,7 @@ AddDebugEntites(Game_State *game_state)
     AddCursorEntity(game_state);
     
     game_state->game_mode = Game_Mode_GAME;
-    SetFlag(game_state->game_session.flags, SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK);
+    SetFlag(game_state->game_session.flags, SessionFlag_ReceivedCards);
     
 #if TEST_ONE_CARD
     AddCardEntity(game_state, MakeCardType(Category_Hearts, Card_Number_Jack), Card_Residency_Down);
@@ -777,65 +775,60 @@ AddDebugEntites(Game_State *game_state)
     }
     
     for (u32 card_index = 0;
-         card_index < 13;
+         card_index < 1;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Up);
+        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Down);
     }
     
     for (u32 card_index = 0;
          card_index < 1;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Up);
+        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Left);
     }
     
-#if 1    
+    for (u32 card_index = 0;
+         card_index < 1;
+         ++card_index)
+    {
+        AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Right);
+    }
+    
+    for (u32 card_index = 0;
+         card_index < 1;
+         ++card_index)
+    {
+        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Up);
+    }
+    
+    // NOTE(fakhri): remaining
+    for (u32 card_index = 1;
+         card_index < 13;
+         ++card_index)
+    {
+        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Down);
+    }
+    
     for (u32 card_index = 1;
          card_index < 13;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
     }
-#endif
     
-    for (u32 card_index = 0;
-         card_index < 1;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Left);
-    }
-    
-#if 1    
     for (u32 card_index = 1;
          card_index < 13;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Down);
     }
-#endif
     
-    for (u32 card_index = 0;
-         card_index < 1;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Right);
-    }
-    
-#if 1    
     for (u32 card_index = 1;
          card_index < 13;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Down);
-    }
-#endif
-    
-    for (u32 card_index = 0;
-         card_index < 13;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Down);
     }
     
     Residency *burnt_residency = game_state->residencies + Card_Residency_Burnt;

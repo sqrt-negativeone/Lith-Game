@@ -104,9 +104,8 @@ HandleAvailableMessages(Game_State *game_state, Game_Session *game_session)
                         b32 is_flipped = (player_index != game_session->my_player_id);
                         AddCardEntity(game_state, card_type, player->assigned_residency, is_flipped);
                     }
-                    
                 }
-                SetFlag(game_session->flags, SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK);
+                SetFlag(game_session->flags, SessionFlag_ReceivedCards);
             } break;
             case MessageType_From_Host_Change_Player_Turn:
             {
@@ -142,7 +141,7 @@ internal void
 StartGame(Game_State *game_state, Game_Session *game_session)
 {
     game_state->game_mode = Game_Mode_GAME;
-    SetFlag(game_session->flags, SESSION_FLAG_HOST_SPLITTING_DECK);
+    SetFlag(game_session->flags, SessionFlag_WaitingForCards);
     glDepthFunc(GL_LESS);
 }
 
@@ -152,22 +151,22 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
     
     // TODO(fakhri): we need to have a concept of stuff taking sometime to happen
     // and not just instantaneous
-    // TODO(fakhri): how should we display the message?
     Game_Session *game_session = &game_state->game_session;
     v4 white = Vec4(1, 1, 1,1);
     v4 red = Vec4(1, 0, 0, 1);
     
     // TODO(fakhri): render a background
-    if(HasFlag(game_session->flags, SESSION_FLAG_HOST_SPLITTING_DECK))
+    
+    if(HasFlag(game_session->flags, SessionFlag_WaitingForCards))
     {
         // NOTE(fakhri): we wait
         ChangeActiveFont(&game_state->render_context, FontKind_Arial);
         
-        Render_PushText(&game_state->render_context, Str8Lit("host splitting the deck"), Vec3(0, 0, 60), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
+        Render_PushText(&game_state->render_context, Str8Lit("waiting for cards from server"), Vec3(0, 0, 60), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
         
-        if(HasFlag(game_session->flags, SESSION_FLAG_HOST_FINISHED_SPLITTING_DECK))
+        if(HasFlag(game_session->flags, SessionFlag_ReceivedCards))
         {
-            RemoveFlag(game_session->flags, SESSION_FLAG_HOST_SPLITTING_DECK);
+            RemoveFlag(game_session->flags, SessionFlag_WaitingForCards);
         }
     }
     else
@@ -221,34 +220,63 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
             }
         }
         
-        if (game_state->should_burn_cards)
+        // NOTE(fakhri): see if any residency needs reorganization
         {
-            game_state->time_to_burn_cards -= dt;
-            if(game_state->time_to_burn_cards <= 0)
+            b32 should_burn_cards = false;
+            for (u32 residency_index = 0;
+                 residency_index < Card_Residency_Count;
+                 ++residency_index)
             {
-                game_state->should_burn_cards = false;
-                
-                // NOTE(fakhri): burn the marked cards
-                Assert(Card_Residency_Down - Card_Residency_Left + 1  == MAX_PLAYER_COUNT);
-                for(u32 residency_index = Card_Residency_Left;
-                    residency_index <= Card_Residency_Down;
-                    ++residency_index)
+                Residency *residency = game_state->residencies + residency_index;
+                if (residency->needs_reorganizing)
                 {
-                    Residency *residency = game_state->residencies + residency_index;
-                    for(u32 index_in_residency = 0;
-                        index_in_residency < residency->entity_count;
-                        ++index_in_residency)
+                    ReorganizeResidencyCards(game_state, (Card_Residency)residency_index);
+                    if (residency->burnable)
                     {
-                        u32 entity_index = residency->entity_indices[index_in_residency];
-                        Entity *entity = game_state->entities + entity_index;
-                        if(entity->marked_for_burning)
+                        if (residency_index == Card_Residency_Down)
                         {
-                            ChangeResidency(game_state, entity_index, Card_Residency_Burnt);
+                            int break_here = 1;
+                        }
+                        // TODO(fakhri): card_number_frequencies can be a field in the Residency
+                        // this way we don't have to recompute it each time we call this function
+                        // but then the complexity of maintaining this frequency table
+                        // will leak to change residency for example
+                        // NOTE(fakhri): count the frequency of each card number in the residency
+                        u32 card_number_freq[Card_Number_Count] = {};
+                        for(u32 entity_index_in_residency = 0;
+                            entity_index_in_residency< residency->entity_count;
+                            ++entity_index_in_residency)
+                        {
+                            u32 entity_index = residency->entity_indices[entity_index_in_residency];
+                            Entity *card_entity = game_state->entities + entity_index;
+                            ++card_number_freq[card_entity->card_type.number];
+                        }
+                        
+                        // NOTE(fakhri): mark the cards to be removed
+                        for(u32 entity_index_in_residency = 0;
+                            entity_index_in_residency< residency->entity_count;
+                            ++entity_index_in_residency)
+                        {
+                            u32 entity_index = residency->entity_indices[entity_index_in_residency];
+                            Entity *card_entity = game_state->entities + entity_index;
+                            if(card_number_freq[card_entity->card_type.number] >= THRESHOLD_FOR_BURNING)
+                            {
+                                card_entity->marked_for_burning = true;
+                                should_burn_cards = true;
+                            }
                         }
                     }
                 }
             }
+            
+            if (should_burn_cards)
+            {
+                GameEvent_PushDelayEvent(os->permanent_arena, &game_state->event_buffer, Seconds(0.5f));
+                GameEvent_PushDisplayMessageEvent(os->permanent_arena, &game_state->event_buffer, Str8Lit("Burning Cards With Too Much Duplicates"), Seconds(2.0f));
+                GameEvent_PushBurnCardsEvent(os->permanent_arena, &game_state->event_buffer);
+            }
         }
+        
     }
     
     // @DebugOnly
@@ -271,34 +299,21 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
 }
 
 
-#if 0
+
 internal
 void UpdateAndRenderMainMenu(Game_State *game_state, UI_Context *ui_context, Controller *controller)
 {
     Game_Session *game_session = &game_state->game_session;
-    v2 half_screen = 0.5f * game_state->screen;
-    v2 screen = game_state->screen;
     
-    UI_BeginFrame(ui_context);
-    
-    glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
-    ChangeActiveFont(game_state, FontKind_MenuTitle);
-    f32 x = 0.5f * screen.width;
-    f32 y = 0.1f * screen.height;
+    UI_BeginFrame(ui_context, controller, &game_state->render_context);
     
     
     // NOTE(fakhri): Menu Title
-    UI_Label(game_state, Str8Lit("Truth Or Lies?"), x, y);
+    UI_Label(ui_context, Str8Lit("Lith?"), Meter(0), CentiMeter(10), FontKind_MenuTitle, CoordinateType_World);
     
-    y = 0.5f * screen.height;
-    // NOTE(fakhri): Join Game Button
-    ChangeActiveFont(game_state, FontKind_MenuItem);
-    f32 stride = 1.9f * GetFontHeight(game_state->active_font);
     
     // NOTE(fakhri): join session button
-    if (UI_Button(game_state, Str8Lit("Join Game Room"), x, y, Vec2(half_screen.width, 1.1f * GetFontHeight(game_state->active_font))))
+    if (UI_Button(ui_context, Str8Lit("Join Game Room"), MiliMeter(0), MiliMeter(0), FontKind_MenuItem))
     {
 #if 0
         FetchHosts(&game_session->hosts_storage);
@@ -308,7 +323,6 @@ void UpdateAndRenderMainMenu(Game_State *game_state, UI_Context *ui_context, Con
         OpenMenu(game_state, Game_Mode_MENU_USERNAME);
 #endif
     }
-    y += stride;
     
 #if 0    
     // NOTE(fakhri): Host Session button
@@ -322,7 +336,7 @@ void UpdateAndRenderMainMenu(Game_State *game_state, UI_Context *ui_context, Con
 #endif
     
     // NOTE(fakhri): Quit
-    if (UI_Button(game_state, Str8Lit("Quit"), x, y, Vec2(half_screen.width, 1.1f * GetFontHeight(game_state->active_font))))
+    if (UI_Button(ui_context, Str8Lit("Quit"), Meter(0), -CentiMeter(10),FontKind_MenuItem))
     {
         os->quit = 1;
     }
@@ -330,92 +344,28 @@ void UpdateAndRenderMainMenu(Game_State *game_state, UI_Context *ui_context, Con
     UI_EndFrame(ui_context, controller);
 }
 
-void UpdateAndRenderJoinSessionMenu(Game_State *game_state, UI_Context *ui_context, Controller *controller)
-{
-    Game_Session *game_session = &game_state->game_session;
-    
-    UI_BeginFrame(ui_context);
-    v2 half_screen = 0.5f * game_state->screen;
-    v2 screen = game_state->screen;
-    
-    glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
-    ChangeActiveFont(game_state, FontKind_MenuTitle);
-    f32 x = 0.5f * screen.width;
-    f32 y = 0.1f * screen.height;
-    
-    // NOTE(fakhri): Menu Title
-    UI_Label(game_state, Str8Lit("Choose a host game"), x, y);
-    f32 stride = 2.0f * GetFontHeight(game_state->active_font);
-    // TODO(fakhri): draw a list of available hosts here
-    b32 is_still_fetching_hosts = game_session->hosts_storage.is_fetching;
-    if (!is_still_fetching_hosts)
-    {
-        y = 0.3f * screen.height;
-        for (u32 host_index = 0;
-             host_index < game_session->hosts_storage.hosts_count;
-             ++host_index)
-        {
-            Host_Info *host_info = game_session->hosts_storage.hosts + host_index;
-            UI_Label(game_state, Str8C(host_info->hostname),x, y );
-            y += stride;
-        }
-        
-        y = 0.9f * screen.height;
-        
-        if(UI_Button(game_state, Str8Lit("Refresh Hosts List"), x, y, Vec2(half_screen.width, 1.1f * GetFontHeight(game_state->active_font))))
-        {
-            FetchHosts(&game_session->hosts_storage);
-        }
-    }
-    else
-    {
-        y = 0.5f * screen.height;
-        UI_Label(game_state, Str8Lit("Refreshing Available Hosts"), x, y);
-    }
-    
-    UI_EndFrame(ui_context, controller);
-}
-
 void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context, Controller *controller)
 {
-#if 1
+    
     Game_Session *game_session = &game_state->game_session;
-    UI_BeginFrame(ui_context);
     
-    v2 half_screen = 0.5f * game_state->screen;
-    v2 screen = game_state->screen;
-    
-    glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
-    ChangeActiveFont(game_state, FontKind_MenuTitle);
-    f32 x = 0.5f * screen.width;
-    f32 y = 0.1f * screen.height;
+    UI_BeginFrame(ui_context, controller, &game_state->render_context);
     
     // NOTE(fakhri): Menu Title
-    UI_Label(game_state, Str8Lit("Connect to game"), x, y);
+    UI_Label(ui_context, Str8Lit("Connect to game"), Meter(0), CentiMeter(20), FontKind_MenuTitle, CoordinateType_World);
     
-    ChangeActiveFont(game_state, FontKind_MenuItem);
-    y = 0.4f * screen.height;
-    f32 stride = 2.0f * GetFontHeight(game_state->active_font);
     
     // NOTE(fakhri): Username input field
     {
-        String8 label_text = Str8Lit("Your username is?");
-        UI_Label(game_state, label_text, x, y);
-        y += stride;
+        UI_Label(ui_context, Str8Lit("Your username is?"), MiliMeter(0), CentiMeter(5), FontKind_MenuItem);
         
-        v2 input_field_size = {500, 50};
-        UI_InputField(game_state, input_field_size, x, y, &game_state->username_buffer);
-        y += stride;
+        // TODO(fakhri): fix the text not rendering in the right position
+        UI_InputField(ui_context, Vec2(CentiMeter(50), CentiMeter(4)), MiliMeter(0), -CentiMeter(3),  &game_state->username_buffer, FontKind_MenuItem);
     }
     
-    y = 0.7f * screen.height;
     if (!HasFlag(game_session->flags, SESSION_FLAG_TRYING_JOIN_GAME))
     {
-        if (UI_Button(game_state, Str8Lit("Join"), x, y, Vec2(half_screen.width, 1.1f * GetFontHeight(game_state->active_font))))
+        if (UI_Button(ui_context, Str8Lit("Join"), Meter(0), -CentiMeter(20), FontKind_MenuItem))
         {
             String8 username =  game_state->username_buffer.content;
             
@@ -432,8 +382,7 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context,
     }
     else
     {
-        String8 label_text = Str8Lit("joinning the game");
-        UI_Label(game_state, label_text, x, y, true);
+        UI_Label(ui_context, Str8Lit("joinning the game"), Meter(0), -CentiMeter(20), FontKind_MenuItem, true);
         
         if (HasFlag(game_session->flags, SESSION_FLAG_JOINED_GAME))
         {
@@ -449,13 +398,13 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context,
         }
     }
     UI_EndFrame(ui_context, controller);
-#endif
+    
 }
 
+#if 0
 internal
 void UpdateAndRenderWaitingPlayersMenu(Game_State *game_state, UI_Context *ui_context, Controller *controller)
 {
-#if 1
     Game_Session *game_session = &game_state->game_session;
     v2 half_screen = 0.5f * game_state->screen;
     v2 screen = game_state->screen;
@@ -536,9 +485,51 @@ void UpdateAndRenderWaitingPlayersMenu(Game_State *game_state, UI_Context *ui_co
         // NOTE(fakhri): enough players have joined
         StartGame(game_state, game_session);
     }
-    
-#endif
 }
+
+void UpdateAndRenderJoinSessionMenu(Game_State *game_state, UI_Context *ui_context, Controller *controller)
+{
+    Game_Session *game_session = &game_state->game_session;
+    
+    UI_BeginFrame(ui_context, controller, &game_state->render_context);
+    
+    glClearColor(0.1f, 0.1f, 0.1f, 1.f); 
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    // NOTE(fakhri): Menu Title
+    UI_Label(game_state, Str8Lit("Choose a host game"), x, y);
+    f32 stride = 2.0f * GetFontHeight(game_state->active_font);
+    // TODO(fakhri): draw a list of available hosts here
+    b32 is_still_fetching_hosts = game_session->hosts_storage.is_fetching;
+    if (!is_still_fetching_hosts)
+    {
+        y = 0.3f * screen.height;
+        for (u32 host_index = 0;
+             host_index < game_session->hosts_storage.hosts_count;
+             ++host_index)
+        {
+            Host_Info *host_info = game_session->hosts_storage.hosts + host_index;
+            UI_Label(game_state, Str8C(host_info->hostname),x, y );
+            y += stride;
+        }
+        
+        y = 0.9f * screen.height;
+        
+        if(UI_Button(game_state, Str8Lit("Refresh Hosts List"), x, y, Vec2(half_screen.width, 1.1f * GetFontHeight(game_state->active_font))))
+        {
+            FetchHosts(&game_session->hosts_storage);
+        }
+    }
+    else
+    {
+        y = 0.5f * screen.height;
+        UI_Label(game_state, Str8Lit("Refreshing Available Hosts"), x, y);
+    }
+    
+    UI_EndFrame(ui_context, controller);
+}
+
+
 #endif
 
 
@@ -579,7 +570,6 @@ APP_PermanantLoad(PermanentLoad)
     
     InitResidencies(game_state);
     game_state->time_scale_factor = 1.f;
-    game_state->message_to_display = InitBuffer(os->permanent_arena, Kilobytes(1));
     
     // @DebugOnly
 #if 1
@@ -588,48 +578,12 @@ APP_PermanantLoad(PermanentLoad)
         residency_index <= Card_Residency_Down;
         ++residency_index)
     {
-        game_state->residencies[residency_index].controlling_player_id = 0;
+        game_state->residencies[residency_index].controlling_player_id = residency_index - 1;
     }
+    game_state->game_session.current_player_id = Card_Residency_Down - 1;
+    game_state->game_session.my_player_id      = Card_Residency_Down - 1;
     AddDebugEntites(game_state);
 #endif
-}
-
-exported
-APP_HotLoadShader(HotLoadShader)
-{
-    // NOTE(fakhri): compute hash
-    u32 hash_index  = ComputeHashShaderPath(shader_name);
-    hash_index %= ArrayCount(game_state->render_context.shaders_hash.shader_slots);
-    
-    b32 found = false;
-    for (Shader_Hash_Slot *shader_hash_slot = game_state->render_context.shaders_hash.shader_slots[hash_index];
-         shader_hash_slot;
-         shader_hash_slot = shader_hash_slot->next_in_hash)
-    {
-        if (Str8Match(shader_name, shader_hash_slot->shader_name, MatchFlag_CaseInsensitive))
-        {
-            found = true;
-            // NOTE(fakhri): recompile the shader
-            Compile_Shader_Result compile_result = CompileShader(shader_name);
-            Assert(shader_hash_slot->kind < ArrayCount(game_state->render_context.shaders));
-            Shader_Kind shader_kind = shader_hash_slot->kind;
-            if (compile_result.is_valid)
-            {
-                glDeleteProgram(game_state->render_context.shaders[shader_kind].id);
-                game_state->render_context.shaders[shader_kind].id = compile_result.program_id;
-                SetupShader(&game_state->render_context, shader_kind);
-            }
-            else
-            {
-                LogError("Couldn't Recompile Shader %s", shader_name.cstr);
-            }
-        }
-    }
-    
-    if (!found)
-    {
-        Log("Make sure that you added %s to the hashtable, couldn't find it", shader_name.cstr);
-    }
 }
 
 
@@ -654,6 +608,32 @@ APP_UpdateAndRender(UpdateAndRender)
     
     HandleAvailableMessages(game_state, game_session);
     Render_Begin(&game_state->render_context, OS_FrameArena());
+    
+    // NOTE(fakhri): Debug UI
+    {
+        M_Temp scratch = GetScratch(0, 0);
+        
+        // NOTE(fakhri): World coords axix
+        {
+            Render_PushQuad(&game_state->render_context, 
+                            Vec3(0, 0, 0),
+                            Vec2(Meter(2.0f), MiliMeter(1.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
+            
+            Render_PushQuad(&game_state->render_context, 
+                            Vec3(0, 0, 0),
+                            Vec2(MiliMeter(1.0f), Meter(2.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
+        }
+        
+        
+        // NOTE(fakhri): time scale
+        {
+            String8 msg = {};
+            msg = PushStr8F(scratch.arena, "time scale factor: %f", game_state->time_scale_factor);
+            Render_PushText(&game_state->render_context, msg, Vec3(300, 50, CentiMeter(60)), Vec4(0,0,0,1), CoordinateType_World, FontKind_Arial);
+        }
+        
+        ReleaseScratch(scratch);
+    }
     
     // NOTE(fakhri): handle input
     {
@@ -714,36 +694,91 @@ APP_UpdateAndRender(UpdateAndRender)
         {
             UpdateAndRenderGame(game_state, controller, dt);
         } break;
-        
-#if 0        
-        case Game_Mode_MENU_USERNAME:
-        {
-            UpdateAndRenderUserNameMenu(game_state, ui_context, controller);
-        } break;
         case Game_Mode_MENU_MAIN:
         {
             UpdateAndRenderMainMenu(game_state, ui_context, controller);
         } break;
+        
+        case Game_Mode_MENU_USERNAME:
+        {
+            UpdateAndRenderUserNameMenu(game_state, ui_context, controller);
+        } break;
+        
+#if 0        
+        
         case Game_Mode_MENU_WAITING_PLAYERS: 
         {
             UpdateAndRenderWaitingPlayersMenu(game_state, ui_context, controller);
         } break;
+        
         case Game_Mode_MENU_JOIN_GAME:
         {
             UpdateAndRenderJoinSessionMenu(game_state, ui_context, controller); 
         } break;
 #endif
-        
+        default: NotImplemented;
     }
     
-    // NOTE(fakhri): display a message if there is any
+    // TODO(fakhri): do we need a separate buffer frame events? 
+    // ei: events that only last for a frame and thus there isn't
+    // a strong notion of order between them? right now the events 
+    // are handled in a first come first served fashion, so it is 
+    // not possible to hadnle events that needs to be processed this frame
+    // if it was proceeded by events that require more than one frame to execute!!
+    // NOTE(fakhri): handle game events
     {
-        if (game_state->message_duration > 0)
+        for(;;)
         {
-            game_state->message_duration -= dt;
+            Game_Event *game_event = game_state->event_buffer.first;
+            if (!game_event) break;
+            game_event->duration -= dt;
+            switch(game_event->kind )
+            {
+                case GameEventKind_DisplayMessage:
+                {
+                    Render_PushText(&game_state->render_context, game_event->string, Vec3(0, 0, CentiMeter(60)), Vec4(1,1,1,1), CoordinateType_World, FontKind_Arial);
+                } break;
+                case GameEventKind_BurnCards:
+                {
+                    
+                    // NOTE(fakhri): burn the marked cards
+                    Assert(Card_Residency_Down - Card_Residency_Left + 1  == MAX_PLAYER_COUNT);
+                    for(u32 residency_index = Card_Residency_Left;
+                        residency_index <= Card_Residency_Down;
+                        ++residency_index)
+                    {
+                        Residency *residency = game_state->residencies + residency_index;
+                        for(u32 index_in_residency = 0;
+                            index_in_residency < residency->entity_count;
+                            )
+                        {
+                            u32 entity_index = residency->entity_indices[index_in_residency];
+                            Entity *entity = game_state->entities + entity_index;
+                            if(entity->marked_for_burning)
+                            {
+                                entity->marked_for_burning = false;
+                                ChangeResidency(game_state, entity_index, Card_Residency_Burnt);
+                            }
+                            else
+                            {
+                                ++index_in_residency;
+                            }
+                        }
+                    }
+                } break;
+                case GameEventKind_Delay:
+                {
+                    // NOTE(fakhri): do nothing
+                } break;
+                default: NotImplemented;
+            }
             
-            Render_PushText(&game_state->render_context, game_state->message_to_display.content, Vec3(0, 0, CentiMeter(60)), Vec4(1,1,1,1), CoordinateType_World, FontKind_Arial);
+            if (game_event->duration > 0)
+            {
+                break;
+            }
             
+            GameEvent_EatFirtEvent(&game_state->event_buffer);
         }
     }
     
@@ -751,32 +786,6 @@ APP_UpdateAndRender(UpdateAndRender)
     Render_PushQuad(&game_state->render_context, 
                     Vec3(os->mouse_position, 99),
                     Vec2(MiliMeter(5.f), MiliMeter(5.f)), Vec4(1, .3f, .5f, 1.f), CoordinateType_Screen);
-    
-    // NOTE(fakhri): Debug UI
-    {
-        M_Temp scratch = GetScratch(0, 0);
-        
-        // NOTE(fakhri): World coords axix
-        {
-            Render_PushQuad(&game_state->render_context, 
-                            Vec3(0, 0, 0),
-                            Vec2(Meter(2.0f), MiliMeter(1.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
-            
-            Render_PushQuad(&game_state->render_context, 
-                            Vec3(0, 0, 0),
-                            Vec2(MiliMeter(1.0f), Meter(2.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
-        }
-        
-        
-        // NOTE(fakhri): time scale
-        {
-            String8 msg = {};
-            msg = PushStr8F(scratch.arena, "time scale factor: %f", game_state->time_scale_factor);
-            Render_PushText(&game_state->render_context, msg, Vec3(300, 50, CentiMeter(60)), Vec4(0,0,0,1), CoordinateType_World, FontKind_Arial);
-        }
-        
-        ReleaseScratch(scratch);
-    }
     
     Render_End(&game_state->render_context);
     

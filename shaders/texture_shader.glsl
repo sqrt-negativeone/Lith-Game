@@ -19,12 +19,15 @@ in vec2 tex_coord;
 uniform sampler2D tex;
 uniform vec4 src;
 uniform vec4 tilting_color;
+uniform bool is_flipped = false;
 out vec4 frag_color;
 
 void main()
 {
-    frag_color = tilting_color * texture(tex, mix(src.xy, src.zw, tex_coord));
-	//frag_color = texture(texture, tex_coord);
+    vec2 sampled_pos = mix(src.xy, src.zw, tex_coord);
+    sampled_pos.y = is_flipped? 1 - sampled_pos.y: sampled_pos.y;
+    
+    frag_color = tilting_color * texture(tex, sampled_pos);
 }
 
 #endif

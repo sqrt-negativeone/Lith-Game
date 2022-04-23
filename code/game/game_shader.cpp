@@ -234,3 +234,41 @@ LoadShader(Render_Context *render_context, Shader_Kind shader_kind)
     }
     
 }
+
+exported
+APP_HotLoadShader(HotLoadShader)
+{
+    // NOTE(fakhri): compute hash
+    u32 hash_index  = ComputeHashShaderPath(shader_name);
+    hash_index %= ArrayCount(game_state->render_context.shaders_hash.shader_slots);
+    
+    b32 found = false;
+    for (Shader_Hash_Slot *shader_hash_slot = game_state->render_context.shaders_hash.shader_slots[hash_index];
+         shader_hash_slot;
+         shader_hash_slot = shader_hash_slot->next_in_hash)
+    {
+        if (Str8Match(shader_name, shader_hash_slot->shader_name, MatchFlag_CaseInsensitive))
+        {
+            found = true;
+            // NOTE(fakhri): recompile the shader
+            Compile_Shader_Result compile_result = CompileShader(shader_name);
+            Assert(shader_hash_slot->kind < ArrayCount(game_state->render_context.shaders));
+            Shader_Kind shader_kind = shader_hash_slot->kind;
+            if (compile_result.is_valid)
+            {
+                glDeleteProgram(game_state->render_context.shaders[shader_kind].id);
+                game_state->render_context.shaders[shader_kind].id = compile_result.program_id;
+                SetupShader(&game_state->render_context, shader_kind);
+            }
+            else
+            {
+                LogError("Couldn't Recompile Shader %s", shader_name.cstr);
+            }
+        }
+    }
+    
+    if (!found)
+    {
+        Log("Make sure that you added %s to the hashtable, couldn't find it", shader_name.cstr);
+    }
+}

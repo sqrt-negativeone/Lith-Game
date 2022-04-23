@@ -114,6 +114,14 @@ WorldCoordsFromScreenCoords(Render_Context *render_context, v2 screen_coords)
     return result;
 }
 
+internal v2
+SizeFromScreenCoordsToWorldCoords(Render_Context *render_context, v2 size)
+{
+    f32 meter_per_pixel = 1.0f / render_context->pixels_per_meter;
+    v2 result = meter_per_pixel * size;
+    return result;
+}
+
 #define Render_PushRequest(push_buffer, T) ((T *)_Render_PushRequest(push_buffer, sizeof(T)))
 
 internal void *
