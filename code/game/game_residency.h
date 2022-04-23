@@ -16,17 +16,21 @@ enum Card_Residency
     Card_Residency_Count,
 };
 
+enum Residency_Flags
+{
+    ResidencyFlags_Horizontal        = 1 << 0,
+    ResidencyFlags_Stacked           = 1 << 1,
+    ResidencyFlags_NeedsReorganizing = 1 << 2,
+    ResidencyFlags_Burnable          = 1 << 3,
+};
+
 struct Residency
 {
     u32 entity_indices[DECK_CARDS_COUNT];
     u32 entity_count;
     u32 controlling_player_id;
     
-    b32 is_horizonal;
-    b32 is_stacked;
-    
-    b32 needs_reorganizing;
-    b32 burnable;
+    i32 flags;
 };
 
 #endif //GAME_RESIDENCY_H

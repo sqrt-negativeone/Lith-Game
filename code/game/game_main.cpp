@@ -78,7 +78,7 @@ HandleAvailableMessages(Game_State *game_state, Game_Session *game_session)
                         u32 compact_card_index = card_base + card_offset;
                         Card_Type card_type = UnpackCompactCardType(message_result.message.compact_deck[compact_card_index]);
                         b32 is_flipped = (player_index != game_session->my_player_id);
-                        AddCardEntity(game_state, card_type, player->assigned_residency, is_flipped);
+                        AddCardEntity(game_state, card_type, (Card_Residency)player->assigned_residency_index, is_flipped);
                     }
                 }
                 SetFlag(game_session->flags, SessionFlag_ReceivedCards);
@@ -125,8 +125,6 @@ internal void
 UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
 {
     
-    // TODO(fakhri): we need to have a concept of stuff taking sometime to happen
-    // and not just instantaneous
     Game_Session *game_session = &game_state->game_session;
     v4 white = Vec4(1, 1, 1,1);
     v4 red = Vec4(1, 0, 0, 1);
@@ -142,7 +140,7 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
         
         if(HasFlag(game_session->flags, SessionFlag_ReceivedCards))
         {
-            RemoveFlag(game_session->flags, SessionFlag_WaitingForCards);
+            ClearFlag(game_session->flags, SessionFlag_WaitingForCards);
         }
     }
     else
@@ -204,10 +202,10 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
                  ++residency_index)
             {
                 Residency *residency = game_state->residencies + residency_index;
-                if (residency->needs_reorganizing)
+                if (HasFlag(residency->flags, ResidencyFlags_NeedsReorganizing))
                 {
                     ReorganizeResidencyCards(game_state, (Card_Residency)residency_index);
-                    if (residency->burnable)
+                    if (HasFlag(residency->flags, ResidencyFlags_Burnable))
                     {
                         if (residency_index == Card_Residency_Down)
                         {
@@ -245,15 +243,23 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
                 }
             }
             
+            if (game_state->game_session.current_player_id != game_state->game_session.my_player_id)
+            {
+                // TODO(fakhri): AI logic here
+            }
+            
             if (should_burn_cards)
             {
-                GameEvent_PushDelayEvent(os->permanent_arena, &game_state->event_buffer, Seconds(0.5f));
-                GameEvent_PushDisplayMessageEvent(os->permanent_arena, &game_state->event_buffer, Str8Lit("Burning Cards With Too Much Duplicates"), Seconds(2.0f));
-                GameEvent_PushBurnCardsEvent(os->permanent_arena, &game_state->event_buffer);
+                GameEvent_PushEvent_Delay(&game_state->event_buffer, Seconds(0.5f));
+                GameEvent_PushEvent_DisplayMessag(&game_state->event_buffer, Str8Lit("Burning Cards With Too Much Duplicates"),
+                                                  Vec4(1, 1, 1, 1), Vec3(0, 0, 0), CoordinateType_World,  Seconds(2.0f));
+                GameEvent_PushEvent_BurnCards(&game_state->event_buffer);
             }
         }
         
     }
+    
+    
     
     // @DebugOnly
     {
@@ -273,7 +279,6 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
         }
     }
 }
-
 
 
 internal
@@ -364,13 +369,13 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context,
         {
             // NOTE(fakhri): good, we wait for all players to join and then we start the game
             OpenMenu(game_state, Game_Mode_MENU_WAITING_PLAYERS);
-            RemoveFlag(game_session->flags, SESSION_FLAG_TRYING_JOIN_GAME);
+            ClearFlag(game_session->flags, SESSION_FLAG_TRYING_JOIN_GAME);
         }
         
         if (HasFlag(game_session->flags, SESSION_FLAG_FAILED_JOIN_GAME))
         {
             // TODO(fakhri): display an error message
-            RemoveFlag(game_session->flags, SESSION_FLAG_TRYING_JOIN_GAME);
+            ClearFlag(game_session->flags, SESSION_FLAG_TRYING_JOIN_GAME);
         }
     }
     UI_EndFrame(ui_context, controller);
@@ -541,7 +546,7 @@ APP_PermanantLoad(PermanentLoad)
     
     game_state->host_address_buffer = InitBuffer(os->permanent_arena, SERVER_ADDRESS_BUFFER_SIZE);
     game_state->username_buffer = InitBuffer(os->permanent_arena, USERNAME_BUFFER_SIZE);
-    
+    game_state->event_buffer.arena = os->permanent_arena;
     OpenMenu(game_state, Game_Mode_MENU_MAIN);
     
     InitResidencies(game_state);
@@ -550,12 +555,7 @@ APP_PermanantLoad(PermanentLoad)
     // @DebugOnly
 #if 1
     //glDepthFunc(GL_LESS);
-    for(u32 residency_index = Card_Residency_Left;
-        residency_index <= Card_Residency_Down;
-        ++residency_index)
-    {
-        game_state->residencies[residency_index].controlling_player_id = residency_index - 1;
-    }
+    AssignResidencyToPlayers(game_state, &game_state->game_session);
     game_state->game_session.current_player_id = Card_Residency_Down - 1;
     game_state->game_session.my_player_id      = Card_Residency_Down - 1;
     AddDebugEntites(game_state);
@@ -712,11 +712,10 @@ APP_UpdateAndRender(UpdateAndRender)
             {
                 case GameEventKind_DisplayMessage:
                 {
-                    Render_PushText(&game_state->render_context, game_event->string, Vec3(0, 0, CentiMeter(60)), Vec4(1,1,1,1), CoordinateType_World, FontKind_Arial);
+                    Render_PushText(&game_state->render_context, game_event->string, game_event->string_position, game_event->string_color, game_event->coords_type, FontKind_Arial);
                 } break;
                 case GameEventKind_BurnCards:
                 {
-                    
                     // NOTE(fakhri): burn the marked cards
                     Assert(Card_Residency_Down - Card_Residency_Left + 1  == MAX_PLAYER_COUNT);
                     for(u32 residency_index = Card_Residency_Left;
@@ -745,6 +744,20 @@ APP_UpdateAndRender(UpdateAndRender)
                 case GameEventKind_Delay:
                 {
                     // NOTE(fakhri): do nothing
+                } break;
+                case GameEventKind_ChangeCurrentPlayer:
+                {
+                    u32 new_player_id = (game_state->game_session.current_player_id + 1) % MAX_PLAYER_COUNT;
+                    
+                    M_Temp scratch = GetScratch(0 ,0);
+                    String8 msg = PushStr8F(scratch.arena, 
+                                            "Player's %d Turn!", new_player_id);
+                    GameEvent_PushEvent_DisplayMessag(&game_state->event_buffer, msg, 
+                                                      Vec4(0, 1, 1, 1), Vec3(0, CentiMeter(10), 0), CoordinateType_World, 
+                                                      Seconds(1));
+                    ReleaseScratch(scratch);
+                    
+                    game_state->game_session.current_player_id = new_player_id;
                 } break;
                 default: NotImplemented;
             }

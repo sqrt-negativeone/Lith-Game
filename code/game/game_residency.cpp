@@ -5,54 +5,42 @@ InitResidencies(Game_State *game_state)
     // NOTE(fakhri): up residency
     {
         Residency *residency = game_state->residencies + Card_Residency_Up;
-        residency->is_horizonal = true;
-        residency->is_stacked   = false;
-        residency->burnable     = true;
+        SetFlag(residency->flags, ResidencyFlags_Horizontal | ResidencyFlags_Burnable);
         residency->controlling_player_id = InvalidePlayerID;
     }
     
     // NOTE(fakhri): down residency
     {
         Residency *residency = game_state->residencies + Card_Residency_Down;
-        residency->is_horizonal = true;
-        residency->is_stacked   = false;
-        residency->burnable     = true;
+        SetFlag(residency->flags, ResidencyFlags_Horizontal | ResidencyFlags_Burnable);
         residency->controlling_player_id = InvalidePlayerID;
     }
     
     // NOTE(fakhri): left residency
     {
         Residency *residency = game_state->residencies + Card_Residency_Left;
-        residency->is_horizonal = false;
-        residency->is_stacked   = false;
-        residency->burnable     = true;
+        SetFlag(residency->flags, ResidencyFlags_Burnable);
         residency->controlling_player_id = InvalidePlayerID;
     }
     
     // NOTE(fakhri): right residency
     {
         Residency *residency = game_state->residencies + Card_Residency_Right;
-        residency->is_horizonal = false;
-        residency->is_stacked   = false;
-        residency->burnable     = true;
+        SetFlag(residency->flags, ResidencyFlags_Burnable);
         residency->controlling_player_id = InvalidePlayerID;
     }
     
     // NOTE(fakhri): table residency
     {
         Residency *residency = game_state->residencies + Card_Residency_Table;
-        residency->is_horizonal = false;
-        residency->is_stacked   = true;
-        residency->burnable     = false;
+        SetFlag(residency->flags, ResidencyFlags_Stacked);
         residency->controlling_player_id = InvalidePlayerID;
     }
     
     // NOTE(fakhri): burnt residency
     {
         Residency *residency = game_state->residencies + Card_Residency_Burnt;
-        residency->is_horizonal = false;
-        residency->is_stacked   = true;
-        residency->burnable     = false;
+        SetFlag(residency->flags, ResidencyFlags_Stacked);
         residency->controlling_player_id = InvalidePlayerID;
     }
     
@@ -139,7 +127,7 @@ ReorganizeResidencyCards(Game_State *game_state, Card_Residency residency_type)
             --remaining_cards;
             
             // NOTE(fakhri): update the residency position for the next card
-            if(residency->is_horizonal)
+            if(HasFlag(residency->flags, ResidencyFlags_Horizontal))
             {
                 if(remaining_cards_per_row)
                 {
@@ -161,7 +149,7 @@ ReorganizeResidencyCards(Game_State *game_state, Card_Residency residency_type)
             else
             {
                 // NOTE(fakhri): veritcal residency
-                if(residency->is_stacked)
+                if(HasFlag(residency->flags, ResidencyFlags_Stacked))
                 {
                     residency_pos.y += MiliMeter(0.24f);
                 }
@@ -184,7 +172,7 @@ ReorganizeResidencyCards(Game_State *game_state, Card_Residency residency_type)
                 residency_pos.z += MiliMeter(20);
             }
         }
-        residency->needs_reorganizing = false;
+        ClearFlag(residency->flags, ResidencyFlags_NeedsReorganizing);
     }
 }
 
@@ -205,7 +193,7 @@ ChangeResidency(Game_State *game_state, u32 entity_index, Card_Residency residen
             {
                 if (old_entity_residency->entity_indices[residency_index] == entity_index)
                 {
-                    old_entity_residency->needs_reorganizing = true;
+                    SetFlag(old_entity_residency->flags, ResidencyFlags_NeedsReorganizing);
                     for (; residency_index + 1 < old_entity_residency->entity_count; ++residency_index)
                     {
                         old_entity_residency->entity_indices[residency_index] = old_entity_residency->entity_indices[residency_index + 1];
@@ -215,7 +203,7 @@ ChangeResidency(Game_State *game_state, u32 entity_index, Card_Residency residen
                 }
             }
             // NOTE(fakhri): make sure that we found the entity in the old residency
-            Assert(old_entity_residency->needs_reorganizing);
+            Assert(HasFlag(old_entity_residency->flags, ResidencyFlags_NeedsReorganizing));
         }
         
         // NOTE(fakhri): add entity to the new residency
@@ -224,6 +212,31 @@ ChangeResidency(Game_State *game_state, u32 entity_index, Card_Residency residen
         entity_residency->entity_indices[entity_residency->entity_count] = entity_index;
         ++entity_residency->entity_count;
         entity->residency = residency;
-        entity_residency->needs_reorganizing = true;
+        SetFlag(entity_residency->flags, ResidencyFlags_NeedsReorganizing);
+    }
+}
+
+
+internal void
+AssignResidencyToPlayers(Game_State *game_state, Game_Session *game_session)
+{
+    u32 residency = Card_Residency_Left;
+    for(u32 player_index = 0;
+        player_index < ArrayCount(game_session->players);
+        ++player_index)
+    {
+        Player *player = game_session->players + player_index;
+        if (player_index == game_session->my_player_id)
+        {
+            player->assigned_residency_index = Card_Residency_Down;
+            game_state->residencies[Card_Residency_Down].controlling_player_id = player_index;
+        }
+        else
+        {
+            Assert(residency != Card_Residency_Down);
+            player->assigned_residency_index = (Card_Residency)residency;
+            game_state->residencies[residency].controlling_player_id = player_index;
+            ++residency;
+        }
     }
 }

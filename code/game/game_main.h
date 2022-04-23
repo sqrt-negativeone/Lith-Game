@@ -69,7 +69,7 @@ struct Player
 {
     b32 joined;
     String8 username;
-    Card_Residency assigned_residency;
+    u32 assigned_residency_index;
 };
 
 
@@ -99,15 +99,14 @@ struct Game_State
     Entity entities[1024];
     u32 entity_count;
     
-    u32 card_pressed_index;
+    u32 card_to_select_index;
+    u32 selected_card_index;
+    
     Residency residencies[Card_Residency_Count];
     
     // NOTE(fakhri): menu stuff
     Buffer host_address_buffer;
     Buffer username_buffer;
-    
-    b32 should_burn_cards;
-    f32 time_to_burn_cards;
     
     f32 time_scale_factor;
 };

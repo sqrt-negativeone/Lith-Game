@@ -1,6 +1,6 @@
 
 internal Game_Event *
-GameEvent_PushEvent(M_Arena *arena, Game_Event_Buffer *event_buffer)
+GameEvent_PushEvent(Game_Event_Buffer *event_buffer)
 {
     Game_Event *game_event = 0;
     if (event_buffer->free_list)
@@ -12,7 +12,7 @@ GameEvent_PushEvent(M_Arena *arena, Game_Event_Buffer *event_buffer)
     
     if (!game_event)
     {
-        game_event = PushStructZero(arena, Game_Event);
+        game_event = PushStructZero(event_buffer->arena, Game_Event);
     }
     
     if (!event_buffer->first)
@@ -22,15 +22,15 @@ GameEvent_PushEvent(M_Arena *arena, Game_Event_Buffer *event_buffer)
     else
     {
         event_buffer->last->next = game_event;
-        event_buffer->last = game_event;
+        event_buffer->last       = game_event;
     }
     return game_event;
 }
 
 internal Game_Event *
-GameEvent_PushDisplayMessageEvent(M_Arena *arena, Game_Event_Buffer *event_buffer, String8 string, f32 duration)
+GameEvent_PushEvent_DisplayMessag(Game_Event_Buffer *event_buffer, String8 string, v4 string_color, v3 string_position, Coordinate_Type coords_type, f32 duration)
 {
-    Game_Event *game_event = GameEvent_PushEvent(arena, event_buffer);
+    Game_Event *game_event = GameEvent_PushEvent(event_buffer);
     Assert(game_event);
     Assert(string.len <= ArrayCount(game_event->buffer));
     
@@ -38,34 +38,46 @@ GameEvent_PushDisplayMessageEvent(M_Arena *arena, Game_Event_Buffer *event_buffe
     MemoryCopy(game_event->string.str, string.str, string.len);
     game_event->string.len = string.len;
     
-    game_event->kind = GameEventKind_DisplayMessage;
-#if 1
-    game_event->duration = duration;
-#endif
+    game_event->string_position = string_position;
+    game_event->kind            = GameEventKind_DisplayMessage;
+    game_event->duration        = duration;
+    game_event->string_color    = string_color;
+    game_event->coords_type     = coords_type;
     
     return game_event;
 }
 
 internal Game_Event *
-GameEvent_PushBurnCardsEvent(M_Arena *arena, Game_Event_Buffer *event_buffer)
+GameEvent_PushEvent_BurnCards(Game_Event_Buffer *event_buffer)
 {
-    Game_Event *game_event = GameEvent_PushEvent(arena, event_buffer);
+    Game_Event *game_event = GameEvent_PushEvent(event_buffer);
     Assert(game_event);
     
-    game_event->kind = GameEventKind_BurnCards;
+    game_event->kind     = GameEventKind_BurnCards;
     game_event->duration = 0;
     
     return game_event;
 }
 
 internal Game_Event *
-GameEvent_PushDelayEvent(M_Arena *arena, Game_Event_Buffer *event_buffer, f32 duration)
+GameEvent_PushEvent_Delay(Game_Event_Buffer *event_buffer, f32 duration)
 {
-    Game_Event *game_event = GameEvent_PushEvent(arena, event_buffer);
+    Game_Event *game_event = GameEvent_PushEvent(event_buffer);
     Assert(game_event);
     
-    game_event->kind = GameEventKind_Delay;
+    game_event->kind     = GameEventKind_Delay;
     game_event->duration = duration;
+    
+    return game_event;
+}
+
+internal Game_Event *
+GameEvent_PushEvent_ChangeCurrentPlayer(Game_Event_Buffer *event_buffer)
+{
+    Game_Event *game_event = GameEvent_PushEvent(event_buffer);
+    Assert(game_event);
+    
+    game_event->kind = GameEventKind_ChangeCurrentPlayer;
     
     return game_event;
 }

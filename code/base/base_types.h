@@ -120,7 +120,7 @@
 
 #define HasFlag(fl,fi) ((fl)&(fi))
 #define SetFlag(fl,fi) ((fl)|=(fi))
-#define RemoveFlag(fl,fi) ((fl)&=~(fi))
+#define ClearFlag(fl,fi) ((fl)&=~(fi))
 #define ToggleFlag(fl,fi) ((fl)^=(fi))
 
 #define Swap(T,a,b) do{ T t__ = a; a = b; b = t__; }while(0)

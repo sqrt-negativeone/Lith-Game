@@ -360,9 +360,66 @@ MoveEntity(Game_State *game_state, Entity *entity, f32 spring_constant, f32 fric
 }
 
 internal void
-UpdateCursorEntity(Game_State *game_state, Entity *entity)
+UpdateCursorEntity(Game_State *game_state, Entity *cursor_entity)
 {
-    entity->center_pos = WorldCoordsFromScreenCoords(&game_state->render_context, os->mouse_position);
+    cursor_entity->center_pos = WorldCoordsFromScreenCoords(&game_state->render_context, os->mouse_position);
+    
+    Player *curent_player = game_state->game_session.players + game_state->game_session.current_player_id;
+    
+    if (game_state->selected_card_index == 0)
+    {
+        
+        for (u32 residency_index = 0;
+             residency_index < Card_Residency_Count;
+             ++residency_index)
+        {
+            
+            Residency *residency = game_state->residencies + residency_index;
+            
+            f32 max_z = -1;
+            u32 selected_card_index = 0;
+            // NOTE(fakhri): find the card entity with the highest z value in residency
+            for (u32 index_in_residency = 0;
+                 index_in_residency < residency->entity_count;
+                 ++index_in_residency)
+            {
+                u32 card_index = residency->entity_indices[index_in_residency];
+                Entity *card_entity = game_state->entities + card_index;
+                
+                if (IsInsideRect(RectCentDim(card_entity->center_pos.xy, card_entity->current_dimension), cursor_entity->center_pos.xy))
+                {
+                    if (!card_entity->is_under_cursor)
+                    {
+                        card_entity->is_under_cursor = true;
+                        card_entity->target_dimension = 1.1f * Vec2(CARD_WIDTH, CARD_HEIGHT);
+                    }
+                    
+                    // NOTE(fakhri): only select the cards in the residency we are controling
+                    if (curent_player->assigned_residency_index == residency_index &&
+                        card_entity->center_pos.z > max_z)
+                    {
+                        selected_card_index = card_index;
+                    }
+                }
+            }
+            
+            if (selected_card_index)
+            {
+                Entity *card_entity = game_state->entities + selected_card_index;
+                if(game_state->controller.left_mouse.pressed)
+                {
+                    // NOTE(fakhri): make sure we are not pressing another card
+                    card_entity->is_pressed = true;
+                    card_entity->entity_index_to_follow = Entity_Type_Cursor_Entity;
+                    card_entity->target_pos.z = 50.f;
+                    
+                    game_state->selected_card_index = selected_card_index;
+                }
+                
+            }
+            
+        }
+    }
 }
 
 internal void
@@ -372,14 +429,8 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index, f32 dt)
     Entity *cursor_entity = game_state->entities + (u32)Entity_Type_Cursor_Entity;
     Assert(cursor_entity->type == Entity_Type_Cursor_Entity);
     
-    // TODO(fakhri): make sure thatonly one card should be able to get selected under cursor
+    // TODO(fakhri): make sure that only one card should be able to get selected under cursor
     b32 should_be_under_cursor = IsInsideRect(RectCentDim(entity->center_pos.xy, entity->current_dimension), cursor_entity->center_pos.xy) ;
-    
-    if (!entity->is_under_cursor && should_be_under_cursor)
-    {
-        entity->is_under_cursor = true;
-        entity->target_dimension = 1.1f * Vec2(CARD_WIDTH, CARD_HEIGHT);
-    }
     
     if (entity->is_under_cursor && !should_be_under_cursor)
     {
@@ -387,30 +438,11 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index, f32 dt)
         entity->target_dimension = Vec2(CARD_WIDTH, CARD_HEIGHT);
     }
     
-    if (entity->is_under_cursor)
-    {
-        if (!entity->is_pressed)
-        {
-            if(game_state->controller.left_mouse.pressed)
-            {
-                // NOTE(fakhri): make sure we are not pressing another card
-                if (game_state->card_pressed_index == 0)
-                {
-                    entity->is_pressed = true;
-                    entity->entity_index_to_follow = Entity_Type_Cursor_Entity;
-                    game_state->card_pressed_index = entity_index;
-                    entity->target_pos.z = 50.f;
-                }
-            }
-        }
-    }
-    
     if (entity->is_pressed)
     {
         b32 can_move_to_table = false;
-        // TODO(fakhri): allow the player to only play his own cards, but allow him to move any card
-        // cuz why not LOL
-        if (IsInsideRect(RectCentDim(Vec2(0, 0), Vec2(CentiMeter(30), CentiMeter(30))), entity->center_pos.xy))
+        Rectangle2D table_region = RectCentDim(Vec2(0, 0), Vec2(CentiMeter(30), CentiMeter(30)));
+        if (IsInsideRect(table_region, entity->center_pos.xy))
         {
             
             Render_PushText(&game_state->render_context, Str8Lit("release your mouse to play the card"), Vec3(0, 0, CentiMeter(60)), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
@@ -423,13 +455,14 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index, f32 dt)
             entity->is_pressed = false;
             entity->target_pos = entity->residency_pos;
             entity->entity_index_to_follow = 0;
-            game_state->card_pressed_index = 0;
+            game_state->selected_card_index = 0;
             entity->target_pos.z =  entity->residency_pos.z;
             
             if (can_move_to_table)
             {
                 entity->target_y_angle = PI32;
                 ChangeResidency(game_state, entity_index, Card_Residency_Table);
+                GameEvent_PushEvent_ChangeCurrentPlayer(&game_state->event_buffer);
             }
         }
         
@@ -488,61 +521,47 @@ AddDebugEntites(Game_State *game_state)
     {
         Player *player = game_state->game_session.players + player_index;
         player->joined = true;
-        player->assigned_residency = (Card_Residency)(player_index + 1);
-        player->username = PushStr8F(os->permanent_arena, "%s", "a");
+        player->assigned_residency_index = (Card_Residency)(player_index + 1);
+        player->username = PushStr8F(os->permanent_arena, "%c", 'a' + player_index);
     }
     
     for (u32 card_index = 0;
-         card_index < 1;
+         card_index < 4;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Down);
+        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Left);
     }
     
-    for (u32 card_index = 0;
-         card_index < 1;
+    for (u32 card_index = 4;
+         card_index < 8;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Left);
+        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Right);
     }
     
-    for (u32 card_index = 0;
-         card_index < 1;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Right);
-    }
-    
-    for (u32 card_index = 0;
-         card_index < 1;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Up);
-    }
-    
-    // NOTE(fakhri): remaining
-    for (u32 card_index = 1;
+    for (u32 card_index = 8;
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Down);
+        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Up);
     }
     
-    for (u32 card_index = 1;
+    
+    for (u32 card_index = 0;
          card_index < 13;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
     }
     
-    for (u32 card_index = 1;
+    for (u32 card_index = 0;
          card_index < 13;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Down);
     }
     
-    for (u32 card_index = 1;
+    for (u32 card_index = 0;
          card_index < 13;
          ++card_index)
     {
