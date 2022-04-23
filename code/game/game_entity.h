@@ -11,19 +11,6 @@ enum Entity_Type
     Entity_Type_Companion,
 };
 
-enum Card_Residency
-{
-    Card_Residency_None,
-    Card_Residency_Left,
-    Card_Residency_Right,
-    Card_Residency_Up,
-    Card_Residency_Down,
-    Card_Residency_Table,
-    Card_Residency_Burnt,
-    
-    Card_Residency_Count,
-};
-
 #define TEST_ONE_CARD 0
 
 

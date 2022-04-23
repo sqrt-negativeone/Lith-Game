@@ -1,4 +1,5 @@
 
+#include "game_residency.cpp"
 #include "game_event.cpp"
 #include "game_texture.cpp"
 #include "game_shader.cpp"

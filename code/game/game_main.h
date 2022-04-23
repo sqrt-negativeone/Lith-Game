@@ -56,19 +56,6 @@ enum Game_Session_Flags
 };
 
 
-struct Residency
-{
-    u32 entity_indices[DECK_CARDS_COUNT];
-    u32 entity_count;
-    u32 controlling_player_id;
-    
-    b32 is_horizonal;
-    b32 is_stacked;
-    
-    b32 needs_reorganizing;
-    b32 burnable;
-};
-
 struct Hosts_Storage
 {
     // TODO(fakhri): how many do we need to display?

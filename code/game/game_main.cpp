@@ -16,30 +16,6 @@
 
 global Thread_Ctx game_tctx;
 
-internal void
-AssignResidencyToPlayers(Game_State *game_state, Game_Session *game_session)
-{
-    u32 residency = Card_Residency_Left;
-    for(u32 player_index = 0;
-        player_index < ArrayCount(game_session->players);
-        ++player_index)
-    {
-        Player *player = game_session->players + player_index;
-        if (player_index == game_session->my_player_id)
-        {
-            player->assigned_residency = Card_Residency_Down;
-            game_state->residencies[Card_Residency_Down].controlling_player_id = player_index;
-        }
-        else
-        {
-            Assert(residency != Card_Residency_Down);
-            player->assigned_residency = (Card_Residency)residency;
-            game_state->residencies[residency].controlling_player_id = player_index;
-            ++residency;
-        }
-    }
-}
-
 internal inline void
 AddPlayer(Game_Session *game_session, MessagePlayer *message_player, u32 player_id)
 {
