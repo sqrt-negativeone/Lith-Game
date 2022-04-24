@@ -60,6 +60,30 @@ GameEvent_PushEvent_BurnCards(Game_Event_Buffer *event_buffer)
 }
 
 internal Game_Event *
+GameEvent_PushEvent_OpenDeclareMenu(Game_Event_Buffer *event_buffer)
+{
+    Game_Event *game_event = GameEvent_PushEvent(event_buffer);
+    Assert(game_event);
+    
+    game_event->kind = GameEventKind_OpenDeclareMenu;
+    
+    return game_event;
+}
+
+internal Game_Event *
+GameEvent_PushEvent_CloseDeclareMenu(Game_Event_Buffer *event_buffer, Card_Number declared_number)
+{
+    Game_Event *game_event = GameEvent_PushEvent(event_buffer);
+    Assert(game_event);
+    
+    game_event->kind = GameEventKind_CloseDeclareMenu;
+    game_event->declared_number = declared_number;
+    
+    
+    return game_event;
+}
+
+internal Game_Event *
 GameEvent_PushEvent_Delay(Game_Event_Buffer *event_buffer, f32 duration)
 {
     Game_Event *game_event = GameEvent_PushEvent(event_buffer);

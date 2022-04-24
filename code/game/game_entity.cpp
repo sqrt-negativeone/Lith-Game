@@ -315,7 +315,7 @@ AddCardEntity(Game_State *game_state, Card_Type card_type, Card_Residency card_r
     card->card_type = card_type;
     card->target_dimension   = Vec2(CARD_WIDTH, CARD_HEIGHT);
     card->current_dimension  = Vec2(CARD_WIDTH, CARD_HEIGHT);
-    ChangeResidency(game_state, card_entity_index, card_residency);
+    AddToResidency(game_state, card_entity_index, card_residency);
     
     card->dy_angle = 4 * PI32;
     
@@ -370,7 +370,7 @@ UpdateCursorEntity(Game_State *game_state, Entity *cursor_entity)
     {
         
         for (u32 residency_index = 0;
-             residency_index < Card_Residency_Count;
+             residency_index < CardResidency_Count;
              ++residency_index)
         {
             
@@ -395,7 +395,9 @@ UpdateCursorEntity(Game_State *game_state, Entity *cursor_entity)
                     }
                     
                     // NOTE(fakhri): only select the cards in the residency we are controling
-                    if (curent_player->assigned_residency_index == residency_index &&
+                    
+                    if (((card_entity->residency == CardResidency_CardSelecting) ||
+                         !HasFlag(game_state->flags, GameStateFlagsGroup_NoSelect)) &&
                         card_entity->center_pos.z > max_z)
                     {
                         selected_card_index = card_index;
@@ -441,13 +443,24 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index, f32 dt)
     if (entity->is_pressed)
     {
         b32 can_move_to_table = false;
+        b32 can_move_to_declare = false;
         Rectangle2D table_region = RectCentDim(Vec2(0, 0), Vec2(CentiMeter(30), CentiMeter(30)));
-        if (IsInsideRect(table_region, entity->center_pos.xy))
+        Rectangle2D declare_region = RectCentDim(Vec2(0, -CentiMeter(10)), 1.2f * Vec2(CARD_WIDTH, CARD_HEIGHT));
+        
+        if ((entity->residency == game_state->players[game_state->current_player_id].assigned_residency_index) && IsInsideRect(table_region, entity->center_pos.xy))
         {
             
             Render_PushText(&game_state->render_context, Str8Lit("release your mouse to play the card"), Vec3(0, 0, CentiMeter(60)), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
             
             can_move_to_table = 1;
+        }
+        
+        if ((entity->residency == CardResidency_CardSelecting) && IsInsideRect(declare_region, entity->center_pos.xy))
+        {
+            
+            Render_PushText(&game_state->render_context, Str8Lit("release your mouse declare the card"), Vec3(0, 0, CentiMeter(60)), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
+            
+            can_move_to_declare = 1;
         }
         
         if (game_state->controller.left_mouse.released)
@@ -461,19 +474,29 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index, f32 dt)
             if (can_move_to_table)
             {
                 entity->target_y_angle = PI32;
-                if (IsResidencyEmpty(game_state, Card_Residency_Table))
+                if (IsResidencyEmpty(game_state, CardResidency_Table))
                 {
                     // NOTE(fakhri): player should declare what is the type of
                     // the card he is playing
-                    
+                    SetFlag(game_state->flags, StateFlag_ShouldOpenDeclaringMenu);
+                    GameEvent_PushEvent_Delay(&game_state->event_buffer, Seconds(0.2f));
+                    GameEvent_PushEvent_OpenDeclareMenu(&game_state->event_buffer);
                 }
                 else
                 {
                     GameEvent_PushEvent_ChangeCurrentPlayer(&game_state->event_buffer);
                 }
-                ChangeResidency(game_state, entity_index, Card_Residency_Table);
-                
+                ChangeResidency(game_state, entity_index, CardResidency_Table);
             }
+            
+            else if (can_move_to_declare)
+            {
+                // TODO(fakhri): should we wait for confirmation?
+                ChangeResidency(game_state, entity_index, CardResidency_CardDeclaring);
+                GameEvent_PushEvent_Delay(&game_state->event_buffer, Seconds(0.2f));
+                GameEvent_PushEvent_CloseDeclareMenu(&game_state->event_buffer, entity->card_type.number);
+            }
+            
         }
         
     }
@@ -518,11 +541,11 @@ AddDebugEntites(Game_State *game_state)
     AddNullEntity(game_state);
     AddCursorEntity(game_state);
     
-    game_state->game_mode = Game_Mode_GAME;
+    game_state->game_mode = GameMode_GAME;
     SetFlag(game_state->flags, StateFlag_ReceivedCards);
     
 #if TEST_ONE_CARD
-    AddCardEntity(game_state, MakeCardType(Category_Hearts, Card_Number_Jack), Card_Residency_Down);
+    AddCardEntity(game_state, MakeCardType(Category_Hearts, Card_Number_Jack), CardResidency_Down);
 #else
     
     for (u32 player_index = 0;
@@ -539,7 +562,7 @@ AddDebugEntites(Game_State *game_state)
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Left);
+        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), CardResidency_Left);
     }
     
     
@@ -547,23 +570,29 @@ AddDebugEntites(Game_State *game_state)
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Right);
+        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), CardResidency_Right);
     }
     
     for (u32 card_index = 0;
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Up);
+        AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), CardResidency_Up);
     }
     
     for (u32 card_index = 0;
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), Card_Residency_Down);
+        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), CardResidency_Down);
     }
     
-    Residency *burnt_residency = game_state->residencies + Card_Residency_Burnt;
+    for (u32 card_index = 0;
+         card_index < 13;
+         ++card_index)
+    {
+        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), CardResidency_None);
+    }
+    
 #endif
 }

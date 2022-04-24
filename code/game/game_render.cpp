@@ -180,7 +180,7 @@ Render_PushImage(Render_Context *render_context, Texture2D texture,
     image_request->src = src;
 }
 
-internal void
+internal f32
 Render_PushText(Render_Context *render_context, String text, v3 pos, v4 color, Coordinate_Type coord_type, Font_Kind font_to_use = FontKind_None)
 {
     Assert(font_to_use < FontKind_Count);
@@ -197,9 +197,9 @@ Render_PushText(Render_Context *render_context, String text, v3 pos, v4 color, C
     
     Font *font = render_context->fonts + font_to_use;
     
+    v2 current_point = pos.xy;
     // NOTE(fakhri): render each character
     {
-        v2 current_point = pos.xy;
         for (u32 ch_index = 0;
              ch_index < text.len;
              ++ch_index)
@@ -218,6 +218,11 @@ Render_PushText(Render_Context *render_context, String text, v3 pos, v4 color, C
             current_point.x += glyph.advance;
         }
     }
+    if (coord_type == CoordinateType_World)
+    {
+        current_point = WorldCoordsFromScreenCoords(render_context, current_point).xy;
+    }
+    return current_point.x;
 }
 
 internal Push_Buffer *

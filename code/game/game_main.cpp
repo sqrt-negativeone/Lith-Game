@@ -107,7 +107,7 @@ FetchHosts(Hosts_Storage *hosts_storage)
 internal inline void
 OpenMenu(Game_State *game_state, Game_Mode menu_mode)
 {
-    Assert(Game_Mode_MENU_BEGIN < menu_mode && menu_mode < Game_Mode_MENU_END);
+    Assert(GameMode_MENU_BEGIN < menu_mode && menu_mode < GameMode_MENU_END);
     game_state->game_mode = menu_mode;
     game_state->ui_context.selected_item = -1;
     glDepthFunc(GL_ALWAYS);
@@ -116,167 +116,9 @@ OpenMenu(Game_State *game_state, Game_Mode menu_mode)
 internal void
 StartGame(Game_State *game_state)
 {
-    game_state->game_mode = Game_Mode_GAME;
+    game_state->game_mode = GameMode_GAME;
     SetFlag(game_state->flags, StateFlag_WaitingForCards);
     glDepthFunc(GL_LESS);
-}
-
-internal void
-UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
-{
-    
-    v4 white = Vec4(1, 1, 1,1);
-    v4 red = Vec4(1, 0, 0, 1);
-    
-    // TODO(fakhri): render a background
-    
-    if(HasFlag(game_state->flags, StateFlag_WaitingForCards))
-    {
-        // NOTE(fakhri): we wait
-        ChangeActiveFont(&game_state->render_context, FontKind_Arial);
-        
-        Render_PushText(&game_state->render_context, Str8Lit("waiting for cards from server"), Vec3(0, 0, 60), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
-        
-        if(HasFlag(game_state->flags, StateFlag_ReceivedCards))
-        {
-            ClearFlag(game_state->flags, StateFlag_WaitingForCards);
-        }
-    }
-    else
-    {
-        // TODO(fakhri): block user control when there are cards that should get burnt
-        // NOTE(fakhri): loop over all the entities and update them
-        for (u32 entity_index = 1;
-             entity_index < game_state->entity_count;
-             ++entity_index)
-        {
-            Entity *entity = game_state->entities + entity_index;
-            switch(entity->type)
-            {
-                case Entity_Type_Cursor_Entity:
-                {
-                    UpdateCursorEntity(game_state, entity);
-                } break;
-                case Entity_Type_Card:
-                {
-                    UpdateCardEntity(game_state, entity_index, dt);
-                    if (entity->is_pressed)
-                    {
-                        Render_PushQuad(&game_state->render_context, 
-                                        Vec3(entity->center_pos.xy, entity->center_pos.z - 0.01f),
-                                        1.05f * entity->current_dimension, red, CoordinateType_World, entity->y_angle);
-                        
-                    }
-                    
-                    Render_PushImage(&game_state->render_context, entity->texture, entity->center_pos, entity->current_dimension, CoordinateType_World,
-                                     entity->y_angle);
-                    
-                    v3 card_back_pos = entity->center_pos;
-                    
-                    Render_PushImage(&game_state->render_context, game_state->frensh_deck.card_back_texture, entity->center_pos, entity->current_dimension, CoordinateType_World, PI32 - entity->y_angle);
-                    
-                } break;
-                case Entity_Type_Companion:
-                {
-                    UpdateCompanionEntity(game_state, entity, dt);
-                    Entity *entity_to_follow = game_state->entities + entity->entity_index_to_follow;
-                    Assert(entity_to_follow);
-                    
-                    Render_PushImage(&game_state->render_context, entity->texture, Vec3(entity->center_pos.xy, entity_to_follow->center_pos.z + 0.01f), entity->current_dimension, CoordinateType_World,
-                                     entity_to_follow->y_angle);
-                    
-                } break;
-                default:
-                {
-                    StopExecution;
-                } break;
-            }
-        }
-        
-        // NOTE(fakhri): see if any residency needs reorganization
-        {
-            b32 should_burn_cards = false;
-            for (u32 residency_index = 0;
-                 residency_index < Card_Residency_Count;
-                 ++residency_index)
-            {
-                Residency *residency = game_state->residencies + residency_index;
-                if (HasFlag(residency->flags, ResidencyFlags_NeedsReorganizing))
-                {
-                    ReorganizeResidencyCards(game_state, (Card_Residency)residency_index);
-                    if (HasFlag(residency->flags, ResidencyFlags_Burnable))
-                    {
-                        if (residency_index == Card_Residency_Down)
-                        {
-                            int break_here = 1;
-                        }
-                        // TODO(fakhri): card_number_frequencies can be a field in the Residency
-                        // this way we don't have to recompute it each time we call this function
-                        // but then the complexity of maintaining this frequency table
-                        // will leak to change residency for example
-                        // NOTE(fakhri): count the frequency of each card number in the residency
-                        u32 card_number_freq[Card_Number_Count] = {};
-                        for(u32 entity_index_in_residency = 0;
-                            entity_index_in_residency< residency->entity_count;
-                            ++entity_index_in_residency)
-                        {
-                            u32 entity_index = residency->entity_indices[entity_index_in_residency];
-                            Entity *card_entity = game_state->entities + entity_index;
-                            ++card_number_freq[card_entity->card_type.number];
-                        }
-                        
-                        // NOTE(fakhri): mark the cards to be removed
-                        for(u32 entity_index_in_residency = 0;
-                            entity_index_in_residency< residency->entity_count;
-                            ++entity_index_in_residency)
-                        {
-                            u32 entity_index = residency->entity_indices[entity_index_in_residency];
-                            Entity *card_entity = game_state->entities + entity_index;
-                            if(card_number_freq[card_entity->card_type.number] >= THRESHOLD_FOR_BURNING)
-                            {
-                                card_entity->marked_for_burning = true;
-                                should_burn_cards = true;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            if (game_state->current_player_id != game_state->my_player_id)
-            {
-                // TODO(fakhri): AI logic here
-            }
-            
-            if (should_burn_cards)
-            {
-                GameEvent_PushEvent_Delay(&game_state->event_buffer, Seconds(0.5f));
-                GameEvent_PushEvent_DisplayMessag(&game_state->event_buffer, Str8Lit("Burning Cards With Too Much Duplicates"),
-                                                  Vec4(1, 1, 1, 1), Vec3(0, 0, 0), CoordinateType_World,  Seconds(2.0f));
-                GameEvent_PushEvent_BurnCards(&game_state->event_buffer);
-            }
-        }
-        
-    }
-    
-    
-    
-    // @DebugOnly
-    {
-        if (controller->right_mouse.pressed)
-        {
-            for (u32 residency_type = Card_Residency_Left;
-                 residency_type <= Card_Residency_Burnt;
-                 ++residency_type)
-            {
-                ReorganizeResidencyCards(game_state, (Card_Residency)residency_type);
-            }
-        }
-        
-        if (controller->confirm.pressed)
-        {
-            AddDebugEntites(game_state);
-        }
-    }
 }
 
 
@@ -295,10 +137,10 @@ void UpdateAndRenderMainMenu(Game_State *game_state, UI_Context *ui_context, Con
     {
 #if 0
         FetchHosts(&game_state->hosts_storage);
-        OpenMenu(game_state, Game_Mode_MENU_JOIN_GAME);
+        OpenMenu(game_state, GameMode_MENU_JOIN_GAME);
 #else
         os->PushNetworkMessage(CreateConnectToServerMessage(Str8Lit("")));
-        OpenMenu(game_state, Game_Mode_MENU_USERNAME);
+        OpenMenu(game_state, GameMode_MENU_USERNAME);
 #endif
     }
     
@@ -306,7 +148,7 @@ void UpdateAndRenderMainMenu(Game_State *game_state, UI_Context *ui_context, Con
     // NOTE(fakhri): Host Session button
     if (UI_Button(game_state, Str8Lit("Create Game Room"), x, y, Vec2(half_screen.width, 1.1f * GetFontHeight(game_state->active_font))))
     {
-        OpenMenu(game_state, Game_Mode_MENU_WAITING_PLAYERS);
+        OpenMenu(game_state, GameMode_MENU_WAITING_PLAYERS);
         os->PushNetworkMessage(CreateStartHostServerMessage());
         SetFlag(game_state->session_state_flags, StateFlag_HostingGame);
     }
@@ -363,7 +205,7 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context,
         if (HasFlag(game_state->flags, StateFlag_JoinedGame))
         {
             // NOTE(fakhri): good, we wait for all players to join and then we start the game
-            OpenMenu(game_state, Game_Mode_MENU_WAITING_PLAYERS);
+            OpenMenu(game_state, GameMode_MENU_WAITING_PLAYERS);
             ClearFlag(game_state->flags, StateFlag_TryingJoinGame);
         }
         
@@ -445,7 +287,7 @@ void UpdateAndRenderWaitingPlayersMenu(Game_State *game_state, UI_Context *ui_co
         b32 cancled_join_game_confirmed = true;
         if (cancled_join_game_confirmed)
         {
-            OpenMenu(game_state, Game_Mode_MENU_MAIN);
+            OpenMenu(game_state, GameMode_MENU_MAIN);
             
             if (HasFlag(game_state->flags, StateFlag_HostingGame))
             {
@@ -542,17 +384,17 @@ APP_PermanantLoad(PermanentLoad)
     game_state->host_address_buffer = InitBuffer(os->permanent_arena, SERVER_ADDRESS_BUFFER_SIZE);
     game_state->username_buffer = InitBuffer(os->permanent_arena, USERNAME_BUFFER_SIZE);
     game_state->event_buffer.arena = os->permanent_arena;
-    OpenMenu(game_state, Game_Mode_MENU_MAIN);
+    OpenMenu(game_state, GameMode_MENU_MAIN);
     
     InitResidencies(game_state);
     game_state->time_scale_factor = 1.f;
-    
+    game_state->declared_number = Card_Number_Count;
     // @DebugOnly
 #if 1
     //glDepthFunc(GL_LESS);
     AssignResidencyToPlayers(game_state);
-    game_state->current_player_id = Card_Residency_Down - 1;
-    game_state->my_player_id      = Card_Residency_Down - 1;
+    game_state->current_player_id = CardResidency_Down - 1;
+    game_state->my_player_id      = CardResidency_Down - 1;
     AddDebugEntites(game_state);
 #endif
 }
@@ -660,28 +502,215 @@ APP_UpdateAndRender(UpdateAndRender)
     
     switch(game_state->game_mode)
     {
-        case Game_Mode_GAME:
+        case GameMode_GAME:
         {
-            UpdateAndRenderGame(game_state, controller, dt);
+            v4 white = Vec4(1, 1, 1,1);
+            v4 red = Vec4(1, 0, 0, 1);
+            
+            // TODO(fakhri): render a background
+            
+            if(HasFlag(game_state->flags, StateFlag_WaitingForCards))
+            {
+                // NOTE(fakhri): we wait
+                ChangeActiveFont(&game_state->render_context, FontKind_Arial);
+                
+                Render_PushText(&game_state->render_context, Str8Lit("waiting for cards from server"), Vec3(0, 0, 60), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
+                
+                if(HasFlag(game_state->flags, StateFlag_ReceivedCards))
+                {
+                    ClearFlag(game_state->flags, StateFlag_WaitingForCards);
+                }
+            }
+            else
+            {
+                // NOTE(fakhri): loop over all the entities and update them
+                for (u32 entity_index = 1;
+                     entity_index < game_state->entity_count;
+                     ++entity_index)
+                {
+                    Entity *entity = game_state->entities + entity_index;
+                    switch(entity->type)
+                    {
+                        case Entity_Type_Cursor_Entity:
+                        {
+                            UpdateCursorEntity(game_state, entity);
+                        } break;
+                        case Entity_Type_Card:
+                        {
+                            if (entity->residency == CardResidency_None)
+                            {
+                                // NOTE(fakhri): ignore
+                                continue;
+                            }
+                            UpdateCardEntity(game_state, entity_index, dt);
+                            if (entity->is_pressed)
+                            {
+                                Render_PushQuad(&game_state->render_context, 
+                                                Vec3(entity->center_pos.xy, entity->center_pos.z - 0.01f),
+                                                1.05f * entity->current_dimension, red, CoordinateType_World, entity->y_angle);
+                            }
+                            
+                            Render_PushImage(&game_state->render_context, entity->texture, entity->center_pos, entity->current_dimension, CoordinateType_World,
+                                             entity->y_angle);
+                            
+                            v3 card_back_pos = entity->center_pos;
+                            
+                            Render_PushImage(&game_state->render_context, game_state->frensh_deck.card_back_texture, entity->center_pos, entity->current_dimension, CoordinateType_World, PI32 - entity->y_angle);
+                            
+                        } break;
+                        case Entity_Type_Companion:
+                        {
+                            Entity *entity_to_follow = game_state->entities + entity->entity_index_to_follow;
+                            Assert(entity_to_follow);
+                            if (entity_to_follow->residency == CardResidency_None)
+                            {
+                                // NOTE(fakhri): ignore
+                                continue;
+                            }
+                            
+                            UpdateCompanionEntity(game_state, entity, dt);
+                            Render_PushImage(&game_state->render_context, entity->texture, Vec3(entity->center_pos.xy, entity_to_follow->center_pos.z + 0.01f), entity->current_dimension, CoordinateType_World,
+                                             entity_to_follow->y_angle);
+                            
+                        } break;
+                        default:
+                        {
+                            StopExecution;
+                        } break;
+                    }
+                }
+                
+                // NOTE(fakhri): see if any residency needs reorganization
+                {
+                    b32 should_burn_cards = false;
+                    for (u32 residency_index = 0;
+                         residency_index < CardResidency_Count;
+                         ++residency_index)
+                    {
+                        Residency *residency = game_state->residencies + residency_index;
+                        if (HasFlag(residency->flags, ResidencyFlags_NeedsReorganizing))
+                        {
+                            ReorganizeResidencyCards(game_state, (Card_Residency)residency_index);
+                            if (HasFlag(residency->flags, ResidencyFlags_Burnable))
+                            {
+                                // TODO(fakhri): card_number_frequencies can be a field in the Residency
+                                // this way we don't have to recompute it each time we call this function
+                                // but then the complexity of maintaining this frequency table
+                                // will leak to change residency for example
+                                // NOTE(fakhri): count the frequency of each card number in the residency
+                                u32 card_number_freq[Card_Number_Count] = {};
+                                for(u32 entity_index_in_residency = 0;
+                                    entity_index_in_residency< residency->entity_count;
+                                    ++entity_index_in_residency)
+                                {
+                                    u32 entity_index = residency->entity_indices[entity_index_in_residency];
+                                    Entity *card_entity = game_state->entities + entity_index;
+                                    ++card_number_freq[card_entity->card_type.number];
+                                }
+                                
+                                // NOTE(fakhri): mark the cards to be removed
+                                for(u32 entity_index_in_residency = 0;
+                                    entity_index_in_residency< residency->entity_count;
+                                    ++entity_index_in_residency)
+                                {
+                                    u32 entity_index = residency->entity_indices[entity_index_in_residency];
+                                    Entity *card_entity = game_state->entities + entity_index;
+                                    if(card_number_freq[card_entity->card_type.number] >= THRESHOLD_FOR_BURNING)
+                                    {
+                                        card_entity->marked_for_burning = true;
+                                        should_burn_cards = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (should_burn_cards)
+                    {
+                        GameEvent_PushEvent_Delay(&game_state->event_buffer, Seconds(0.5f));
+                        GameEvent_PushEvent_DisplayMessag(&game_state->event_buffer, Str8Lit("Burning Cards With Too Much Duplicates"),
+                                                          Vec4(1, 1, 1, 1), Vec3(0, 0, 0), CoordinateType_World,  Seconds(2.0f));
+                        GameEvent_PushEvent_BurnCards(&game_state->event_buffer);
+                        SetFlag(game_state->flags, StateFlag_ShouldBurnCards);
+                    }
+                }
+                
+                // NOTE(fakhri): declaring a card if the table was empty
+                if (HasFlag(game_state->flags, StateFlag_ShouldDeclareCard))
+                {
+                    b32 did_choose_card = false;
+                    
+                    Render_PushQuad(&game_state->render_context, Vec3(0,0,0), Vec2(CentiMeter(80), CentiMeter(50)),Vec4(0.1f, 0.1f, 0.1f, 0.5f), CoordinateType_World);
+                    
+                    Render_PushText(&game_state->render_context, Str8Lit("Select A Card To Declare"),  Vec3(0,CentiMeter(20),0), Vec4(1.0f, 1.0f, 1.0f, 1.0f), CoordinateType_World, FontKind_Arial);
+                    
+                    // TODO(fakhri): think about how to present this
+                    
+                    Render_PushQuad(&game_state->render_context, Vec3(0, -CentiMeter(10), 0), 1.2f * Vec2(CARD_WIDTH, CARD_HEIGHT),Vec4(0.f, 0.f, 0.f, 0.5f), CoordinateType_World);
+                    
+                    if (did_choose_card)
+                    {
+                        ClearFlag(game_state->flags, StateFlag_ShouldDeclareCard);
+                    }
+                }
+                
+                // NOTE(fakhri): display the declared number
+                if (game_state->declared_number < Card_Number_Count)
+                {
+                    // TODO(fakhri): think about how to present this
+                    M_Temp scratch = GetScratch(0 ,0);
+                    String8 msg = PushStr8F(scratch.arena, 
+                                            "Declared Number is: ", game_state->declared_number);
+                    v3 pos = Vec3(-CentiMeter(30), CentiMeter(24), 0);
+                    pos.x = Render_PushText(&game_state->render_context, msg, pos, Vec4(0, 0, 0, 1), CoordinateType_World, FontKind_Arial);
+                    Texture2D texture = game_state->frensh_deck.red_numbers_up[game_state->declared_number];
+                    v2 dim = 0.15f * Vec2(MiliMeter(128.f), MiliMeter(203.f));
+                    pos.x += 0.5f * dim.x;
+                    pos.y += 0.25f * dim.y;
+                    Render_PushImage(&game_state->render_context, texture, pos, dim, CoordinateType_World);
+                    ReleaseScratch(scratch);
+                    
+                }
+                // TODO(fakhri): AI stuff for debug?
+            }
+            
+            
+            // @DebugOnly
+            {
+                if (controller->right_mouse.pressed)
+                {
+                    for (u32 residency_type = CardResidency_Left;
+                         residency_type <= CardResidency_Burnt;
+                         ++residency_type)
+                    {
+                        ReorganizeResidencyCards(game_state, (Card_Residency)residency_type);
+                    }
+                }
+                
+                if (controller->confirm.pressed)
+                {
+                    AddDebugEntites(game_state);
+                }
+            }
         } break;
-        case Game_Mode_MENU_MAIN:
+        case GameMode_MENU_MAIN:
         {
             UpdateAndRenderMainMenu(game_state, ui_context, controller);
         } break;
         
-        case Game_Mode_MENU_USERNAME:
+        case GameMode_MENU_USERNAME:
         {
             UpdateAndRenderUserNameMenu(game_state, ui_context, controller);
         } break;
         
 #if 0        
         
-        case Game_Mode_MENU_WAITING_PLAYERS: 
+        case GameMode_MENU_WAITING_PLAYERS: 
         {
             UpdateAndRenderWaitingPlayersMenu(game_state, ui_context, controller);
         } break;
         
-        case Game_Mode_MENU_JOIN_GAME:
+        case GameMode_MENU_JOIN_GAME:
         {
             UpdateAndRenderJoinSessionMenu(game_state, ui_context, controller); 
         } break;
@@ -711,9 +740,9 @@ APP_UpdateAndRender(UpdateAndRender)
                 case GameEventKind_BurnCards:
                 {
                     // NOTE(fakhri): burn the marked cards
-                    Assert(Card_Residency_Down - Card_Residency_Left + 1  == MAX_PLAYER_COUNT);
-                    for(u32 residency_index = Card_Residency_Left;
-                        residency_index <= Card_Residency_Down;
+                    Assert(CardResidency_Down - CardResidency_Left + 1  == MAX_PLAYER_COUNT);
+                    for(u32 residency_index = CardResidency_Left;
+                        residency_index <= CardResidency_Down;
                         ++residency_index)
                     {
                         Residency *residency = game_state->residencies + residency_index;
@@ -726,7 +755,7 @@ APP_UpdateAndRender(UpdateAndRender)
                             if(entity->marked_for_burning)
                             {
                                 entity->marked_for_burning = false;
-                                ChangeResidency(game_state, entity_index, Card_Residency_Burnt);
+                                ChangeResidency(game_state, entity_index, CardResidency_Burnt);
                             }
                             else
                             {
@@ -734,6 +763,7 @@ APP_UpdateAndRender(UpdateAndRender)
                             }
                         }
                     }
+                    ClearFlag(game_state->flags, StateFlag_ShouldBurnCards);
                 } break;
                 case GameEventKind_Delay:
                 {
@@ -752,6 +782,25 @@ APP_UpdateAndRender(UpdateAndRender)
                     ReleaseScratch(scratch);
                     
                     game_state->current_player_id = new_player_id;
+                } break;
+                case GameEventKind_OpenDeclareMenu:
+                {
+                    ClearFlag(game_state->flags, StateFlag_ShouldOpenDeclaringMenu);
+                    SetFlag(game_state->flags, StateFlag_ShouldDeclareCard);
+                    // NOTE(fakhri): move selection cards out from the none residency
+                    MoveAllFromResidency(game_state, CardResidency_None, CardResidency_CardSelecting);
+                    
+                } break;
+                case GameEventKind_CloseDeclareMenu:
+                {
+                    SetFlag(game_state->flags, StateFlag_ShouldDeclareCard);
+                    // NOTE(fakhri): move selection cards out from the none residency
+                    MoveAllFromResidency(game_state, CardResidency_CardSelecting, CardResidency_None);
+                    
+                    MoveAllFromResidency(game_state, CardResidency_CardDeclaring, CardResidency_None);
+                    GameEvent_PushEvent_ChangeCurrentPlayer(&game_state->event_buffer);
+                    game_state->declared_number = game_event->declared_number;
+                    ClearFlag(game_state->flags, StateFlag_ShouldDeclareCard);
                 } break;
                 default: NotImplemented;
             }

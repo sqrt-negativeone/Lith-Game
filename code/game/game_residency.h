@@ -5,15 +5,17 @@
 
 enum Card_Residency
 {
-    Card_Residency_None,
-    Card_Residency_Left,
-    Card_Residency_Right,
-    Card_Residency_Up,
-    Card_Residency_Down,
-    Card_Residency_Table,
-    Card_Residency_Burnt,
+    CardResidency_None,
+    CardResidency_Left,
+    CardResidency_Right,
+    CardResidency_Up,
+    CardResidency_Down,
+    CardResidency_Table,
+    CardResidency_Burnt,
+    CardResidency_CardSelecting,
+    CardResidency_CardDeclaring,
     
-    Card_Residency_Count,
+    CardResidency_Count,
 };
 
 enum Residency_Flags
@@ -22,8 +24,6 @@ enum Residency_Flags
     ResidencyFlags_Stacked           = 1 << 1,
     ResidencyFlags_NeedsReorganizing = 1 << 2,
     ResidencyFlags_Burnable          = 1 << 3,
-    ResidencyFlags_WrapDown          = 1 << 4,
-    ResidencyFlags_WrapLeft          = 1 << 5,
 };
 
 struct Residency
