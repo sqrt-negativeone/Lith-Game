@@ -17,16 +17,16 @@
 global Thread_Ctx game_tctx;
 
 internal inline void
-AddPlayer(Game_Session *game_session, MessagePlayer *message_player, u32 player_id)
+AddPlayer(Game_State *game_state, MessagePlayer *message_player, u32 player_id)
 {
-    Player *player = game_session->players + player_id;
+    Player *player = game_state->players + player_id;
     player->username = PushStr8F(os->permanent_arena, "%s", message_player->username);
     player->joined = true;
-    ++game_session->players_joined_so_far;
+    ++game_state->players_joined_so_far;
 }
 
 internal void
-HandleAvailableMessages(Game_State *game_state, Game_Session *game_session)
+HandleAvailableMessages(Game_State *game_state)
 {
     for(MessageResult message_result = os->GetNextNetworkMessageIfAvailable();
         message_result.is_available;
@@ -39,7 +39,7 @@ HandleAvailableMessages(Game_State *game_state, Game_Session *game_session)
             {
                 u32 player_id = message_result.message.player_id;
                 MessagePlayer *message_player = message_result.message.players + player_id;
-                AddPlayer(game_session, message_player, player_id);
+                AddPlayer(game_state, message_player, player_id);
             } break;
             case MessageType_From_Host_Connected_Players_List:
             {
@@ -47,29 +47,29 @@ HandleAvailableMessages(Game_State *game_state, Game_Session *game_session)
                 // the host sends a list of all the currently connected players,
                 // and we are garanteed to be the last one on this list,
                 // so we can safely assume that our id is `player_count - 1`
-                game_session->my_player_id = message_result.message.players_count - 1;
+                game_state->my_player_id = message_result.message.players_count - 1;
                 for(u32 player_index = 0;
                     player_index < message_result.message.players_count;
                     ++player_index)
                 {
                     MessagePlayer *message_player = message_result.message.players + player_index;
-                    AddPlayer(game_session, message_player, player_index);
+                    AddPlayer(game_state, message_player, player_index);
                 }
-                SetFlag(game_session->flags, SESSION_FLAG_JOINED_GAME);
+                SetFlag(game_state->flags, StateFlag_JoinedGame);
             } break;
             case MessageType_From_Host_Invalid_Username:
             {
-                SetFlag(game_session->flags, SESSION_FLAG_FAILED_JOIN_GAME);
+                SetFlag(game_state->flags, StateFlag_FailedJoinGame);
             } break;
             case MessageType_From_Host_Shuffled_Deck:
             {
-                AssignResidencyToPlayers(game_state, game_session);
+                AssignResidencyToPlayers(game_state);
                 // NOTE(fakhri): split the deck between players
                 for(u32 player_index = 0;
                     player_index < MAX_PLAYER_COUNT;
                     ++player_index)
                 {
-                    Player *player = game_session->players + player_index;
+                    Player *player = game_state->players + player_index;
                     u32 card_base = player_index * CARDS_PER_PLAYER;
                     for(u32 card_offset = 0;
                         card_offset < CARDS_PER_PLAYER;
@@ -77,11 +77,11 @@ HandleAvailableMessages(Game_State *game_state, Game_Session *game_session)
                     {
                         u32 compact_card_index = card_base + card_offset;
                         Card_Type card_type = UnpackCompactCardType(message_result.message.compact_deck[compact_card_index]);
-                        b32 is_flipped = (player_index != game_session->my_player_id);
+                        b32 is_flipped = (player_index != game_state->my_player_id);
                         AddCardEntity(game_state, card_type, (Card_Residency)player->assigned_residency_index, is_flipped);
                     }
                 }
-                SetFlag(game_session->flags, SessionFlag_ReceivedCards);
+                SetFlag(game_state->flags, StateFlag_ReceivedCards);
             } break;
             case MessageType_From_Host_Change_Player_Turn:
             {
@@ -114,10 +114,10 @@ OpenMenu(Game_State *game_state, Game_Mode menu_mode)
 }
 
 internal void
-StartGame(Game_State *game_state, Game_Session *game_session)
+StartGame(Game_State *game_state)
 {
     game_state->game_mode = Game_Mode_GAME;
-    SetFlag(game_session->flags, SessionFlag_WaitingForCards);
+    SetFlag(game_state->flags, StateFlag_WaitingForCards);
     glDepthFunc(GL_LESS);
 }
 
@@ -125,22 +125,21 @@ internal void
 UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
 {
     
-    Game_Session *game_session = &game_state->game_session;
     v4 white = Vec4(1, 1, 1,1);
     v4 red = Vec4(1, 0, 0, 1);
     
     // TODO(fakhri): render a background
     
-    if(HasFlag(game_session->flags, SessionFlag_WaitingForCards))
+    if(HasFlag(game_state->flags, StateFlag_WaitingForCards))
     {
         // NOTE(fakhri): we wait
         ChangeActiveFont(&game_state->render_context, FontKind_Arial);
         
         Render_PushText(&game_state->render_context, Str8Lit("waiting for cards from server"), Vec3(0, 0, 60), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
         
-        if(HasFlag(game_session->flags, SessionFlag_ReceivedCards))
+        if(HasFlag(game_state->flags, StateFlag_ReceivedCards))
         {
-            ClearFlag(game_session->flags, SessionFlag_WaitingForCards);
+            ClearFlag(game_state->flags, StateFlag_WaitingForCards);
         }
     }
     else
@@ -243,7 +242,7 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
                 }
             }
             
-            if (game_state->game_session.current_player_id != game_state->game_session.my_player_id)
+            if (game_state->current_player_id != game_state->my_player_id)
             {
                 // TODO(fakhri): AI logic here
             }
@@ -284,8 +283,6 @@ UpdateAndRenderGame(Game_State *game_state, Controller *controller, f32 dt)
 internal
 void UpdateAndRenderMainMenu(Game_State *game_state, UI_Context *ui_context, Controller *controller)
 {
-    Game_Session *game_session = &game_state->game_session;
-    
     UI_BeginFrame(ui_context, controller, &game_state->render_context);
     
     
@@ -297,7 +294,7 @@ void UpdateAndRenderMainMenu(Game_State *game_state, UI_Context *ui_context, Con
     if (UI_Button(ui_context, Str8Lit("Join Game Room"), MiliMeter(0), MiliMeter(0), FontKind_MenuItem))
     {
 #if 0
-        FetchHosts(&game_session->hosts_storage);
+        FetchHosts(&game_state->hosts_storage);
         OpenMenu(game_state, Game_Mode_MENU_JOIN_GAME);
 #else
         os->PushNetworkMessage(CreateConnectToServerMessage(Str8Lit("")));
@@ -311,7 +308,7 @@ void UpdateAndRenderMainMenu(Game_State *game_state, UI_Context *ui_context, Con
     {
         OpenMenu(game_state, Game_Mode_MENU_WAITING_PLAYERS);
         os->PushNetworkMessage(CreateStartHostServerMessage());
-        SetFlag(game_session->session_state_flags, SESSION_FLAG_HOSTING_GAME);
+        SetFlag(game_state->session_state_flags, StateFlag_HostingGame);
     }
     y += stride;
 #endif
@@ -328,8 +325,6 @@ void UpdateAndRenderMainMenu(Game_State *game_state, UI_Context *ui_context, Con
 void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context, Controller *controller)
 {
     
-    Game_Session *game_session = &game_state->game_session;
-    
     UI_BeginFrame(ui_context, controller, &game_state->render_context);
     
     // NOTE(fakhri): Menu Title
@@ -344,7 +339,7 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context,
         UI_InputField(ui_context, Vec2(CentiMeter(50), CentiMeter(4)), MiliMeter(0), -CentiMeter(3),  &game_state->username_buffer, FontKind_MenuItem);
     }
     
-    if (!HasFlag(game_session->flags, SESSION_FLAG_TRYING_JOIN_GAME))
+    if (!HasFlag(game_state->flags, StateFlag_TryingJoinGame))
     {
         if (UI_Button(ui_context, Str8Lit("Join"), Meter(0), -CentiMeter(20), FontKind_MenuItem))
         {
@@ -353,7 +348,7 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context,
             if(username.size)
             {
                 os->PushNetworkMessage(CreateUsernameMessage(username));
-                SetFlag(game_session->flags, SESSION_FLAG_TRYING_JOIN_GAME);
+                SetFlag(game_state->flags, StateFlag_TryingJoinGame);
             }
             else
             {
@@ -365,17 +360,17 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context,
     {
         UI_Label(ui_context, Str8Lit("joinning the game"), Meter(0), -CentiMeter(20), FontKind_MenuItem, true);
         
-        if (HasFlag(game_session->flags, SESSION_FLAG_JOINED_GAME))
+        if (HasFlag(game_state->flags, StateFlag_JoinedGame))
         {
             // NOTE(fakhri): good, we wait for all players to join and then we start the game
             OpenMenu(game_state, Game_Mode_MENU_WAITING_PLAYERS);
-            ClearFlag(game_session->flags, SESSION_FLAG_TRYING_JOIN_GAME);
+            ClearFlag(game_state->flags, StateFlag_TryingJoinGame);
         }
         
-        if (HasFlag(game_session->flags, SESSION_FLAG_FAILED_JOIN_GAME))
+        if (HasFlag(game_state->flags, StateFlag_FailedJoinGame))
         {
             // TODO(fakhri): display an error message
-            ClearFlag(game_session->flags, SESSION_FLAG_TRYING_JOIN_GAME);
+            ClearFlag(game_state->flags, StateFlag_TryingJoinGame);
         }
     }
     UI_EndFrame(ui_context, controller);
@@ -386,7 +381,7 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context,
 internal
 void UpdateAndRenderWaitingPlayersMenu(Game_State *game_state, UI_Context *ui_context, Controller *controller)
 {
-    Game_Session *game_session = &game_state->game_session;
+    Game_Session *game_state = &game_state->game_state;
     v2 half_screen = 0.5f * game_state->screen;
     v2 screen = game_state->screen;
     
@@ -416,10 +411,10 @@ void UpdateAndRenderWaitingPlayersMenu(Game_State *game_state, UI_Context *ui_co
     
     // NOTE(fakhri): render the connected players
     for (u32 player_index = 0;
-         player_index < ArrayCount(game_session->players);
+         player_index < ArrayCount(game_state->players);
          ++player_index)
     {
-        Player *player = game_session->players + player_index;
+        Player *player = game_state->players + player_index;
         if(player->joined)
         {
             UI_Label(game_state, player->username, x , y);
@@ -437,7 +432,7 @@ void UpdateAndRenderWaitingPlayersMenu(Game_State *game_state, UI_Context *ui_co
     
     if (UI_Button(game_state, Str8Lit("Cancel"), x, y, Vec2(half_screen.width, 1.1f * GetFontHeight(game_state->active_font))))
     {
-        if (HasFlag(game_session->flags, SESSION_FLAG_HOSTING_GAME))
+        if (HasFlag(game_state->flags, StateFlag_HostingGame))
         {
             // TODO(fakhri): display a warning message
         }
@@ -452,25 +447,25 @@ void UpdateAndRenderWaitingPlayersMenu(Game_State *game_state, UI_Context *ui_co
         {
             OpenMenu(game_state, Game_Mode_MENU_MAIN);
             
-            if (HasFlag(game_session->flags, SESSION_FLAG_HOSTING_GAME))
+            if (HasFlag(game_state->flags, StateFlag_HostingGame))
             {
                 // TODO(fakhri): stop the server
             }
             
-            game_session->players_joined_so_far = 0;
+            game_state->players_joined_so_far = 0;
         }
     }
     
-    if (game_session->players_joined_so_far == MAX_PLAYER_COUNT)
+    if (game_state->players_joined_so_far == MAX_PLAYER_COUNT)
     {
         // NOTE(fakhri): enough players have joined
-        StartGame(game_state, game_session);
+        StartGame(game_state, game_state);
     }
 }
 
 void UpdateAndRenderJoinSessionMenu(Game_State *game_state, UI_Context *ui_context, Controller *controller)
 {
-    Game_Session *game_session = &game_state->game_session;
+    Game_Session *game_state = &game_state->game_state;
     
     UI_BeginFrame(ui_context, controller, &game_state->render_context);
     
@@ -481,15 +476,15 @@ void UpdateAndRenderJoinSessionMenu(Game_State *game_state, UI_Context *ui_conte
     UI_Label(game_state, Str8Lit("Choose a host game"), x, y);
     f32 stride = 2.0f * GetFontHeight(game_state->active_font);
     // TODO(fakhri): draw a list of available hosts here
-    b32 is_still_fetching_hosts = game_session->hosts_storage.is_fetching;
+    b32 is_still_fetching_hosts = game_state->hosts_storage.is_fetching;
     if (!is_still_fetching_hosts)
     {
         y = 0.3f * screen.height;
         for (u32 host_index = 0;
-             host_index < game_session->hosts_storage.hosts_count;
+             host_index < game_state->hosts_storage.hosts_count;
              ++host_index)
         {
-            Host_Info *host_info = game_session->hosts_storage.hosts + host_index;
+            Host_Info *host_info = game_state->hosts_storage.hosts + host_index;
             UI_Label(game_state, Str8C(host_info->hostname),x, y );
             y += stride;
         }
@@ -498,7 +493,7 @@ void UpdateAndRenderJoinSessionMenu(Game_State *game_state, UI_Context *ui_conte
         
         if(UI_Button(game_state, Str8Lit("Refresh Hosts List"), x, y, Vec2(half_screen.width, 1.1f * GetFontHeight(game_state->active_font))))
         {
-            FetchHosts(&game_session->hosts_storage);
+            FetchHosts(&game_state->hosts_storage);
         }
     }
     else
@@ -555,9 +550,9 @@ APP_PermanantLoad(PermanentLoad)
     // @DebugOnly
 #if 1
     //glDepthFunc(GL_LESS);
-    AssignResidencyToPlayers(game_state, &game_state->game_session);
-    game_state->game_session.current_player_id = Card_Residency_Down - 1;
-    game_state->game_session.my_player_id      = Card_Residency_Down - 1;
+    AssignResidencyToPlayers(game_state);
+    game_state->current_player_id = Card_Residency_Down - 1;
+    game_state->my_player_id      = Card_Residency_Down - 1;
     AddDebugEntites(game_state);
 #endif
 }
@@ -577,12 +572,11 @@ APP_UpdateAndRender(UpdateAndRender)
     glClearColor(0.4f, 0.4f, 0.4f, 1.f); 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    Game_Session *game_session = &game_state->game_session;
     UI_Context *ui_context = &game_state->ui_context;
     game_state->controller = {};
     Controller *controller = &game_state->controller;
     
-    HandleAvailableMessages(game_state, game_session);
+    HandleAvailableMessages(game_state);
     Render_Begin(&game_state->render_context, OS_FrameArena());
     
     // NOTE(fakhri): Debug UI
@@ -747,7 +741,7 @@ APP_UpdateAndRender(UpdateAndRender)
                 } break;
                 case GameEventKind_ChangeCurrentPlayer:
                 {
-                    u32 new_player_id = (game_state->game_session.current_player_id + 1) % MAX_PLAYER_COUNT;
+                    u32 new_player_id = (game_state->current_player_id + 1) % MAX_PLAYER_COUNT;
                     
                     M_Temp scratch = GetScratch(0 ,0);
                     String8 msg = PushStr8F(scratch.arena, 
@@ -757,7 +751,7 @@ APP_UpdateAndRender(UpdateAndRender)
                                                       Seconds(1));
                     ReleaseScratch(scratch);
                     
-                    game_state->game_session.current_player_id = new_player_id;
+                    game_state->current_player_id = new_player_id;
                 } break;
                 default: NotImplemented;
             }

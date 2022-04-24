@@ -41,18 +41,18 @@ enum Game_Mode
 };
 
 
-enum Game_Session_Flags
+enum Game_State_Flags
 {
-    SESSION_FLAG_HOSTING_GAME                 = (1 << 0),
-    SESSION_FLAG_SERVER_DOWN                  = (1 << 1),
-    SESSION_FLAG_TRYING_CONNECT_GAME          = (1 << 2),
-    SESSION_FLAG_CONNECTED_TO_GAME            = (1 << 3),
-    SESSION_FLAG_FAILED_CONNECT_GAME          = (1 << 4),
-    SESSION_FLAG_TRYING_JOIN_GAME             = (1 << 5),
-    SESSION_FLAG_FAILED_JOIN_GAME             = (1 << 6),
-    SESSION_FLAG_JOINED_GAME                  = (1 << 7),
-    SessionFlag_WaitingForCards  = (1 << 8),
-    SessionFlag_ReceivedCards    = (1 << 9),
+    StateFlag_HostingGame         = (1 << 0),
+    StateFlag_ServerDown          = (1 << 1),
+    StateFlag_TryingConnectGame   = (1 << 2),
+    StateFlag_ConnectedToGame     = (1 << 3),
+    StateFlag_FailedConnectToGame = (1 << 4),
+    StateFlag_TryingJoinGame      = (1 << 5),
+    StateFlag_FailedJoinGame      = (1 << 6),
+    StateFlag_JoinedGame          = (1 << 7),
+    StateFlag_WaitingForCards     = (1 << 8),
+    StateFlag_ReceivedCards       = (1 << 9),
 };
 
 
@@ -72,42 +72,26 @@ struct Player
     u32 assigned_residency_index;
 };
 
-
-struct Game_Session
-{
-    Player players[MAX_PLAYER_COUNT];
-    u32 players_joined_so_far;
-    // NOTE(fakhri): indicate if we are the ones hosting the game
-    u32 flags;
-    Hosts_Storage hosts_storage;
-    u32 current_player_id;
-    u32 my_player_id;
-};
-
 struct Game_State
 {
-    Game_Event_Buffer event_buffer;
-    Render_Context render_context;
-    
     Game_Mode game_mode;
-    UI_Context ui_context;
-    Game_Session game_session;
-    Controller controller;
-    
+    Render_Context render_context;
     Frensh_Suited_Cards_Texture frensh_deck;
-    
+    UI_Context ui_context;
+    Player players[MAX_PLAYER_COUNT];
+    u32 players_joined_so_far;
+    u32 flags;
+    u32 current_player_id;
+    u32 my_player_id;
+    Controller controller;
+    Game_Event_Buffer event_buffer;
     Entity entities[1024];
     u32 entity_count;
-    
-    u32 card_to_select_index;
     u32 selected_card_index;
-    
     Residency residencies[Card_Residency_Count];
-    
     // NOTE(fakhri): menu stuff
     Buffer host_address_buffer;
     Buffer username_buffer;
-    
     f32 time_scale_factor;
 };
 

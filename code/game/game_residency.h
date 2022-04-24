@@ -22,6 +22,8 @@ enum Residency_Flags
     ResidencyFlags_Stacked           = 1 << 1,
     ResidencyFlags_NeedsReorganizing = 1 << 2,
     ResidencyFlags_Burnable          = 1 << 3,
+    ResidencyFlags_WrapDown          = 1 << 4,
+    ResidencyFlags_WrapLeft          = 1 << 5,
 };
 
 struct Residency

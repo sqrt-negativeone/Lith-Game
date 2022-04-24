@@ -364,7 +364,7 @@ UpdateCursorEntity(Game_State *game_state, Entity *cursor_entity)
 {
     cursor_entity->center_pos = WorldCoordsFromScreenCoords(&game_state->render_context, os->mouse_position);
     
-    Player *curent_player = game_state->game_session.players + game_state->game_session.current_player_id;
+    Player *curent_player = game_state->players + game_state->current_player_id;
     
     if (game_state->selected_card_index == 0)
     {
@@ -461,8 +461,18 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index, f32 dt)
             if (can_move_to_table)
             {
                 entity->target_y_angle = PI32;
+                if (IsResidencyEmpty(game_state, Card_Residency_Table))
+                {
+                    // NOTE(fakhri): player should declare what is the type of
+                    // the card he is playing
+                    
+                }
+                else
+                {
+                    GameEvent_PushEvent_ChangeCurrentPlayer(&game_state->event_buffer);
+                }
                 ChangeResidency(game_state, entity_index, Card_Residency_Table);
-                GameEvent_PushEvent_ChangeCurrentPlayer(&game_state->event_buffer);
+                
             }
         }
         
@@ -509,7 +519,7 @@ AddDebugEntites(Game_State *game_state)
     AddCursorEntity(game_state);
     
     game_state->game_mode = Game_Mode_GAME;
-    SetFlag(game_state->game_session.flags, SessionFlag_ReceivedCards);
+    SetFlag(game_state->flags, StateFlag_ReceivedCards);
     
 #if TEST_ONE_CARD
     AddCardEntity(game_state, MakeCardType(Category_Hearts, Card_Number_Jack), Card_Residency_Down);
@@ -519,46 +529,32 @@ AddDebugEntites(Game_State *game_state)
          player_index < MAX_PLAYER_COUNT;
          ++player_index)
     {
-        Player *player = game_state->game_session.players + player_index;
+        Player *player = game_state->players + player_index;
         player->joined = true;
         player->assigned_residency_index = (Card_Residency)(player_index + 1);
         player->username = PushStr8F(os->permanent_arena, "%c", 'a' + player_index);
     }
     
     for (u32 card_index = 0;
-         card_index < 4;
+         card_index < 13;
          ++card_index)
     {
         AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Left);
     }
     
-    for (u32 card_index = 4;
-         card_index < 8;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Right);
-    }
-    
-    for (u32 card_index = 8;
-         card_index < 13;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), Card_Residency_Up);
-    }
-    
     
     for (u32 card_index = 0;
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Down);
+        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), Card_Residency_Right);
     }
     
     for (u32 card_index = 0;
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Down);
+        AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), Card_Residency_Up);
     }
     
     for (u32 card_index = 0;
