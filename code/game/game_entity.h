@@ -5,10 +5,12 @@
 
 enum Entity_Type
 {
-    Entity_Type_Null_Entity,
-    Entity_Type_Cursor_Entity, // NOTE(fakhri): always following mouse
-    Entity_Type_Card,
-    Entity_Type_Companion,
+    EntityType_Null_Entity,
+    EntityType_Cursor_Entity, // NOTE(fakhri): always following mouse
+    EntityType_Card,
+    EntityType_Companion,
+    EntityType_Button,
+    EntityType_Numbers,
 };
 
 #define TEST_ONE_CARD 0
@@ -24,7 +26,8 @@ enum Entity_Type
 #define CARD_VIRTICAL_ADVANCE (CARD_HEIGHT + CARD_VIRTICAL_GAP)
 #define THRESHOLD_FOR_BURNING Category_Count
 
-enum Card_Category
+typedef u8 Card_Category;
+enum
 {
     Category_Hearts,  // red
     Category_Tiles,   // red
@@ -33,7 +36,8 @@ enum Card_Category
     Category_Count,
 };
 
-enum Card_Number
+typedef u8 Card_Number;
+enum
 {
     Card_Number_Ace,
     Card_Number_2,
@@ -82,6 +86,23 @@ UnpackCompactCardType(Compact_Card_Type compact_card)
     return result;
 }
 
+typedef u32 EntityFlags;
+enum
+{
+    EntityFlag_UnderCursor       = 1 << 0,
+    EntityFlag_Pressed           = 1 << 1,
+    EntityFlag_DontDrawThisFrame = 1 << 2,
+    EntityFlag_Selected          = 1 << 3,
+    EntityFlag_MarkedForBurning  = 1 << 4,
+};
+
+typedef u32 ButtonEntityKind;
+enum
+{
+    ButtonEntityKind_QuestionCredibility,
+    ButtonEntityKind_PlaySelectedCards,
+};
+
 struct Entity
 {
     Entity_Type type;
@@ -93,25 +114,24 @@ struct Entity
     f32 target_y_angle;
     f32 dy_angle;
     
-    v2 current_dimension;
+    v2 curr_dimension;
     v2 target_dimension;
     f32 dDimension;
     
     v2 velocity;
     
     // TODO(fakhri): we can have flags here instead, then each type of entity can have its own flags
-    b32 is_under_cursor;
-    b32 is_pressed;
+    EntityFlags flags;
     
-    u32 entity_index_to_follow;
+    EntityID entity_id_to_follow;
     v2  offset_in_follwed_entity;
     
     Card_Type card_type;
     
-    Card_Residency residency;
+    ResidencyKind residency;
     Texture2D texture;
     
-    b32 marked_for_burning;
+    ButtonEntityKind button_kind;
 };
 
 #endif //GAME_ENTITY_H

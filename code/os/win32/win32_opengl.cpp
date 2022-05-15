@@ -116,7 +116,7 @@ W32_InitOpenGL(HINSTANCE h_instance)
         w32_gl_ctx = wglCreateContextAttribsARB(w32_device_context, 0, context_attribs);
         if(w32_gl_ctx)
         {
-            BOOL make_current_good = wglMakeCurrent(w32_device_context, w32_gl_ctx);
+            BOOL make_curr_good = wglMakeCurrent(w32_device_context, w32_gl_ctx);
             wglSwapIntervalEXT(1);
             
             SetPixelFormat(w32_device_context, w32_pixel_format, &w32_pfd);

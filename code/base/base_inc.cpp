@@ -5,3 +5,4 @@
 #include "base_buffer.cpp"
 #include "perlin.c"
 #include "base_string.cpp"
+#include "base_random.cpp"

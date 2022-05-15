@@ -30,7 +30,7 @@ extern "C" {
     */
     /*
     ** This header is generated from the Khronos OpenGL / OpenGL ES XML
-    ** API Registry. The current version of the Registry, generator scripts
+    ** API Registry. The curr version of the Registry, generator scripts
     ** used to make the header, and the header can be found at
     **   https://github.com/KhronosGroup/OpenGL-Registry
     */
@@ -125,8 +125,8 @@ extern "C" {
 #define WGL_FRAMEBUFFER_SRGB_CAPABLE_ARB  0x20A9
 #endif /* WGL_ARB_framebuffer_sRGB */
     
-#ifndef WGL_ARB_make_current_read
-#define WGL_ARB_make_current_read 1
+#ifndef WGL_ARB_make_curr_read
+#define WGL_ARB_make_curr_read 1
 #define ERROR_INVALID_PIXEL_TYPE_ARB      0x2043
 #define ERROR_INCOMPATIBLE_DEVICE_CONTEXTS_ARB 0x2054
     typedef BOOL (WINAPI * PFNWGLMAKECONTEXTCURRENTARBPROC) (HDC hDrawDC, HDC hReadDC, HGLRC hglrc);
@@ -135,7 +135,7 @@ extern "C" {
     BOOL WINAPI wglMakeContextCurrentARB (HDC hDrawDC, HDC hReadDC, HGLRC hglrc);
     HDC WINAPI wglGetCurrentReadDCARB (void);
 #endif
-#endif /* WGL_ARB_make_current_read */
+#endif /* WGL_ARB_make_curr_read */
     
 #ifndef WGL_ARB_multisample
 #define WGL_ARB_multisample 1
@@ -394,8 +394,8 @@ extern "C" {
 #define WGL_FRAMEBUFFER_SRGB_CAPABLE_EXT  0x20A9
 #endif /* WGL_EXT_framebuffer_sRGB */
     
-#ifndef WGL_EXT_make_current_read
-#define WGL_EXT_make_current_read 1
+#ifndef WGL_EXT_make_curr_read
+#define WGL_EXT_make_curr_read 1
 #define ERROR_INVALID_PIXEL_TYPE_EXT      0x2043
     typedef BOOL (WINAPI * PFNWGLMAKECONTEXTCURRENTEXTPROC) (HDC hDrawDC, HDC hReadDC, HGLRC hglrc);
     typedef HDC (WINAPI * PFNWGLGETCURRENTREADDCEXTPROC) (void);
@@ -403,7 +403,7 @@ extern "C" {
     BOOL WINAPI wglMakeContextCurrentEXT (HDC hDrawDC, HDC hReadDC, HGLRC hglrc);
     HDC WINAPI wglGetCurrentReadDCEXT (void);
 #endif
-#endif /* WGL_EXT_make_current_read */
+#endif /* WGL_EXT_make_curr_read */
     
 #ifndef WGL_EXT_multisample
 #define WGL_EXT_multisample 1

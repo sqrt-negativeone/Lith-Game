@@ -4,7 +4,7 @@ UI_ChangeSelectedItem(UI_Context *ui_context, i32 delta)
 {
     Assert(ui_context);
     ui_context->last_select_time = os->time.game_time;
-    ui_context->selected_item = (ui_context->selected_item + delta + ui_context->items_count) % ui_context->items_count;
+    ui_context->pressed_item = (ui_context->pressed_item + delta + ui_context->items_count) % ui_context->items_count;
 }
 
 internal void
@@ -99,10 +99,10 @@ UI_Button(UI_Context *ui_context, String8 item_text, f32 x, f32 y, Font_Kind fon
     if (IsInsideRect(RectCentDim(item_pos, hitbox), WorldCoordsFromScreenCoords(ui_context->render_context, os->mouse_position).xy))
     {
         ui_context->last_select_time = os->time.game_time;
-        ui_context->selected_item = ui_context->items_count;
+        ui_context->pressed_item = ui_context->items_count;
     }
     
-    b32 is_selected = (ui_context->selected_item == ui_context->items_count);
+    b32 is_selected = (ui_context->pressed_item == ui_context->items_count);
     
     if (is_selected)
     {
@@ -185,10 +185,10 @@ UI_InputField(UI_Context *ui_context, v2 item_size, f32 x, f32 y, Buffer *input_
     
     if (IsInsideRect(RectCentDim(item_pos, item_size), WorldCoordsFromScreenCoords(ui_context->render_context, os->mouse_position).xy))
     {
-        ui_context->selected_item = ui_context->items_count;
+        ui_context->pressed_item = ui_context->items_count;
     }
     
-    b32 is_selected = (ui_context->selected_item == ui_context->items_count);
+    b32 is_selected = (ui_context->pressed_item == ui_context->items_count);
     if (is_selected)
     {
         HandleInputFieldKeyboardInput(input_buffer);

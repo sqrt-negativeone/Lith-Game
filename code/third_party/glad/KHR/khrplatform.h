@@ -100,8 +100,8 @@
  * This precedes the return type of the function in the function prototype.
  */
 #if defined(KHRONOS_STATIC)
-    /* If the preprocessor constant KHRONOS_STATIC is defined, make the
-     * header compatible with static linking. */
+/* If the preprocessor constant KHRONOS_STATIC is defined, make the
+ * header compatible with static linking. */
 #   define KHRONOS_APICALL
 #elif defined(_WIN32)
 #   define KHRONOS_APICALL __declspec(dllimport)
@@ -120,7 +120,7 @@
  * name in the function prototype.
  */
 #if defined(_WIN32) && !defined(_WIN32_WCE) && !defined(__SCITECH_SNAP__)
-    /* Win32 but not WinCE */
+/* Win32 but not WinCE */
 #   define KHRONOS_APIENTRY __stdcall
 #else
 #   define KHRONOS_APIENTRY
@@ -233,7 +233,7 @@ typedef unsigned short int     khronos_uint16_t;
 /*
  * Types that differ between LLP64 and LP64 architectures - in LLP64,
  * pointers are 64 bits, but 'long' is still 32 bits. Win64 appears
- * to be the only LLP64 architecture in current use.
+ * to be the only LLP64 architecture in curr use.
  */
 #ifdef _WIN64
 typedef signed   long long int khronos_intptr_t;

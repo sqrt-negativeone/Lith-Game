@@ -6,6 +6,7 @@
 #undef far
 
 
+#include "game_ids.h"
 #include "game_residency.h"
 #include "game_texture.h"
 #include "game_font.h"
@@ -13,6 +14,6 @@
 #include "game_render.h"
 #include "game_ui.h"
 #include "game_entity.h"
-#include "game_event.h"
+#include "game_command.h"
 
 #include "game_main.h"

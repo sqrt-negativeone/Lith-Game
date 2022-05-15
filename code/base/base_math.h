@@ -2717,13 +2717,13 @@ Rotate(f32 Angle, vec3f32 Axis)
 
 
 internal inline mat4f32 
-Scale(vec3f32 Scale)
+Scale(vec3f32 scale)
 {
     mat4f32 Result = Mat4d(1.0f);
     
-    Result.Elements[0][0] = Scale.X;
-    Result.Elements[1][1] = Scale.Y;
-    Result.Elements[2][2] = Scale.Z;
+    Result.Elements[0][0] = scale.X;
+    Result.Elements[1][1] = scale.Y;
+    Result.Elements[2][2] = scale.Z;
     
     return (Result);
 }

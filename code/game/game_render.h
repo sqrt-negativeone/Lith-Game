@@ -46,6 +46,7 @@ enum Render_Kind
     RenderKind_None,
     RenderKind_Quad,
     RenderKind_Image,
+    RenderKind_Clear,
     
     RenderKind_Count,
 };
@@ -59,28 +60,35 @@ enum Coordinate_Type
     CoordinateType_Count,
 };
 
-struct Render_Request_Header
+struct RenderRequest_Header
 {
     Render_Kind kind;
-    v3 screen_coords;
 };
 
-struct Render_Quad_Request
+struct RenderRequest_Quad
 {
-    Render_Request_Header header;
+    RenderRequest_Header header;
+    v3 screen_coords;
     v4 color;
     v2 size;
     f32 y_angle;
 };
 
-struct Render_Image_Request
+struct RenderRequest_Image
 {
-    Render_Request_Header header;
+    RenderRequest_Header header;
+    v3 screen_coords;
     Texture2D texture;
     v2 size;
     f32 y_angle;
     v4 color;
     v4 src;
+};
+
+struct RenderRequest_Clear
+{
+    RenderRequest_Header header;
+    v4 color;
 };
 
 struct Push_Buffer
@@ -102,6 +110,7 @@ struct Render_Context
     
     Push_Buffer *push_buffer;
     
+    f32 mouse_influence;
     v2 screen;
     v2 camera_position;
     f32 pixels_per_meter;

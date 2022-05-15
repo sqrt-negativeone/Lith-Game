@@ -40,8 +40,8 @@ enum Game_Mode
     
 };
 
-
-enum Game_State_Flags
+typedef u32 GameStateFlags;
+enum
 {
     StateFlag_HostingGame             = (1 << 0),
     StateFlag_ServerDown              = (1 << 1),
@@ -56,11 +56,13 @@ enum Game_State_Flags
     StateFlag_ShouldOpenDeclaringMenu = (1 << 10),
     StateFlag_ShouldBurnCards         = (1 << 11),
     StateFlag_ShouldDeclareCard       = (1 << 12),
+    StateFlag_PlaySelectedCards       = (1 << 13),
 };
 
 enum GameStateFlagsGroup
 {
     GameStateFlagsGroup_NoSelect = StateFlag_ShouldDeclareCard | StateFlag_ShouldBurnCards | StateFlag_ShouldOpenDeclaringMenu,
+    GameStateFlagsGroup_ValidOnlyForOneFrame = StateFlag_PlaySelectedCards,
 };
 
 struct Hosts_Storage
@@ -76,31 +78,33 @@ struct Player
 {
     b32 joined;
     String8 username;
-    i32 assigned_residency_index;
+    ResidencyKind assigned_residency_index;
 };
 
 struct Game_State
 {
     Game_Mode game_mode;
-    u32 flags;
+    GameStateFlags flags;
     Render_Context render_context;
     Frensh_Suited_Cards_Texture frensh_deck;
     UI_Context ui_context;
     Player players[MAX_PLAYER_COUNT];
     u32 players_joined_so_far;
-    u32 current_player_id;
-    u32 my_player_id;
+    PlayerID prev_player_id;
+    PlayerID curr_player_id;
+    PlayerID my_player_id;
     Controller controller;
-    Game_Event_Buffer event_buffer;
+    Game_Command_Buffer command_buffer;
     Entity entities[1024];
     u32 entity_count;
-    u32 selected_card_index;
-    Residency residencies[CardResidency_Count];
+    Residency residencies[ResidencyKind_Count];
     // NOTE(fakhri): menu stuff
     Buffer host_address_buffer;
     Buffer username_buffer;
     f32 time_scale_factor;
-    Card_Number declared_number;
+    EntityID highest_card_under_cursor;
+    u32 selection_limit;
+    u32 selection_count;
 };
 
 #endif //GAME_MAIN_H

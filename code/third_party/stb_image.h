@@ -244,7 +244,7 @@ RECENT REVISION HISTORY:
 //
 // I/O callbacks allow you to read from arbitrary sources, like packaged
 // files or some other source. Data read from callbacks are processed
-// through a small internal buffer (currently 128 bytes) to try to reduce
+// through a small internal buffer (currly 128 bytes) to try to reduce
 // overhead.
 //
 // The three functions you must define are "read" (reads some bytes of data),
@@ -258,7 +258,7 @@ RECENT REVISION HISTORY:
 // supported by the compiler. For ARM Neon support, you must explicitly
 // request it.
 //
-// (The old do-it-yourself SIMD API is no longer supported in the current
+// (The old do-it-yourself SIMD API is no longer supported in the curr
 // code.)
 //
 // On x86, SSE2 will automatically be used when available based on a run-time
@@ -275,7 +275,7 @@ RECENT REVISION HISTORY:
 //
 // HDR image support   (disable by defining STBI_NO_HDR)
 //
-// stb_image supports loading HDR images in general, and currently the Radiance
+// stb_image supports loading HDR images in general, and currly the Radiance
 // .HDR file format specifically. You can still load any file through the existing
 // interface; if you attempt to load an HDR file, it will be automatically remapped
 // to LDR, assuming gamma 2.2 and an arbitrary scale factor defaulting to 1;
@@ -317,7 +317,7 @@ RECENT REVISION HISTORY:
 //
 // Call stbi_set_unpremultiply_on_load(1) as well to force a divide per
 // pixel to remove any premultiplied alpha *only* if the image file explicitly
-// says there's premultiplied data (currently only happens in iPhone images,
+// says there's premultiplied data (currly only happens in iPhone images,
 // and only if iPhone convert-to-rgb processing is on).
 //
 // ===========================================================================
@@ -695,7 +695,7 @@ typedef unsigned char validate_uint32[sizeof(stbi__uint32)==4 ? 1 : -1];
 #if defined(__GNUC__) && defined(STBI__X86_TARGET) && !defined(__SSE2__) && !defined(STBI_NO_SIMD)
 // gcc doesn't support sse2 intrinsics unless you compile with -msse2,
 // which in turn means it gets to use SSE2 everywhere. This is unfortunate,
-// but previous attempts to provide the SSE2 functions with runtime
+// but prev attempts to provide the SSE2 functions with runtime
 // detection caused numerous issues. The way architecture extensions are
 // exposed in GCC/Clang is, sadly, not really suited for one-file libs.
 // New behavior: if compiled with -msse2, we use SSE2 without any
@@ -986,7 +986,7 @@ static void *stbi__malloc(size_t size)
 
 // stb_image uses ints pervasively, including for offset calculations.
 // therefore the largest decoded image size we can support with the
-// current code, even on 64-bit targets, is INT_MAX. this is not a
+// curr code, even on 64-bit targets, is INT_MAX. this is not a
 // significant limitation for the intended use case.
 //
 // we do, however, need to make sure our size calculations don't
@@ -1118,7 +1118,7 @@ static void *stbi__load_main(stbi__context *s, int *x, int *y, int *comp, int re
 {
     memset(ri, 0, sizeof(*ri)); // make sure it's initialized if we add new fields
     ri->bits_per_channel = 8; // default is 8 so most paths don't have to be changed
-    ri->channel_order = STBI_ORDER_RGB; // all current input & output are this, but this is here so we can add BGR order
+    ri->channel_order = STBI_ORDER_RGB; // all curr input & output are this, but this is here so we can add BGR order
     ri->num_channels = 0;
     
     // test the formats with a very explicit header first (at least a FOURCC
@@ -3498,12 +3498,12 @@ static stbi_uc *stbi__resample_row_hv_2_simd(stbi_uc *out, stbi_uc *in_near, stb
         __m128i nearw = _mm_unpacklo_epi8(nearb, zero);
         __m128i diff  = _mm_sub_epi16(farw, nearw);
         __m128i nears = _mm_slli_epi16(nearw, 2);
-        __m128i curr  = _mm_add_epi16(nears, diff); // current row
+        __m128i curr  = _mm_add_epi16(nears, diff); // curr row
         
-        // horizontal filter works the same based on shifted vers of current
-        // row. "prev" is current row shifted right by 1 pixel; we need to
-        // insert the previous pixel value (from t1).
-        // "next" is current row shifted left by 1 pixel, with first pixel
+        // horizontal filter works the same based on shifted vers of curr
+        // row. "prev" is curr row shifted right by 1 pixel; we need to
+        // insert the prev pixel value (from t1).
+        // "next" is curr row shifted left by 1 pixel, with first pixel
         // of next block of 8 pixels added in.
         __m128i prv0 = _mm_slli_si128(curr, 2);
         __m128i nxt0 = _mm_srli_si128(curr, 2);
@@ -3538,12 +3538,12 @@ static stbi_uc *stbi__resample_row_hv_2_simd(stbi_uc *out, stbi_uc *in_near, stb
         uint8x8_t nearb = vld1_u8(in_near + i);
         int16x8_t diff  = vreinterpretq_s16_u16(vsubl_u8(farb, nearb));
         int16x8_t nears = vreinterpretq_s16_u16(vshll_n_u8(nearb, 2));
-        int16x8_t curr  = vaddq_s16(nears, diff); // current row
+        int16x8_t curr  = vaddq_s16(nears, diff); // curr row
         
-        // horizontal filter works the same based on shifted vers of current
-        // row. "prev" is current row shifted right by 1 pixel; we need to
-        // insert the previous pixel value (from t1).
-        // "next" is current row shifted left by 1 pixel, with first pixel
+        // horizontal filter works the same based on shifted vers of curr
+        // row. "prev" is curr row shifted right by 1 pixel; we need to
+        // insert the prev pixel value (from t1).
+        // "next" is curr row shifted left by 1 pixel, with first pixel
         // of next block of 8 pixels added in.
         int16x8_t prv0 = vextq_s16(curr, curr, 7);
         int16x8_t nxt0 = vextq_s16(curr, curr, 1);
@@ -3567,7 +3567,7 @@ static stbi_uc *stbi__resample_row_hv_2_simd(stbi_uc *out, stbi_uc *in_near, stb
         vst2_u8(out + i*2, o);
 #endif
         
-        // "previous" value for next iter
+        // "prev" value for next iter
         t1 = 3*in_near[i+7] + in_far[i+7];
     }
     
@@ -4633,7 +4633,7 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
         }
         prior = cur - stride; // bugfix: need to compute this after 'cur +=' computation above
         
-        // if first row, use special filter that doesn't sample previous row
+        // if first row, use special filter that doesn't sample prev row
         if (j == 0) filter = first_row_filter[filter];
         
         // handle first byte explicitly
@@ -6483,7 +6483,7 @@ typedef struct
 {
     int w,h;
     stbi_uc *out;                 // output buffer (always 4 components)
-    stbi_uc *background;          // The current "background" as far as a gif is concerned
+    stbi_uc *background;          // The curr "background" as far as a gif is concerned
     stbi_uc *history;
     int flags, bgindex, ratio, transparent, eflags;
     stbi_uc  pal[256][4];
@@ -6718,15 +6718,15 @@ static stbi_uc *stbi__gif_load_next(stbi__context *s, stbi__gif *g, int *comp, i
         if (!g->out || !g->background || !g->history)
             return stbi__errpuc("outofmem", "Out of memory");
         
-        // image is treated as "transparent" at the start - ie, nothing overwrites the current background;
+        // image is treated as "transparent" at the start - ie, nothing overwrites the curr background;
         // background colour is only used for pixels that are not rendered first frame, after that "background"
-        // color refers to the color that was there the previous frame.
+        // color refers to the color that was there the prev frame.
         memset(g->out, 0x00, 4 * pcount);
         memset(g->background, 0x00, 4 * pcount); // state of the background (starts transparent)
-        memset(g->history, 0x00, pcount);        // pixels that were affected previous frame
+        memset(g->history, 0x00, pcount);        // pixels that were affected prev frame
         first_frame = 1;
     } else {
-        // second frame - how do we dispose of the previous one?
+        // second frame - how do we dispose of the prev one?
         dispose = (g->eflags & 0x1C) >> 2;
         pcount = g->w * g->h;
         
@@ -6734,7 +6734,7 @@ static stbi_uc *stbi__gif_load_next(stbi__context *s, stbi__gif *g, int *comp, i
             dispose = 2; // if I don't have an image to revert back to, default to the old background
         }
         
-        if (dispose == 3) { // use previous graphic
+        if (dispose == 3) { // use prev graphic
             for (pi = 0; pi < pcount; ++pi) {
                 if (g->history[pi]) {
                     memcpy( &g->out[pi * 4], &two_back[pi * 4], 4 );
@@ -6759,7 +6759,7 @@ static stbi_uc *stbi__gif_load_next(stbi__context *s, stbi__gif *g, int *comp, i
     }
     
     // clear my history;
-    memset( g->history, 0x00, g->w * g->h );        // pixels that were affected previous frame
+    memset( g->history, 0x00, g->w * g->h );        // pixels that were affected prev frame
     
     for (;;) {
         int tag = stbi__get8(s);
@@ -6786,7 +6786,7 @@ static stbi_uc *stbi__gif_load_next(stbi__context *s, stbi__gif *g, int *comp, i
                 
                 // if the width of the specified rectangle is 0, that means
                 // we may not see *any* pixels or the image is malformed;
-                // to make sure this is caught, move the current y down to
+                // to make sure this is caught, move the curr y down to
                 // max_y (which is what out_gif_code checks).
                 if (w == 0)
                     g->cur_y = g->max_y;

@@ -247,10 +247,10 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         }
     }
     
-    u32 concurrent_threads_count = 1;
+    u32 concurr_threads_count = 1;
     network_thread_iocp_handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE,
                                                         0, 0,
-                                                        concurrent_threads_count);
+                                                        concurr_threads_count);
     
     
     W32_TimerInit(&w32_timer);

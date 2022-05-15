@@ -35,3 +35,10 @@ OpenGL_DrawSolidQuad(Shader_Program *program, m4 projection, m4 model, v4 color)
     glDrawArrays(GL_TRIANGLES, 0, 6);
     
 }
+
+internal void
+OpenGL_Clear(v4 color)
+{
+    glClearColor(color.r, color.g, color.b, color.a);
+    glClear(GL_COLOR_BUFFER_BIT);
+}

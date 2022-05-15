@@ -95,7 +95,6 @@ internal v3
 ScreenCoordsFromWorldCoords(Render_Context *render_context, v3 world_coords)
 {
     v3 result;
-    
     result.xy = render_context->pixels_per_meter * world_coords.xy;
     result.z = world_coords.z;
     // NOTE(fakhri): world origin is at the center of the screen, and Y is up
@@ -108,6 +107,7 @@ internal v3
 WorldCoordsFromScreenCoords(Render_Context *render_context, v2 screen_coords)
 {
     v3 result = {};
+    // NOTE(fakhri): inverse the y
     screen_coords.y = render_context->screen.height - screen_coords.y;
     screen_coords -= render_context->camera_position;
     result.xy = screen_coords / render_context->pixels_per_meter;
@@ -139,6 +139,15 @@ _Render_PushRequest(Push_Buffer *push_buffer, u32 size)
 
 
 internal void
+Render_PushClear(Render_Context *render_context, v4 color)
+{
+    RenderRequest_Clear *clear_request = Render_PushRequest(render_context->push_buffer, RenderRequest_Clear);
+    
+    clear_request->header.kind = RenderKind_Clear;
+    clear_request->color = color;
+}
+
+internal void
 Render_PushQuad(Render_Context *render_context, v3 pos, v2 size_in_meter, v4 color, Coordinate_Type coord_type, f32 y_angle = 0.0f)
 {
     Assert(coord_type < CoordinateType_Count);
@@ -147,10 +156,10 @@ Render_PushQuad(Render_Context *render_context, v3 pos, v2 size_in_meter, v4 col
         pos = ScreenCoordsFromWorldCoords(render_context, pos);
     }
     
-    Render_Quad_Request *quad_request = Render_PushRequest(render_context->push_buffer, Render_Quad_Request);
+    RenderRequest_Quad *quad_request = Render_PushRequest(render_context->push_buffer, RenderRequest_Quad);
     
     quad_request->header.kind = RenderKind_Quad;
-    quad_request->header.screen_coords = pos;
+    quad_request->screen_coords = pos;
     quad_request->size = render_context->pixels_per_meter * size_in_meter;
     quad_request->color = color;
     quad_request->y_angle = y_angle;
@@ -169,10 +178,10 @@ Render_PushImage(Render_Context *render_context, Texture2D texture,
         pos = ScreenCoordsFromWorldCoords(render_context, pos);
     }
     
-    Render_Image_Request *image_request = Render_PushRequest(render_context->push_buffer, Render_Image_Request);
+    RenderRequest_Image *image_request = Render_PushRequest(render_context->push_buffer, RenderRequest_Image);
     
     image_request->header.kind = RenderKind_Image;
-    image_request->header.screen_coords = pos;
+    image_request->screen_coords = pos;
     image_request->texture = texture;
     image_request->size = is_size_in_meter ? render_context->pixels_per_meter * size : size;
     image_request->y_angle = y_angle;
@@ -197,7 +206,7 @@ Render_PushText(Render_Context *render_context, String text, v3 pos, v4 color, C
     
     Font *font = render_context->fonts + font_to_use;
     
-    v2 current_point = pos.xy;
+    v2 curr_point = pos.xy;
     // NOTE(fakhri): render each character
     {
         for (u32 ch_index = 0;
@@ -208,21 +217,21 @@ Render_PushText(Render_Context *render_context, String text, v3 pos, v4 color, C
             Assert(font->map_first <= ch && ch < font->map_opl);
             Glyph glyph = font->map[ch - font->map_first];
             
-            v2 glyph_pos = current_point + 0.5f * glyph.size + glyph.offset;
+            v2 glyph_pos = curr_point + 0.5f * glyph.size + glyph.offset;
             pos.xy = glyph_pos;
             Render_PushImage(render_context, font->texture, 
                              pos, glyph.size, 
                              CoordinateType_Screen,
                              0, 0, color, glyph.src.compact_rect);
             
-            current_point.x += glyph.advance;
+            curr_point.x += glyph.advance;
         }
     }
     if (coord_type == CoordinateType_World)
     {
-        current_point = WorldCoordsFromScreenCoords(render_context, current_point).xy;
+        curr_point = WorldCoordsFromScreenCoords(render_context, curr_point).xy;
     }
-    return current_point.x;
+    return curr_point.x;
 }
 
 internal Push_Buffer *
@@ -231,7 +240,7 @@ AllocatePushBuffer(M_Arena *arena)
     Push_Buffer *push_buffer = (Push_Buffer *)M_ArenaPushZero(arena, Megabytes(1));
     
     push_buffer->memory = push_buffer + sizeof(*push_buffer);
-    push_buffer->capacity = Megabytes(1);
+    push_buffer->capacity = Megabytes(1) - sizeof(Push_Buffer);
     push_buffer->size = 0;
     
     return push_buffer;
@@ -255,8 +264,9 @@ Render_Begin(Render_Context *render_context, M_Arena *frame_arena)
     
     v2 camera_center = 0.5f * render_context->screen;
     
-    // NOTE(fakhri): mouse influence should be zero at the cetner of the camera
-    v2 camera_offset = 0.05f * (os->mouse_position - camera_center);
+    // NOTE(fakhri): mouse influence should be zero at the cetner of the screen
+    render_context->mouse_influence = 0.05f;
+    v2 camera_offset = render_context->mouse_influence * (os->mouse_position - camera_center);
     
     render_context->camera_position = Vec2(camera_center.x - camera_offset.x, camera_center.y + camera_offset.y);
     
@@ -279,13 +289,13 @@ Render_End(Render_Context *render_context)
         header_ptr < (u8*)push_buffer->memory + push_buffer->size;
         )
     {
-        Render_Request_Header *header = (Render_Request_Header *)header_ptr;
+        RenderRequest_Header *header = (RenderRequest_Header *)header_ptr;
         switch(header->kind)
         {
             case RenderKind_Quad:
             {
-                Render_Quad_Request *quad_request = (Render_Quad_Request *)header;
-                m4 trans = Translate(header->screen_coords);
+                RenderRequest_Quad *quad_request = (RenderRequest_Quad *)header;
+                m4 trans = Translate(quad_request->screen_coords);
                 m4 scale = Scale(Vec3(quad_request->size, 1.0f));
                 m4 rotat = Rotate(quad_request->y_angle, Vec3(0,1,0));
                 
@@ -299,9 +309,9 @@ Render_End(Render_Context *render_context)
             
             case RenderKind_Image:
             {
-                Render_Image_Request *image_request = (Render_Image_Request *)header;
+                RenderRequest_Image *image_request = (RenderRequest_Image *)header;
                 
-                m4 trans = Translate(header->screen_coords);
+                m4 trans = Translate(image_request->screen_coords);
                 m4 scale = Scale(Vec3(image_request->size, 1.0f));
                 m4 rotat = Rotate(image_request->y_angle, Vec3(0,1,0));
                 m4 model = trans * rotat * scale;
@@ -311,6 +321,14 @@ Render_End(Render_Context *render_context)
                 
                 header_ptr += sizeof(*image_request);
             } break;
+            
+            case RenderKind_Clear:
+            {
+                RenderRequest_Clear *clear_request = (RenderRequest_Clear *)header;
+                OpenGL_Clear(clear_request->color);
+                header_ptr += sizeof(*clear_request);
+            } break;
+            
             default :
             {
                 Assert(header->kind < RenderKind_Count);

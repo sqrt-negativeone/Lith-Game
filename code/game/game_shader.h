@@ -38,7 +38,7 @@ struct Shaders_Hash
 
 struct Shader_Program
 {
-    b32 previously_loaded;
+    b32 prevly_loaded;
     
     Shader_ID id;
     Shader_ID vao;

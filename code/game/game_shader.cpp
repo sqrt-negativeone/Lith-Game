@@ -128,10 +128,10 @@ SetupShader(Render_Context *render_context, Shader_Kind kind)
     glUseProgram(program->id);
     
     // NOTE(fakhri): per shader kind init
-    if (!render_context->shaders[kind].previously_loaded)
+    if (!render_context->shaders[kind].prevly_loaded)
     {
         // NOTE(fakhri): stuff that only need to happen the first time we load the shader
-        program->previously_loaded = true;
+        program->prevly_loaded = true;
         
         // NOTE(fakhri): shared settings
         glGenVertexArrays(1, &program->vao);

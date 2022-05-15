@@ -3,173 +3,189 @@ internal u32
 AddEntity(Game_State *game_state)
 {
     Assert(game_state->entity_count < ArrayCount(game_state->entities));
-    u32 entity_index = game_state->entity_count++;
-    return entity_index;
+    u32 entity_id = game_state->entity_count++;
+    return entity_id;
 }
 
 internal void
 AddNullEntity(Game_State *game_state)
 {
-    u32 entity_index = AddEntity(game_state);
-    Entity *entity = game_state->entities + entity_index;
-    entity->type = Entity_Type_Null_Entity;
+    u32 entity_id = AddEntity(game_state);
+    Entity *entity = game_state->entities + entity_id;
+    entity->type = EntityType_Null_Entity;
 }
 
 internal void
 AddCursorEntity(Game_State *game_state)
 {
-    u32 entity_index = AddEntity(game_state);
-    Entity *entity = game_state->entities + entity_index;
-    entity->type = Entity_Type_Cursor_Entity;
+    u32 entity_id = AddEntity(game_state);
+    Entity *entity = game_state->entities + entity_id;
+    entity->type = EntityType_Cursor_Entity;
 }
 
 internal void
-AddCompanionEntity(Game_State *game_state, Texture2D texture, v2 companion_dimensions, u32 entity_index_to_follow, v2 followed_offset)
+AddNumberEntity(Game_State *game_state, Card_Number number)
 {
-    u32 companion_entity_index = AddEntity(game_state);
-    Entity *companion_entity = game_state->entities + companion_entity_index;
-    Entity *card_entitiy = game_state->entities + entity_index_to_follow;
+    u32 entity_id = AddEntity(game_state);
+    Entity *entity = game_state->entities + entity_id;
+    entity->type = EntityType_Numbers;
+    entity->card_type.number = number;
+    
+    entity->target_dimension = 3 * Vec2(MiliMeter(6.5f), MiliMeter(10));
+    entity->curr_dimension   = 3 * Vec2(MiliMeter(6.5f), MiliMeter(10));
+    
+    entity->texture = game_state->frensh_deck.black_numbers_up[number];
+    
+    AddToResidency(game_state, entity_id, ResidencyKind_Nonespacial);
+}
+
+internal void
+AddCompanionEntity(Game_State *game_state, Texture2D texture, v2 companion_dimensions, u32 entity_id_to_follow, v2 followed_offset)
+{
+    u32 companion_entity_id = AddEntity(game_state);
+    Entity *companion_entity = game_state->entities + companion_entity_id;
+    Entity *card_entitiy = game_state->entities + entity_id_to_follow;
     *companion_entity = {};
-    companion_entity->type = Entity_Type_Companion;
+    companion_entity->type = EntityType_Companion;
     companion_entity->center_pos = card_entitiy->center_pos;
     companion_entity->target_pos = card_entitiy->center_pos;
-    companion_entity->current_dimension = companion_dimensions;
-    companion_entity->entity_index_to_follow = entity_index_to_follow;
+    companion_entity->curr_dimension = companion_dimensions;
+    companion_entity->entity_id_to_follow = entity_id_to_follow;
     companion_entity->offset_in_follwed_entity = followed_offset;
     companion_entity->texture = texture;
 }
 
 internal inline void
-AddCompanion_Ace(Game_State *game_state, Texture2D category, v2 companion_size, u32 card_entity_index)
+AddCompanion_Ace(Game_State *game_state, Texture2D category, v2 companion_size, u32 card_entity_id)
 {
-    AddCompanionEntity(game_state, category, companion_size, card_entity_index, Vec2(0, 0));
+    AddCompanionEntity(game_state, category, companion_size, card_entity_id, Vec2(0, 0));
 }
 
 internal inline void
-AddCompanion_2(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+AddCompanion_2(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
                        Vec2(0, MiliMeter(28.85f)));
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
                        Vec2(0, -MiliMeter(28.85f)));
 }
 
 internal inline void
-AddCompanion_3(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+AddCompanion_3(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanion_Ace(game_state, category_up, companion_size, card_entity_index);
+    AddCompanion_Ace(game_state, category_up, companion_size, card_entity_id);
     
-    AddCompanion_2(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+    AddCompanion_2(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
 }
 
 internal inline void
-AddCompanion_4(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+AddCompanion_4(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
     
     v2 companion_offset = Vec2(MiliMeter(11.55f), MiliMeter(28.85f));
     
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
                        Vec2(-companion_offset.x, companion_offset.y));
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
                        Vec2(companion_offset.x, companion_offset.y));
     
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
                        Vec2(-companion_offset.x, -companion_offset.y));
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
                        Vec2(companion_offset.x, -companion_offset.y));
     
 }
 
 internal inline void
-AddCompanion_5(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+AddCompanion_5(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanion_Ace(game_state, category_up, companion_size, card_entity_index);
+    AddCompanion_Ace(game_state, category_up, companion_size, card_entity_id);
     
-    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
 }
 
 internal inline  void
-AddCompanion_6(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+AddCompanion_6(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
     
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
                        Vec2(-MiliMeter(11.55f), 0));
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
                        Vec2(MiliMeter(11.55f), 0));
     
 }
 
 internal inline void
-AddCompanion_7(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+AddCompanion_7(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanion_6(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+    AddCompanion_6(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
     
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
                        Vec2(0, MiliMeter(14.45f)));
     
 }
 
 internal inline void
-AddCompanion_8(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+AddCompanion_8(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanion_7(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+    AddCompanion_7(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
     
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
                        Vec2(0, -MiliMeter(14.45f)));
     
 }
 
 internal inline void
-AddCompanion_9(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+AddCompanion_9(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanion_Ace(game_state, category_up, companion_size, card_entity_index);
+    AddCompanion_Ace(game_state, category_up, companion_size, card_entity_id);
     
-    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
     
     v2 companion_offset = Vec2(MiliMeter(11.55f), MiliMeter(9.55f));
     
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
                        Vec2(-companion_offset.x, companion_offset.y));
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
                        Vec2(companion_offset.x, companion_offset.y));
     
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
                        Vec2(-companion_offset.x, -companion_offset.y));
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
                        Vec2(companion_offset.x, -companion_offset.y));
     
 }
 
 internal inline void
-AddCompanion_10(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_index)
+AddCompanion_10(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
     
-    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
     
     v2 companion_offset = Vec2(MiliMeter(11.55f), MiliMeter(9.55f));
     
     // NOTE(fakhri): the four at the sides
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
                        Vec2(-companion_offset.x, companion_offset.y));
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
                        Vec2(companion_offset.x, companion_offset.y));
     
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
                        Vec2(-companion_offset.x, -companion_offset.y));
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
                        Vec2(companion_offset.x, -companion_offset.y));
     
     // NOTE(fakhri): middle two
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
                        Vec2(0, MiliMeter(19.15f)));
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_index, 
+    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
                        Vec2(0, -MiliMeter(19.15f)));
     
 }
 
 internal inline  void
-AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_deck, Card_Type card_type, v2 card_dimension, u32 card_entity_index)
+AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_deck, Card_Type card_type, v2 card_dimension, u32 card_entity_id)
 {
     Texture2D category_up = {};
     Texture2D category_down = {};
@@ -224,18 +240,18 @@ AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_de
     
     // @Hardcoded
     AddCompanionEntity(game_state, number_up, Vec2(MiliMeter(6.5f), MiliMeter(10)),
-                       card_entity_index,
+                       card_entity_id,
                        Vec2(-MiliMeter(22.35f), MiliMeter(36.5f)));
     
     AddCompanionEntity(game_state, category_up, Vec2(MiliMeter(7.2f), MiliMeter(7.2f)),
-                       card_entity_index,
+                       card_entity_id,
                        Vec2(-MiliMeter(22.4f), MiliMeter(26.4f)));
     
     AddCompanionEntity(game_state, number_down, Vec2(MiliMeter(6.4f), MiliMeter(10)),
-                       card_entity_index,
+                       card_entity_id,
                        Vec2(MiliMeter(22.35f), -MiliMeter(36.5f)));
     AddCompanionEntity(game_state, category_down, Vec2(MiliMeter(7.2f), MiliMeter(7.2f)),
-                       card_entity_index,
+                       card_entity_id,
                        Vec2(MiliMeter(22.4f), -MiliMeter(26.4f)));
     
     
@@ -244,78 +260,78 @@ AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_de
     {
         case Card_Number_Ace:
         {
-            AddCompanion_Ace(game_state, category_up, companion_size, card_entity_index);
+            AddCompanion_Ace(game_state, category_up, companion_size, card_entity_id);
         } break;
         case Card_Number_2:
         {
-            AddCompanion_2(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+            AddCompanion_2(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_3:
         {
-            AddCompanion_3(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+            AddCompanion_3(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_4:
         {
-            AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+            AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_5:
         {
-            AddCompanion_5(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+            AddCompanion_5(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_6:
         {
-            AddCompanion_6(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+            AddCompanion_6(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_7:
         {
-            AddCompanion_7(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+            AddCompanion_7(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_8:
         {
-            AddCompanion_8(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+            AddCompanion_8(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
             
         } break;
         case Card_Number_9:
         {
-            AddCompanion_9(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+            AddCompanion_9(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_10:
         {
-            AddCompanion_10(game_state, category_up, category_down, companion_size, card_dimension, card_entity_index);
+            AddCompanion_10(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_Jack:
         {
             Texture2D jack = frensh_deck->jacks[card_type.category];
             
-            AddCompanion_Ace(game_state, jack, Vec2(MiliMeter(36.9f), MiliMeter(62.0f)), card_entity_index);
+            AddCompanion_Ace(game_state, jack, Vec2(MiliMeter(36.9f), MiliMeter(62.0f)), card_entity_id);
         } break;
         case Card_Number_Queen:
         {
             Texture2D queen = frensh_deck->queens[card_type.category];
             
-            AddCompanion_Ace(game_state, queen, Vec2(MiliMeter(36.9f), MiliMeter(62.0f)), card_entity_index);
+            AddCompanion_Ace(game_state, queen, Vec2(MiliMeter(36.9f), MiliMeter(62.0f)), card_entity_id);
         } break;
         case Card_Number_King:
         {
             Texture2D king = frensh_deck->kings[card_type.category];
             
-            AddCompanion_Ace(game_state, king, Vec2(MiliMeter(36.9f), MiliMeter(62.0f)), card_entity_index);
+            AddCompanion_Ace(game_state, king, Vec2(MiliMeter(36.9f), MiliMeter(62.0f)), card_entity_id);
         } break;
     }
 }
 
 
 internal void
-AddCardEntity(Game_State *game_state, Card_Type card_type, Card_Residency card_residency, b32 is_fliped = false)
+AddCardEntity(Game_State *game_state, Card_Type card_type, ResidencyKind card_residency, b32 is_fliped = false)
 {
-    u32 card_entity_index = AddEntity(game_state);
-    Entity *card = game_state->entities + card_entity_index;
+    u32 card_entity_id = AddEntity(game_state);
+    Entity *card = game_state->entities + card_entity_id;
     *card = {};
-    card->type = Entity_Type_Card;
+    card->type = EntityType_Card;
     card->card_type = card_type;
     card->target_dimension   = Vec2(CARD_WIDTH, CARD_HEIGHT);
-    card->current_dimension  = Vec2(CARD_WIDTH, CARD_HEIGHT);
-    AddToResidency(game_state, card_entity_index, card_residency);
+    card->curr_dimension  = Vec2(CARD_WIDTH, CARD_HEIGHT);
+    AddToResidency(game_state, card_entity_id, card_residency);
     
     card->dy_angle = 4 * PI32;
     
@@ -335,16 +351,16 @@ AddCardEntity(Game_State *game_state, Card_Type card_type, Card_Residency card_r
     Frensh_Suited_Cards_Texture *frensh_deck = &game_state->frensh_deck;
     card->texture = frensh_deck->card_frame_texture;
     
-    AddCardCompanions(game_state, frensh_deck, card_type, card->current_dimension, card_entity_index);
+    AddCardCompanions(game_state, frensh_deck, card_type, card->curr_dimension, card_entity_id);
 } 
 
 
 internal void
 MoveEntity(Game_State *game_state, Entity *entity, f32 spring_constant, f32 friction, f32 mass, f32 dt)
 {
-    if (entity->entity_index_to_follow)
+    if (entity->entity_id_to_follow)
     {
-        Entity *followed_entity = game_state->entities + entity->entity_index_to_follow;
+        Entity *followed_entity = game_state->entities + entity->entity_id_to_follow;
         f32 following_trigger_distance = 0.0f;
         if (LengthSquaredVec2(followed_entity->center_pos.xy - entity->center_pos.xy) > following_trigger_distance)
         {
@@ -364,90 +380,110 @@ UpdateCursorEntity(Game_State *game_state, Entity *cursor_entity)
 {
     cursor_entity->center_pos = WorldCoordsFromScreenCoords(&game_state->render_context, os->mouse_position);
     
-    Player *curent_player = game_state->players + game_state->current_player_id;
-    
-    if (game_state->selected_card_index == 0)
+    f32 max_z = -1;
+    game_state->highest_card_under_cursor = 0;
+    for (EachValidResidencyKind(residency_kind))
     {
-        
-        for (u32 residency_index = 0;
-             residency_index < CardResidency_Count;
-             ++residency_index)
+        Residency *residency = game_state->residencies + residency_kind;
+        if (HasFlag(residency->flags, ResidencyFlags_HostsCards))
         {
-            
-            Residency *residency = game_state->residencies + residency_index;
-            
-            f32 max_z = -1;
-            u32 selected_card_index = 0;
             // NOTE(fakhri): find the card entity with the highest z value in residency
-            for (u32 index_in_residency = 0;
-                 index_in_residency < residency->entity_count;
-                 ++index_in_residency)
+            ResidencyIterator iter = MakeResidencyIterator(residency);
+            for(EachValidResidencyEntityID(card_id, iter))
             {
-                u32 card_index = residency->entity_indices[index_in_residency];
-                Entity *card_entity = game_state->entities + card_index;
-                
-                if (IsInsideRect(RectCentDim(card_entity->center_pos.xy, card_entity->current_dimension), cursor_entity->center_pos.xy))
+                Entity *card_entity = game_state->entities + card_id;
+                if (IsInsideRect(RectCentDim(card_entity->center_pos.xy, card_entity->curr_dimension), cursor_entity->center_pos.xy) && 
+                    max_z < card_entity->center_pos.z)
                 {
-                    if (!card_entity->is_under_cursor)
-                    {
-                        card_entity->is_under_cursor = true;
-                        card_entity->target_dimension = 1.1f * Vec2(CARD_WIDTH, CARD_HEIGHT);
-                    }
-                    
-                    // NOTE(fakhri): only select the cards in the residency we are controling
-                    
-                    if (((card_entity->residency == CardResidency_CardSelecting) ||
-                         !HasFlag(game_state->flags, GameStateFlagsGroup_NoSelect)) &&
-                        card_entity->center_pos.z > max_z)
-                    {
-                        selected_card_index = card_index;
-                    }
+                    game_state->highest_card_under_cursor = card_id;
+                    max_z = card_entity->center_pos.z;
                 }
             }
-            
-            if (selected_card_index)
-            {
-                Entity *card_entity = game_state->entities + selected_card_index;
-                if(game_state->controller.left_mouse.pressed)
-                {
-                    // NOTE(fakhri): make sure we are not pressing another card
-                    card_entity->is_pressed = true;
-                    card_entity->entity_index_to_follow = Entity_Type_Cursor_Entity;
-                    card_entity->target_pos.z = 50.f;
-                    
-                    game_state->selected_card_index = selected_card_index;
-                }
-                
-            }
-            
         }
     }
 }
 
 internal void
-UpdateCardEntity(Game_State *game_state, u32 entity_index, f32 dt)
+UpdateCardEntity(Game_State *game_state, EntityID entity_id, f32 dt)
 {
-    Entity *entity = game_state->entities + entity_index;
-    Entity *cursor_entity = game_state->entities + (u32)Entity_Type_Cursor_Entity;
-    Assert(cursor_entity->type == Entity_Type_Cursor_Entity);
+    Entity *entity = game_state->entities + entity_id;
+    Entity *cursor_entity = game_state->entities + (u32)EntityType_Cursor_Entity;
+    Assert(cursor_entity->type == EntityType_Cursor_Entity);
+    Assert(ResidencyKind_Nil < entity->residency && entity->residency < ResidencyKind_Count);
     
-    // TODO(fakhri): make sure that only one card should be able to get selected under cursor
-    b32 should_be_under_cursor = IsInsideRect(RectCentDim(entity->center_pos.xy, entity->current_dimension), cursor_entity->center_pos.xy) ;
-    
-    if (entity->is_under_cursor && !should_be_under_cursor)
+    if (HasFlag(entity->flags, EntityFlag_UnderCursor) && 
+        !IsInsideRect(RectCentDim(entity->center_pos.xy, entity->curr_dimension),
+                      cursor_entity->center_pos.xy))
     {
-        entity->is_under_cursor = false;
+        ClearFlag(entity->flags, EntityFlag_UnderCursor);
         entity->target_dimension = Vec2(CARD_WIDTH, CARD_HEIGHT);
     }
     
-    if (entity->is_pressed)
+    if (game_state->highest_card_under_cursor == entity_id)
+    {
+        // NOTE(fakhri): we are under the cursor
+        if (!HasFlag(entity->flags, EntityFlag_UnderCursor))
+        {
+            SetFlag(entity->flags, EntityFlag_UnderCursor);
+            entity->target_dimension = 1.1f * Vec2(CARD_WIDTH, CARD_HEIGHT);
+        }
+        
+        if (game_state->controller.left_mouse.pressed)
+        {
+            Player *curr_player = game_state->players + game_state->curr_player_id;
+            if (entity->residency == curr_player->assigned_residency_index)
+            {
+                if (HasFlag(entity->flags, EntityFlag_Selected))
+                {
+                    ClearFlag(entity->flags, EntityFlag_Selected);
+                    game_state->selection_count -= 1;
+                    entity->target_pos.y -= MiliMeter(10);
+                }
+                else
+                {
+                    if (game_state->selection_count < game_state->selection_limit)
+                    {
+                        ++game_state->selection_count;
+                        SetFlag(entity->flags, EntityFlag_Selected);
+                        entity->target_pos.y += MiliMeter(10);
+                    }
+                    else
+                    {
+                        M_Temp scratch = GetScratch(0, 0);
+                        String8 msg = PushStr8F(scratch.arena, "you can't select more than %d cards", game_state->selection_limit);
+                        GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, msg, Vec4(1, 1, 1, 1), Vec3(0, 0, 50), CoordinateType_World, Seconds(1.0f));
+                        ReleaseScratch(scratch);
+                    }
+                }
+            }
+            else
+            {
+                GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, Str8Lit("you can't select other players cards!"), Vec4(1, 1, 1, 1), Vec3(0, 0, 50), CoordinateType_World, Seconds(2.0f));
+            }
+        }
+    }
+    
+#if 0    
+    if (HasFlag(entity->flags, EntityFlag_Selected))
+    {
+        if (game_state->controller.left_mouse.pressed)
+        {
+            SetFlag(entity->flags, EntityFlag_Pressed);
+            entity->entity_id_to_follow = EntityType_Cursor_Entity;
+            entity->target_pos.z = 50.f;
+        }
+    }
+    
+    if (HasFlag(entity->flags, EntityFlag_Pressed))
     {
         b32 can_move_to_table = false;
         b32 can_move_to_declare = false;
         Rectangle2D table_region = RectCentDim(Vec2(0, 0), Vec2(CentiMeter(30), CentiMeter(30)));
-        Rectangle2D declare_region = RectCentDim(Vec2(0, -CentiMeter(10)), 1.2f * Vec2(CARD_WIDTH, CARD_HEIGHT));
+        Rectangle2D declare_region = RectCentDim(Vec2(0, -CentiMeter(10)), 
+                                                 1.2f * Vec2(CARD_WIDTH, CARD_HEIGHT));
         
-        if ((entity->residency == game_state->players[game_state->current_player_id].assigned_residency_index) && IsInsideRect(table_region, entity->center_pos.xy))
+        if ((entity->residency == GetResidencyOfCurrentPlayer(game_state)) &&
+            IsInsideRect(table_region, entity->center_pos.xy))
         {
             
             Render_PushText(&game_state->render_context, Str8Lit("release your mouse to play the card"), Vec3(0, 0, CentiMeter(60)), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
@@ -455,7 +491,7 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index, f32 dt)
             can_move_to_table = 1;
         }
         
-        if ((entity->residency == CardResidency_CardSelecting) && IsInsideRect(declare_region, entity->center_pos.xy))
+        if ((entity->residency == ResidencyKind_DeclarationOptions) && IsInsideRect(declare_region, entity->center_pos.xy))
         {
             
             Render_PushText(&game_state->render_context, Str8Lit("release your mouse declare the card"), Vec3(0, 0, CentiMeter(60)), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
@@ -465,71 +501,153 @@ UpdateCardEntity(Game_State *game_state, u32 entity_index, f32 dt)
         
         if (game_state->controller.left_mouse.released)
         {
-            entity->is_pressed = false;
+            ClearFlag(entity->flags, EntityFlag_Pressed);
             entity->target_pos = entity->residency_pos;
-            entity->entity_index_to_follow = 0;
-            game_state->selected_card_index = 0;
+            entity->entity_id_to_follow = 0;
             entity->target_pos.z =  entity->residency_pos.z;
             
             if (can_move_to_table)
             {
-                entity->target_y_angle = PI32;
-                if (IsResidencyEmpty(game_state, CardResidency_Table))
+                game_state->prev_player_card = entity->card_type.number;
+                if (IsResidencyEmpty(game_state, ResidencyKind_Table))
                 {
                     // NOTE(fakhri): player should declare what is the type of
                     // the card he is playing
                     SetFlag(game_state->flags, StateFlag_ShouldOpenDeclaringMenu);
-                    GameEvent_PushEvent_Delay(&game_state->event_buffer, Seconds(0.2f));
-                    GameEvent_PushEvent_OpenDeclareMenu(&game_state->event_buffer);
+                    ClearFlag(entity->flags, EntityFlag_Selected);
+                    GameCommand_PushCommand_Delay(&game_state->command_buffer, Seconds(0.2f));
+                    GameCommand_PushCommand_OpenDeclareMenu(&game_state->command_buffer);
+                    ChangeResidency(game_state, entity_id, ResidencyKind_SelectedCards);
                 }
                 else
                 {
-                    GameEvent_PushEvent_ChangeCurrentPlayer(&game_state->event_buffer);
+                    ChangeResidency(game_state, entity_id, ResidencyKind_Table);
+                    GameCommand_PushCommand_ChangeCurrentPlayer(&game_state->command_buffer);
                 }
-                ChangeResidency(game_state, entity_index, CardResidency_Table);
             }
-            
             else if (can_move_to_declare)
             {
                 // TODO(fakhri): should we wait for confirmation?
-                ChangeResidency(game_state, entity_index, CardResidency_CardDeclaring);
-                GameEvent_PushEvent_Delay(&game_state->event_buffer, Seconds(0.2f));
-                GameEvent_PushEvent_CloseDeclareMenu(&game_state->event_buffer, entity->card_type.number);
+                GameCommand_PushCommand_Delay(&game_state->command_buffer, Seconds(0.2f));
+                GameCommand_PushCommand_CloseDeclareMenu(&game_state->command_buffer, entity->card_type.number);
             }
-            
         }
-        
     }
+#endif
     
     entity->y_angle = MoveTowards(entity->y_angle, entity->target_y_angle, entity->dy_angle * dt);
     
     // NOTE(fakhri): update dimension
-    entity->current_dimension = Vec2MoveTowards(entity->current_dimension,
-                                                entity->target_dimension,
-                                                dt * entity->dDimension);
+    entity->curr_dimension = Vec2MoveTowards(entity->curr_dimension,
+                                             entity->target_dimension,
+                                             dt * entity->dDimension);
     
+    MoveEntity(game_state, entity, 100, 10, 0.5f, dt);
+}
+
+internal void
+UpdateNumberEntity(Game_State *game_state, Entity *entity, f32 dt)
+{
     MoveEntity(game_state, entity, 100, 10, 0.5f, dt);
 }
 
 internal void
 UpdateCompanionEntity(Game_State *game_state, Entity *entity, f32 dt)
 {
-    Assert(entity->entity_index_to_follow);
+    Assert(entity->entity_id_to_follow);
     
     MoveEntity(game_state, entity, 85.f, 0.5f, 0.1f, dt);
     
-#if 0    
-    Entity *followed_entity = game_state->entities + entity->entity_index_to_follow;
-    entity->center_pos.xy = ClampInsideRect(RectCentDim(followed_entity->center_pos.xy, followed_entity->current_dimension), entity->center_pos.xy);
-#endif
+    Entity *entity_to_follow = game_state->entities + entity->entity_id_to_follow;
+    Assert(entity_to_follow);
+    entity->center_pos.z =  entity_to_follow->center_pos.z + 0.01f;
+    entity->y_angle = entity_to_follow->y_angle;
     
+    if (entity_to_follow->residency == ResidencyKind_Nil)
+    {
+        SetFlag(entity->flags, EntityFlag_DontDrawThisFrame);
+    }
 }
 
+internal void
+UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
+{
+    Entity *cursor_entity = game_state->entities + (u32)EntityType_Cursor_Entity;
+    
+    b32 clicked = 0;
+    b32 mouse_inside = IsInsideRect(RectCentDim(entity->center_pos.xy, entity->curr_dimension),
+                                    cursor_entity->center_pos.xy);
+    if (mouse_inside)
+    {
+        if (game_state->controller.left_mouse.pressed)
+        {
+            SetFlag(entity->flags, EntityFlag_Pressed);
+            entity->target_dimension = 1.2f * Vec2(MiliMeter(50), MiliMeter(30));
+            clicked = true;
+        }
+    }
+    
+    if (HasFlag(entity->flags, EntityFlag_Pressed))
+    {
+        if (game_state->controller.left_mouse.released)
+        {
+            entity->target_dimension = Vec2(MiliMeter(50), MiliMeter(30));
+            ClearFlag(entity->flags, EntityFlag_Pressed);
+        }
+    }
+    
+    // NOTE(fakhri): update dimension
+    entity->curr_dimension = Vec2MoveTowards(entity->curr_dimension,
+                                             entity->target_dimension,
+                                             dt * entity->dDimension);
+    
+    
+    if (clicked)
+    {
+        switch(entity->button_kind)
+        {
+            case ButtonEntityKind_PlaySelectedCards:
+            {
+                if (game_state->selection_count)
+                {
+                    SetFlag(game_state->flags, StateFlag_PlaySelectedCards);
+                }
+                else
+                {
+                    GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, Str8Lit("Select a card first"), Vec4(0, 0, 0, 1), Vec3(0, 0, 50), CoordinateType_World, Seconds(1.0f));
+                }
+            } break;
+            default: NotImplemented;
+        }
+    }
+}
 
+internal void
+AddButtonEntity(Game_State *game_state, ButtonEntityKind button_kind, v3 center_pos, v2 dimension)
+{
+    u32 button_entity_id = AddEntity(game_state);
+    Entity *button = game_state->entities + button_entity_id;
+    MemoryZero(button, sizeof(Entity));
+    
+    button->type             = EntityType_Button;
+    button->button_kind      = button_kind;
+    button->center_pos       = center_pos;
+    button->target_dimension = dimension;
+    button->curr_dimension   = dimension;
+    button->dDimension       = 20.f;
+}
 
 internal void
 AddDebugEntites(Game_State *game_state)
 {
+    
+    for(ResidencyKind residency_kind = ResidencyKind_Nil;
+        residency_kind < ResidencyKind_Count;
+        ++residency_kind)
+    {
+        MemoryZeroArray(game_state->residencies[residency_kind].entity_ids);
+    }
+    
     game_state->entity_count = 0;
     for (u32 residency_index = 0;
          residency_index < ArrayCount(game_state->residencies);
@@ -541,11 +659,12 @@ AddDebugEntites(Game_State *game_state)
     AddNullEntity(game_state);
     AddCursorEntity(game_state);
     
+    
     game_state->game_mode = GameMode_GAME;
     SetFlag(game_state->flags, StateFlag_ReceivedCards);
     
 #if TEST_ONE_CARD
-    AddCardEntity(game_state, MakeCardType(Category_Hearts, Card_Number_Jack), CardResidency_Down);
+    AddCardEntity(game_state, MakeCardType(Category_Hearts, Card_Number_Jack), ResidencyKind_Down);
 #else
     
     for (u32 player_index = 0;
@@ -554,7 +673,7 @@ AddDebugEntites(Game_State *game_state)
     {
         Player *player = game_state->players + player_index;
         player->joined = true;
-        player->assigned_residency_index = (Card_Residency)(player_index + 1);
+        player->assigned_residency_index = ResidencyKind_Left + player_index;
         player->username = PushStr8F(os->permanent_arena, "%c", 'a' + player_index);
     }
     
@@ -562,7 +681,7 @@ AddDebugEntites(Game_State *game_state)
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), CardResidency_Left);
+        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), ResidencyKind_Left);
     }
     
     
@@ -570,29 +689,42 @@ AddDebugEntites(Game_State *game_state)
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), CardResidency_Right);
+        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), ResidencyKind_Right);
     }
     
     for (u32 card_index = 0;
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), CardResidency_Up);
+        AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), ResidencyKind_Up);
     }
     
     for (u32 card_index = 0;
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), CardResidency_Down);
+        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), ResidencyKind_Down);
     }
     
+#if 0    
     for (u32 card_index = 0;
          card_index < 13;
          ++card_index)
     {
-        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), CardResidency_None);
+        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), ResidencyKind_DeclarationOptions);
     }
+#endif
     
+#if 1
+    for (Card_Number number = Card_Number_Ace;
+         number < Card_Number_Count;
+         ++number)
+    {
+        AddNumberEntity(game_state, number);
+    }
+#endif
+    
+    AddButtonEntity(game_state, ButtonEntityKind_QuestionCredibility, Vec3(MiliMeter(150), MiliMeter(0), 0), Vec2(MiliMeter(50), MiliMeter(30)));
+    AddButtonEntity(game_state, ButtonEntityKind_PlaySelectedCards, Vec3(MiliMeter(150), -MiliMeter(40), 0), Vec2(MiliMeter(50), MiliMeter(30)));
 #endif
 }

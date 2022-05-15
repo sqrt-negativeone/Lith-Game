@@ -8,3 +8,4 @@
 #include "base_buffer.h"
 #include "perlin.h"
 #include "program_options.h"
+#include "base_random.h"

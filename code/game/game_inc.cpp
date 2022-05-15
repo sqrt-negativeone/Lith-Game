@@ -1,6 +1,7 @@
+#define index_in_residency
 
 #include "game_residency.cpp"
-#include "game_event.cpp"
+#include "game_command.cpp"
 #include "game_texture.cpp"
 #include "game_shader.cpp"
 #include "game_font.cpp"

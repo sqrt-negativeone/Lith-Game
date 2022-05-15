@@ -33,7 +33,7 @@ struct UI_Context
     Render_Context    *render_context;
     struct Controller *controller;
     
-    i32 selected_item;
+    i32 pressed_item;
     i32 items_count;
     
     f32 last_select_time;

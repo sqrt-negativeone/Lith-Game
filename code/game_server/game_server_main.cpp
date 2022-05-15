@@ -238,8 +238,8 @@ DWORD WINAPI HostMain(LPVOID param)
             }
         }
         
-        u32 current_player_id = 0;
-        Player_Move previous_move = {};
+        u32 curr_player_id = 0;
+        Player_Move prev_move = {};
         Compact_Card_Hand burnt_cards = {};
         Compact_Card_Hand table = {};
         Compact_Card_Type deck[DECK_CARDS_COUNT];
@@ -301,42 +301,42 @@ DWORD WINAPI HostMain(LPVOID param)
                         BurnExtraCards(&player->hand, &burnt_cards);
                     }
                     
-                    current_player_id = rand();
+                    curr_player_id = rand();
                     step = Game_Step_Change_Player_Turn;
                 } break;
                 case Game_Step_Change_Player_Turn:
                 {
                     // NOTE(fakhri): go in a cercle
-                    ++current_player_id; 
-                    current_player_id %= MAX_PLAYER_COUNT;
-                    BroadcastChangeTurnMessage(current_player_id);
+                    ++curr_player_id; 
+                    curr_player_id %= MAX_PLAYER_COUNT;
+                    BroadcastChangeTurnMessage(curr_player_id);
                     step = Game_Step_Wait_For_Player_Move;
                 } break;
                 case Game_Step_Wait_For_Player_Move:
                 {
-                    Connected_Player *current_player = host_context.players_storage.players + current_player_id;
+                    Connected_Player *curr_player = host_context.players_storage.players + curr_player_id;
                     Player_Move player_move;
-                    ReceivePlayerMove(current_player->socket, &player_move);
+                    ReceivePlayerMove(curr_player->socket, &player_move);
                     
                     
-                    u32 previous_player_id = (current_player_id - 1) % MAX_PLAYER_COUNT;
-                    Connected_Player *previous_player = host_context.players_storage.players + previous_player_id;
+                    u32 prev_player_id = (curr_player_id - 1) % MAX_PLAYER_COUNT;
+                    Connected_Player *prev_player = host_context.players_storage.players + prev_player_id;
                     
                     // NOTE(fakhri): update our state
                     {
                         if (player_move.type == Player_Move_Question_Credibility)
                         {
-                            if (previous_move.type == Player_Move_Play_Card)
+                            if (prev_move.type == Player_Move_Play_Card)
                             {
-                                if (previous_move.actual_card != previous_move.claimed_card)
+                                if (prev_move.actual_card != prev_move.claimed_card)
                                 {
                                     // NOTE(fakhri): you got him, the liar
-                                    AddTableCardsToPlayerHand(&previous_player->hand, &table, &burnt_cards);
+                                    AddTableCardsToPlayerHand(&prev_player->hand, &table, &burnt_cards);
                                 }
                                 else
                                 {
                                     // NOTE(fakhri): oups.. he was telling the truth this time
-                                    AddTableCardsToPlayerHand(&current_player->hand, &table, &burnt_cards);
+                                    AddTableCardsToPlayerHand(&curr_player->hand, &table, &burnt_cards);
                                 }
                             }
                             else
@@ -348,17 +348,17 @@ DWORD WINAPI HostMain(LPVOID param)
                         {
                             u32 card_index;
                             for (card_index = 0;
-                                 card_index < current_player->hand.cards_count;
+                                 card_index < curr_player->hand.cards_count;
                                  ++card_index)
                             {
-                                if (current_player->hand.cards[card_index] == player_move.actual_card)
+                                if (curr_player->hand.cards[card_index] == player_move.actual_card)
                                 {
                                     break;
                                 }
                             }
                             
-                            Assert(card_index < current_player->hand.cards_count);
-                            if (card_index < current_player->hand.cards_count)
+                            Assert(card_index < curr_player->hand.cards_count);
+                            if (card_index < curr_player->hand.cards_count)
                             {
                                 AddCardToHand(&table, player_move.actual_card);
                                 RemoveCardFromHand(&table, card_index);
@@ -369,15 +369,15 @@ DWORD WINAPI HostMain(LPVOID param)
                             }
                         }
                         
-                        previous_move = player_move;
+                        prev_move = player_move;
                     }
                     // NOTE(fakhri): let all the players know what the move was
                     BroadcastPlayerMove(player_move);
-                    if (previous_player->hand.cards_count == 0)
+                    if (prev_player->hand.cards_count == 0)
                     {
-                        // NOTE(fakhri): previous player won!
+                        // NOTE(fakhri): prev player won!
                         // tell the players that he won
-                        BroadcastPlayerWon(previous_player_id);
+                        BroadcastPlayerWon(prev_player_id);
                         
                         // NOTE(fakhri): a host will only run one game at a time
                         // players should reconnect to the host to play again

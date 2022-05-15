@@ -164,8 +164,8 @@
 //         and below the baseline.
 //
 //      Current Point
-//         As you draw text to the screen, you keep track of a "current point"
-//         which is the origin of each character. The current point's vertical
+//         As you draw text to the screen, you keep track of a "curr point"
+//         which is the origin of each character. The curr point's vertical
 //         position is the baseline. Even "baked fonts" use this model.
 //
 //      Vertical Font Metrics
@@ -207,21 +207,21 @@
 //    screen where y=0, then you would set the baseline to SF*-y0.
 //
 //  Current point:
-//    Set the current point where the first character will appear. The
-//    first character could extend left of the current point; this is font
-//    dependent. You can either choose a current point that is the leftmost
+//    Set the curr point where the first character will appear. The
+//    first character could extend left of the curr point; this is font
+//    dependent. You can either choose a curr point that is the leftmost
 //    point and hope, or add some padding, or check the bounding box or
 //    left-side-bearing of the first character to be displayed and set
-//    the current point based on that.
+//    the curr point based on that.
 //
 //  Displaying a character:
 //    Compute the bounding box of the character. It will contain signed values
-//    relative to <current_point, baseline>. I.e. if it returns x0,y0,x1,y1,
+//    relative to <curr_point, baseline>. I.e. if it returns x0,y0,x1,y1,
 //    then the character should be displayed in the rectangle from
-//    <current_point+SF*x0, baseline+SF*y0> to <current_point+SF*x1,baseline+SF*y1).
+//    <curr_point+SF*x0, baseline+SF*y0> to <curr_point+SF*x1,baseline+SF*y1).
 //
 //  Advancing for the next character:
-//    Call GlyphHMetrics, and compute 'current_point += SF * advance'.
+//    Call GlyphHMetrics, and compute 'curr_point += SF * advance'.
 //
 //
 // ADVANCED USAGE
@@ -548,15 +548,15 @@ extern "C" {
     
     STBTT_DEF void stbtt_GetBakedQuad(const stbtt_bakedchar *chardata, int pw, int ph,  // same data as above
                                       int char_index,             // character to display
-                                      float *xpos, float *ypos,   // pointers to current position in screen pixel space
+                                      float *xpos, float *ypos,   // pointers to curr position in screen pixel space
                                       stbtt_aligned_quad *q,      // output: quad to draw
                                       int opengl_fillrule);       // true if opengl fill rule; false if DX9 or earlier
     // Call GetBakedQuad with char_index = 'character - first_char', and it
-    // creates the quad you need to draw and advances the current position.
+    // creates the quad you need to draw and advances the curr position.
     //
     // The coordinate system used assumes y increases downwards.
     //
-    // Characters will extend both above and below the current position;
+    // Characters will extend both above and below the curr position;
     // see discussion of "BASELINE" above.
     //
     // It's inefficient; you might want to c&p it and optimize it.
@@ -656,7 +656,7 @@ extern "C" {
     
     STBTT_DEF void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int ph,  // same data as above
                                        int char_index,             // character to display
-                                       float *xpos, float *ypos,   // pointers to current position in screen pixel space
+                                       float *xpos, float *ypos,   // pointers to curr position in screen pixel space
                                        stbtt_aligned_quad *q,      // output: quad to draw
                                        int align_to_integer);
     
@@ -698,7 +698,7 @@ extern "C" {
     // This function will determine the number of fonts in a font file.  TrueType
     // collection (.ttc) files may contain multiple fonts, while TrueType font
     // (.ttf) files only contain one font. The number of fonts can be used for
-    // indexing with the previous function where the index is between zero and one
+    // indexing with the prev function where the index is between zero and one
     // less than the total fonts. If an error occurs, -1 is returned.
     
     STBTT_DEF int stbtt_GetFontOffsetForIndex(const unsigned char *data, int index);
@@ -786,8 +786,8 @@ extern "C" {
     // the bounding box around all possible characters
     
     STBTT_DEF void stbtt_GetCodepointHMetrics(const stbtt_fontinfo *info, int codepoint, int *advanceWidth, int *leftSideBearing);
-    // leftSideBearing is the offset from the current horizontal position to the left edge of the character
-    // advanceWidth is the offset from the current horizontal position to the next horizontal position
+    // leftSideBearing is the offset from the curr horizontal position to the left edge of the character
+    // advanceWidth is the offset from the curr horizontal position to the next horizontal position
     //   these are expressed in unscaled coordinates
     
     STBTT_DEF int  stbtt_GetCodepointKernAdvance(const stbtt_fontinfo *info, int ch1, int ch2);
@@ -850,8 +850,8 @@ extern "C" {
     // The shape is a series of contours. Each one starts with
     // a STBTT_moveto, then consists of a series of mixed
     // STBTT_lineto and STBTT_curveto segments. A lineto
-    // draws a line from previous endpoint to its x,y; a curveto
-    // draws a quadratic bezier from previous endpoint to
+    // draws a line from prev endpoint to its x,y; a curveto
+    // draws a quadratic bezier from prev endpoint to
     // its x,y, using cx,cy as the bezier control point.
     
     STBTT_DEF void stbtt_FreeShape(const stbtt_fontinfo *info, stbtt_vertex *vertices);
@@ -2017,7 +2017,7 @@ static int stbtt__run_charstring(const stbtt_fontinfo *info, int glyph_index, st
     
 #define STBTT__CSERR(s) (0)
     
-    // this currently ignores the initial width value, which isn't needed if we have hmtx
+    // this currly ignores the initial width value, which isn't needed if we have hmtx
     b = stbtt__cff_index_get(info->charstrings, glyph_index);
     while (b.cursor < b.size) {
         i = 0;
@@ -2886,7 +2886,7 @@ static void stbtt__fill_active_edges(unsigned char *scanline, int len, stbtt__ac
     
     while (e) {
         if (w == 0) {
-            // if we're currently at zero, we need to record the edge start point
+            // if we're currly at zero, we need to record the edge start point
             x0 = e->x; w += e->direction;
         } else {
             int x1 = e->x; w += e->direction;
@@ -2955,7 +2955,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
                     z->direction = 0;
                     stbtt__hheap_free(&hh, z);
                 } else {
-                    z->x += z->dx; // advance to position for current scanline
+                    z->x += z->dx; // advance to position for curr scanline
                     step = &((*step)->next); // advance through list
                 }
             }
@@ -3377,7 +3377,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
         step = &active;
         while (*step) {
             stbtt__active_edge *z = *step;
-            z->fx += z->fdx; // advance to position for current scanline
+            z->fx += z->fdx; // advance to position for curr scanline
             step = &((*step)->next); // advance through list
         }
         
@@ -4209,7 +4209,7 @@ STBTT_DEF int stbtt_PackFontRangesRenderIntoRects(stbtt_pack_context *spc, const
 {
     int i,j,k, missing_glyph = -1, return_value = 1;
     
-    // save current values
+    // save curr values
     int old_h_over = spc->h_oversample;
     int old_v_over = spc->v_oversample;
     

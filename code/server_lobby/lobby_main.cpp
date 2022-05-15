@@ -357,10 +357,10 @@ InitLobbyContext(Lobby_Context *lobby_context)
     lobby_context->main_thread_info.thread_id = U64_MAX;
     lobby_context->main_thread_info.work_queue = &lobby_context->work_queue;
     
-    u32 concurrent_threads_count = 1;
+    u32 concurr_threads_count = 1;
     lobby_context->hosts_iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE,
                                                        0, 0,
-                                                       concurrent_threads_count);
+                                                       concurr_threads_count);
     
     u32 intial_count = 0;
     u32 max_count = WORKER_THREAD_MAX;

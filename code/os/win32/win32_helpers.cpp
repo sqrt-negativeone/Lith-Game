@@ -166,9 +166,9 @@ internal f32
 W32_GetTime(void)
 {
     W32_Timer *timer = &w32_timer;
-    LARGE_INTEGER current_time;
-    QueryPerformanceCounter(&current_time);
-    return w32_os.time.wall_time + (f32)(current_time.QuadPart - timer->begin_frame.QuadPart) / (f32)timer->counts_per_second.QuadPart;
+    LARGE_INTEGER curr_time;
+    QueryPerformanceCounter(&curr_time);
+    return w32_os.time.wall_time + (f32)(curr_time.QuadPart - timer->begin_frame.QuadPart) / (f32)timer->counts_per_second.QuadPart;
 }
 
 internal u64

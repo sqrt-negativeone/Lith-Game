@@ -52,7 +52,6 @@ internal B32      M_ArenaIsNil(M_Arena *arena);
 internal M_Arena *M_ArenaAlloc(U64 cap);
 internal M_Arena *M_ArenaAllocDefault(void);
 internal void     M_ArenaRelease(M_Arena *arena);
-internal void     M_ArenaPushChild(M_Arena *parent, M_Arena *new_child);
 internal void    *M_ArenaPushAligned(M_Arena *arena, U64 size, U64 align);
 internal void    *M_ArenaPush(M_Arena *arena, U64 size);
 internal void    *M_ArenaPushZero(M_Arena *arena, U64 size);
