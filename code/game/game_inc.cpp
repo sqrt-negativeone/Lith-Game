@@ -1,4 +1,3 @@
-#define index_in_residency
 
 #include "game_residency.cpp"
 #include "game_command.cpp"

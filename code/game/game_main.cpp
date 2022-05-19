@@ -16,6 +16,33 @@
 
 global Thread_Ctx game_tctx;
 
+internal void
+ChangeCurrentPlayer(Game_State *game_state)
+{
+    u32 new_player_id = (game_state->curr_player_id + 1) % MAX_PLAYER_COUNT;
+    
+    M_Temp scratch = GetScratch(0 ,0);
+    String8 msg = PushStr8F(scratch.arena, 
+                            "Player's %d Turn!", new_player_id);
+    GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, msg, 
+                                          Vec4(0, 1, 1, 1), Vec3(0, CentiMeter(10), 0), CoordinateType_World, 
+                                          Seconds(1));
+    ReleaseScratch(scratch);
+    
+    game_state->prev_player_id = game_state->curr_player_id;
+    game_state->curr_player_id = new_player_id;
+}
+
+internal void
+PlaySelectedCards(Game_State *game_state)
+{
+    game_state->prev_played_cards_count = game_state->selection_count;
+    game_state->selection_count = 0;
+    MoveAllFromResidency(game_state, ResidencyKind_SelectedCards, ResidencyKind_Table);
+    ChangeCurrentPlayer(game_state);
+    ClearFlag(game_state->flags, StateFlag_ShouldDeclareCard);
+}
+
 internal inline void
 AddPlayer(Game_State *game_state, MessagePlayer *message_player, u32 player_id)
 {
@@ -78,7 +105,7 @@ HandleAvailableMessages(Game_State *game_state)
                         u32 compact_card_index = card_base + card_offset;
                         Card_Type card_type = UnpackCompactCardType(message_result.message.compact_deck[compact_card_index]);
                         b32 is_flipped = (player_index != game_state->my_player_id);
-                        AddCardEntity(game_state, card_type, (ResidencyKind)player->assigned_residency_index, is_flipped);
+                        AddCardEntity(game_state, card_type, (ResidencyKind)player->assigned_residency_kind, is_flipped);
                     }
                 }
                 SetFlag(game_state->flags, StateFlag_ReceivedCards);
@@ -590,7 +617,7 @@ APP_UpdateAndRender(UpdateAndRender)
                         } break;
                         case EntityType_Numbers:
                         {
-                            UpdateNumberEntity(game_state, entity, dt);
+                            UpdateNumberEntity(game_state, entity_id, dt);
                             Render_PushImage(&game_state->render_context, entity->texture, entity->center_pos, entity->curr_dimension, CoordinateType_World,
                                              entity->y_angle);
                         } break;
@@ -633,7 +660,7 @@ APP_UpdateAndRender(UpdateAndRender)
                     }
                     else
                     {
-                        GameCommand_PushCommand_ChangeCurrentPlayer(&game_state->command_buffer);
+                        PlaySelectedCards(game_state);
                     }
                 }
                 
@@ -799,38 +826,12 @@ APP_UpdateAndRender(UpdateAndRender)
                 {
                     // NOTE(fakhri): do nothing
                 } break;
-                case GameCommandKind_ChangeCurrentPlayer:
-                {
-                    u32 new_player_id = (game_state->curr_player_id + 1) % MAX_PLAYER_COUNT;
-                    
-                    M_Temp scratch = GetScratch(0 ,0);
-                    String8 msg = PushStr8F(scratch.arena, 
-                                            "Player's %d Turn!", new_player_id);
-                    GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, msg, 
-                                                          Vec4(0, 1, 1, 1), Vec3(0, CentiMeter(10), 0), CoordinateType_World, 
-                                                          Seconds(1));
-                    ReleaseScratch(scratch);
-                    
-                    game_state->prev_player_id = game_state->curr_player_id;
-                    game_state->curr_player_id = new_player_id;
-                } break;
                 case GameCommandKind_OpenDeclareMenu:
                 {
                     ClearFlag(game_state->flags, StateFlag_ShouldOpenDeclaringMenu);
                     SetFlag(game_state->flags, StateFlag_ShouldDeclareCard);
                     // NOTE(fakhri): move selection cards out from the none residency
                     //MoveAllFromResidency(game_state, ResidencyKind_Nil, ResidencyKind_DeclarationOptions);
-                } break;
-                case GameCommandKind_CloseDeclareMenu:
-                {
-                    // NOTE(fakhri): move selection cards out from the none residency
-                    MoveAllFromResidency(game_state, ResidencyKind_DeclarationOptions, ResidencyKind_Nil);
-                    MoveAllFromResidency(game_state, ResidencyKind_SelectedCards, ResidencyKind_Table);
-                    GameCommand_PushCommand_ChangeCurrentPlayer(&game_state->command_buffer);
-#if 0
-                    game_state->declared_number = game_command->declared_number;
-#endif
-                    ClearFlag(game_state->flags, StateFlag_ShouldDeclareCard);
                 } break;
                 default: NotImplemented;
             }

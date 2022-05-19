@@ -10,9 +10,7 @@ enum Game_Command_Kind
     GameCommandKind_DisplayMessage,
     GameCommandKind_BurnCards,
     GameCommandKind_Delay,
-    GameCommandKind_ChangeCurrentPlayer,
     GameCommandKind_OpenDeclareMenu,
-    GameCommandKind_CloseDeclareMenu,
 };
 
 struct Game_Command

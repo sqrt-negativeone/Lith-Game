@@ -33,6 +33,7 @@ AddNumberEntity(Game_State *game_state, Card_Number number)
     
     entity->target_dimension = 3 * Vec2(MiliMeter(6.5f), MiliMeter(10));
     entity->curr_dimension   = 3 * Vec2(MiliMeter(6.5f), MiliMeter(10));
+    entity->dDimension = 20.f;
     
     entity->texture = game_state->frensh_deck.black_numbers_up[number];
     
@@ -381,23 +382,21 @@ UpdateCursorEntity(Game_State *game_state, Entity *cursor_entity)
     cursor_entity->center_pos = WorldCoordsFromScreenCoords(&game_state->render_context, os->mouse_position);
     
     f32 max_z = -1;
-    game_state->highest_card_under_cursor = 0;
+    game_state->highest_entity_under_cursor = 0;
     for (EachValidResidencyKind(residency_kind))
     {
         Residency *residency = game_state->residencies + residency_kind;
-        if (HasFlag(residency->flags, ResidencyFlags_HostsCards))
+        
+        // NOTE(fakhri): find the card entity with the highest z value in residency
+        ResidencyIterator iter = MakeResidencyIterator(residency);
+        for(EachValidResidencyEntityID(entity_id, iter))
         {
-            // NOTE(fakhri): find the card entity with the highest z value in residency
-            ResidencyIterator iter = MakeResidencyIterator(residency);
-            for(EachValidResidencyEntityID(card_id, iter))
+            Entity *entity = game_state->entities + entity_id;
+            if (IsInsideRect(RectCentDim(entity->center_pos.xy, entity->curr_dimension), cursor_entity->center_pos.xy) && 
+                max_z < entity->center_pos.z)
             {
-                Entity *card_entity = game_state->entities + card_id;
-                if (IsInsideRect(RectCentDim(card_entity->center_pos.xy, card_entity->curr_dimension), cursor_entity->center_pos.xy) && 
-                    max_z < card_entity->center_pos.z)
-                {
-                    game_state->highest_card_under_cursor = card_id;
-                    max_z = card_entity->center_pos.z;
-                }
+                game_state->highest_entity_under_cursor = entity_id;
+                max_z = entity->center_pos.z;
             }
         }
     }
@@ -419,7 +418,7 @@ UpdateCardEntity(Game_State *game_state, EntityID entity_id, f32 dt)
         entity->target_dimension = Vec2(CARD_WIDTH, CARD_HEIGHT);
     }
     
-    if (game_state->highest_card_under_cursor == entity_id)
+    if (game_state->highest_entity_under_cursor == entity_id)
     {
         // NOTE(fakhri): we are under the cursor
         if (!HasFlag(entity->flags, EntityFlag_UnderCursor))
@@ -431,7 +430,7 @@ UpdateCardEntity(Game_State *game_state, EntityID entity_id, f32 dt)
         if (game_state->controller.left_mouse.pressed)
         {
             Player *curr_player = game_state->players + game_state->curr_player_id;
-            if (entity->residency == curr_player->assigned_residency_index)
+            if (entity->residency == curr_player->assigned_residency_kind)
             {
                 if (HasFlag(entity->flags, EntityFlag_Selected))
                 {
@@ -463,78 +462,6 @@ UpdateCardEntity(Game_State *game_state, EntityID entity_id, f32 dt)
         }
     }
     
-#if 0    
-    if (HasFlag(entity->flags, EntityFlag_Selected))
-    {
-        if (game_state->controller.left_mouse.pressed)
-        {
-            SetFlag(entity->flags, EntityFlag_Pressed);
-            entity->entity_id_to_follow = EntityType_Cursor_Entity;
-            entity->target_pos.z = 50.f;
-        }
-    }
-    
-    if (HasFlag(entity->flags, EntityFlag_Pressed))
-    {
-        b32 can_move_to_table = false;
-        b32 can_move_to_declare = false;
-        Rectangle2D table_region = RectCentDim(Vec2(0, 0), Vec2(CentiMeter(30), CentiMeter(30)));
-        Rectangle2D declare_region = RectCentDim(Vec2(0, -CentiMeter(10)), 
-                                                 1.2f * Vec2(CARD_WIDTH, CARD_HEIGHT));
-        
-        if ((entity->residency == GetResidencyOfCurrentPlayer(game_state)) &&
-            IsInsideRect(table_region, entity->center_pos.xy))
-        {
-            
-            Render_PushText(&game_state->render_context, Str8Lit("release your mouse to play the card"), Vec3(0, 0, CentiMeter(60)), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
-            
-            can_move_to_table = 1;
-        }
-        
-        if ((entity->residency == ResidencyKind_DeclarationOptions) && IsInsideRect(declare_region, entity->center_pos.xy))
-        {
-            
-            Render_PushText(&game_state->render_context, Str8Lit("release your mouse declare the card"), Vec3(0, 0, CentiMeter(60)), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
-            
-            can_move_to_declare = 1;
-        }
-        
-        if (game_state->controller.left_mouse.released)
-        {
-            ClearFlag(entity->flags, EntityFlag_Pressed);
-            entity->target_pos = entity->residency_pos;
-            entity->entity_id_to_follow = 0;
-            entity->target_pos.z =  entity->residency_pos.z;
-            
-            if (can_move_to_table)
-            {
-                game_state->prev_player_card = entity->card_type.number;
-                if (IsResidencyEmpty(game_state, ResidencyKind_Table))
-                {
-                    // NOTE(fakhri): player should declare what is the type of
-                    // the card he is playing
-                    SetFlag(game_state->flags, StateFlag_ShouldOpenDeclaringMenu);
-                    ClearFlag(entity->flags, EntityFlag_Selected);
-                    GameCommand_PushCommand_Delay(&game_state->command_buffer, Seconds(0.2f));
-                    GameCommand_PushCommand_OpenDeclareMenu(&game_state->command_buffer);
-                    ChangeResidency(game_state, entity_id, ResidencyKind_SelectedCards);
-                }
-                else
-                {
-                    ChangeResidency(game_state, entity_id, ResidencyKind_Table);
-                    GameCommand_PushCommand_ChangeCurrentPlayer(&game_state->command_buffer);
-                }
-            }
-            else if (can_move_to_declare)
-            {
-                // TODO(fakhri): should we wait for confirmation?
-                GameCommand_PushCommand_Delay(&game_state->command_buffer, Seconds(0.2f));
-                GameCommand_PushCommand_CloseDeclareMenu(&game_state->command_buffer, entity->card_type.number);
-            }
-        }
-    }
-#endif
-    
     entity->y_angle = MoveTowards(entity->y_angle, entity->target_y_angle, entity->dy_angle * dt);
     
     // NOTE(fakhri): update dimension
@@ -545,10 +472,44 @@ UpdateCardEntity(Game_State *game_state, EntityID entity_id, f32 dt)
     MoveEntity(game_state, entity, 100, 10, 0.5f, dt);
 }
 
+internal void PlaySelectedCards(Game_State *game_state);
 internal void
-UpdateNumberEntity(Game_State *game_state, Entity *entity, f32 dt)
+UpdateNumberEntity(Game_State *game_state, EntityID entity_id, f32 dt)
 {
+    Entity *entity = game_state->entities + entity_id;
+    Entity *cursor_entity = game_state->entities + (u32)EntityType_Cursor_Entity;
     MoveEntity(game_state, entity, 100, 10, 0.5f, dt);
+    
+    if (HasFlag(entity->flags, EntityFlag_UnderCursor) && 
+        !IsInsideRect(RectCentDim(entity->center_pos.xy, entity->curr_dimension),
+                      cursor_entity->center_pos.xy))
+    {
+        ClearFlag(entity->flags, EntityFlag_UnderCursor);
+        entity->target_dimension = 3 * Vec2(MiliMeter(6.5f), MiliMeter(10));
+    }
+    
+    if (game_state->highest_entity_under_cursor == entity_id)
+    {
+        // NOTE(fakhri): we are under the cursor
+        if (!HasFlag(entity->flags, EntityFlag_UnderCursor))
+        {
+            SetFlag(entity->flags, EntityFlag_UnderCursor);
+            entity->target_dimension = 1.1f * 3 * Vec2(MiliMeter(6.5f), MiliMeter(10));
+        }
+        
+        if (game_state->controller.left_mouse.pressed)
+        {
+            game_state->declared_number = entity->card_type.number;
+            PlaySelectedCards(game_state);
+            MoveAllFromResidency(game_state, ResidencyKind_DeclarationOptions, ResidencyKind_Nonespacial);
+        }
+    }
+    
+    // NOTE(fakhri): update dimension
+    entity->curr_dimension = Vec2MoveTowards(entity->curr_dimension,
+                                             entity->target_dimension,
+                                             dt * entity->dDimension);
+    
 }
 
 internal void
@@ -617,6 +578,34 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
                     GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, Str8Lit("Select a card first"), Vec4(0, 0, 0, 1), Vec3(0, 0, 50), CoordinateType_World, Seconds(1.0f));
                 }
             } break;
+            case ButtonEntityKind_QuestionCredibility:
+            {
+                if (game_state->prev_played_cards_count)
+                {
+                    // NOTE(fakhri): if any of the previously played cards are
+                    // different from the declared cards then punish the prev player,
+                    // else punish the current player
+                    b32 prev_player_lied = false;
+                    for (u32 index = 0;
+                         index < game_state->prev_played_cards_count;
+                         ++index)
+                    {
+                        Residency *residency = game_state->residencies + ResidencyKind_Table;
+                        EntityID entity_id = residency->entity_ids[residency->entity_count - index];
+                        if (game_state->entities[entity_id].card_type.number != game_state->declared_number)
+                        {
+                            prev_player_lied = true;
+                            break;
+                        }
+                    } 
+                    
+                    PlayerID player_id_to_punish = prev_player_lied?
+                        game_state->prev_player_id : game_state->curr_player_id;
+                    Player *player_to_punish = game_state->players + player_id_to_punish;
+                    MoveAllFromResidency(game_state, ResidencyKind_Table, player_to_punish->assigned_residency_kind);
+                    // TODO(fakhri): clear the declared number
+                }
+            } break;
             default: NotImplemented;
         }
     }
@@ -673,7 +662,7 @@ AddDebugEntites(Game_State *game_state)
     {
         Player *player = game_state->players + player_index;
         player->joined = true;
-        player->assigned_residency_index = ResidencyKind_Left + player_index;
+        player->assigned_residency_kind = ResidencyKind_Left + player_index;
         player->username = PushStr8F(os->permanent_arena, "%c", 'a' + player_index);
     }
     
@@ -715,14 +704,12 @@ AddDebugEntites(Game_State *game_state)
     }
 #endif
     
-#if 1
     for (Card_Number number = Card_Number_Ace;
          number < Card_Number_Count;
          ++number)
     {
         AddNumberEntity(game_state, number);
     }
-#endif
     
     AddButtonEntity(game_state, ButtonEntityKind_QuestionCredibility, Vec3(MiliMeter(150), MiliMeter(0), 0), Vec2(MiliMeter(50), MiliMeter(30)));
     AddButtonEntity(game_state, ButtonEntityKind_PlaySelectedCards, Vec3(MiliMeter(150), -MiliMeter(40), 0), Vec2(MiliMeter(50), MiliMeter(30)));

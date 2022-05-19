@@ -73,18 +73,6 @@ GameCommand_PushCommand_OpenDeclareMenu(Game_Command_Buffer *command_buffer)
 }
 
 internal Game_Command *
-GameCommand_PushCommand_CloseDeclareMenu(Game_Command_Buffer *command_buffer, Card_Number declared_number)
-{
-    Game_Command *game_command = GameCommand_PushCommand(command_buffer);
-    Assert(game_command);
-    
-    game_command->kind = GameCommandKind_CloseDeclareMenu;
-    game_command->declared_number = declared_number;
-    
-    return game_command;
-}
-
-internal Game_Command *
 GameCommand_PushCommand_Delay(Game_Command_Buffer *command_buffer, f32 duration)
 {
     Game_Command *game_command = GameCommand_PushCommand(command_buffer);
@@ -92,17 +80,6 @@ GameCommand_PushCommand_Delay(Game_Command_Buffer *command_buffer, f32 duration)
     
     game_command->kind     = GameCommandKind_Delay;
     game_command->duration = duration;
-    
-    return game_command;
-}
-
-internal Game_Command *
-GameCommand_PushCommand_ChangeCurrentPlayer(Game_Command_Buffer *command_buffer)
-{
-    Game_Command *game_command = GameCommand_PushCommand(command_buffer);
-    Assert(game_command);
-    
-    game_command->kind = GameCommandKind_ChangeCurrentPlayer;
     
     return game_command;
 }

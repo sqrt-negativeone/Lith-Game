@@ -18,7 +18,9 @@ internal EntityID
 ResidencyIterator_NextValid(ResidencyIterator *iter)
 {
     EntityID result = InvalidEntityID;
-    for (;iter->index < iter->residency->entity_count; ++iter->index)
+    for (;
+         iter->index < ArrayCount(iter->residency->entity_ids);
+         ++iter->index)
     {
         EntityID entity_id = iter->residency->entity_ids[iter->index];
         if(IsValidEntityID(entity_id))
@@ -113,7 +115,6 @@ InitResidencies(Game_State *game_state)
     
 }
 
-
 internal void
 ReorganizeResidencyCards(Game_State *game_state, ResidencyKind residency_kind)
 {
@@ -125,7 +126,7 @@ ReorganizeResidencyCards(Game_State *game_state, ResidencyKind residency_kind)
         {
             u32 min_invalide_index = 0;
             for (u32 index = 0;
-                 index < residency->entity_count;
+                 index < ArrayCount(residency->entity_ids);
                  ++index)
             {
                 EntityID entity_id = residency->entity_ids[index];
@@ -135,7 +136,14 @@ ReorganizeResidencyCards(Game_State *game_state, ResidencyKind residency_kind)
                     min_invalide_index++;
                 }
             }
-            residency->entity_count = min_invalide_index;
+            
+            for (u32 index = min_invalide_index;
+                 index < ArrayCount(residency->entity_ids);
+                 ++index)
+            {
+                residency->entity_ids[index] = InvalidEntityID;
+            }
+            
         }
         
         if (residency->entity_count)
@@ -149,7 +157,13 @@ ReorganizeResidencyCards(Game_State *game_state, ResidencyKind residency_kind)
             Rand_Ctx rand_ctx = {};
             v3 base_position = residency->base_position;
             axis_count_limit = residency->entity_count;
-            if (!HasFlag(residency->flags, ResidencyFlags_RandomizedPlacement))
+            
+            if (HasFlag(residency->flags, ResidencyFlags_RandomizedPlacement))
+            {
+                u32 seed = *(u32*)&os->time.wall_time;
+                rand_ctx = MakeLineraRandomGenerator(seed);
+            }
+            else
             {
                 if (HasFlag(residency->flags, ResidencyFlags_Horizontal))
                 {
@@ -170,23 +184,17 @@ ReorganizeResidencyCards(Game_State *game_state, ResidencyKind residency_kind)
                     axis_count_limit = 13;
                     advance = Vec2(CARD_HORIZONTAL_ADVANCE, CARD_VIRTICAL_ADVANCE);
                 }
-                
                 base_position[axis] = -0.5f * Min(axis_count_limit, residency->entity_count) * advance[axis];
                 advance[overflow_axis] *= residency->advance_direction;
             }
-            else
-            {
-                u32 seed = *(u32*)&os->time.wall_time;
-                rand_ctx = MakeLineraRandomGenerator(seed);
-            }
             
-            Assert(axis_count_limit);
             u32 total_row_count = residency->entity_count / axis_count_limit;
             u32 remaining_entity_count = residency->entity_count % axis_count_limit;
             u32 current_row = 0;
             
             ResidencyIterator iter = MakeResidencyIterator(residency);
             for(EachValidResidencyEntityID(entity_id, iter))
+                
             {
                 v3 position = {};
                 
@@ -286,14 +294,14 @@ ChangeResidency(Game_State *game_state, u32 entity_id, ResidencyKind residency)
         if (old_residency != ResidencyKind_Nil)
         {
             Residency *old_entity_residency = game_state->residencies + old_residency;
-            for (u32 residency_index = 0;
-                 residency_index < old_entity_residency->entity_count;
-                 ++residency_index)
+            ResidencyIterator iter = MakeResidencyIterator(old_entity_residency);
+            for (EachValidResidencyEntityID(residency_entity_id, iter))
             {
-                if (old_entity_residency->entity_ids[residency_index] == entity_id)
+                if (residency_entity_id == entity_id)
                 {
                     SetFlag(old_entity_residency->flags, ResidencyFlags_NeedsReorganizing);
-                    old_entity_residency->entity_ids[residency_index] = InvalidEntityID;
+                    old_entity_residency->entity_ids[iter.index - 1] = InvalidEntityID;
+                    --old_entity_residency->entity_count;
                     break;
                 }
             }
@@ -325,13 +333,13 @@ AssignResidencyToPlayers(Game_State *game_state)
         Player *player = game_state->players + player_index;
         if (player_index == game_state->my_player_id)
         {
-            player->assigned_residency_index = ResidencyKind_Down;
+            player->assigned_residency_kind = ResidencyKind_Down;
             game_state->residencies[ResidencyKind_Down].controlling_player_id = player_index;
         }
         else
         {
             Assert(residency != ResidencyKind_Down);
-            player->assigned_residency_index = (ResidencyKind)residency;
+            player->assigned_residency_kind = (ResidencyKind)residency;
             game_state->residencies[residency].controlling_player_id = player_index;
             ++residency;
         }
@@ -349,6 +357,6 @@ internal ResidencyKind
 GetResidencyOfCurrentPlayer(Game_State *game_state)
 {
     u32 curr_player_id = game_state->curr_player_id;
-    ResidencyKind result = (ResidencyKind)game_state->players[curr_player_id].assigned_residency_index;
+    ResidencyKind result = (ResidencyKind)game_state->players[curr_player_id].assigned_residency_kind;
     return result;
 }

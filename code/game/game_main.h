@@ -78,7 +78,7 @@ struct Player
 {
     b32 joined;
     String8 username;
-    ResidencyKind assigned_residency_index;
+    ResidencyKind assigned_residency_kind;
 };
 
 struct Game_State
@@ -102,9 +102,11 @@ struct Game_State
     Buffer host_address_buffer;
     Buffer username_buffer;
     f32 time_scale_factor;
-    EntityID highest_card_under_cursor;
+    EntityID highest_entity_under_cursor;
     u32 selection_limit;
+    u32 prev_played_cards_count;
     u32 selection_count;
+    Card_Number declared_number;
 };
 
 #endif //GAME_MAIN_H
