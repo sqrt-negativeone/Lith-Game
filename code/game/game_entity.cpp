@@ -528,6 +528,7 @@ UpdateCompanionEntity(Game_State *game_state, Entity *entity, f32 dt)
     }
 }
 
+internal void ChangeCurrentPlayer(Game_State *game_state);
 internal void
 UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
 {
@@ -589,7 +590,7 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
                          ++index)
                     {
                         Residency *residency = game_state->residencies + ResidencyKind_Table;
-                        EntityID entity_id = residency->entity_ids[residency->entity_count - index];
+                        EntityID entity_id = residency->entity_ids[residency->entity_count - 1 - index];
                         if (game_state->entities[entity_id].card_type.number != game_state->declared_number)
                         {
                             prev_player_lied = true;
@@ -601,6 +602,7 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
                         game_state->prev_player_id : game_state->curr_player_id;
                     Player *player_to_punish = game_state->players + player_id_to_punish;
                     MoveAllFromResidency(game_state, ResidencyKind_Table, player_to_punish->assigned_residency_kind);
+                    ChangeCurrentPlayer(game_state);
                     // TODO(fakhri): clear the declared number
                 }
             } break;
