@@ -667,20 +667,16 @@ APP_UpdateAndRender(UpdateAndRender)
                 // NOTE(fakhri): see if any residency needs reorganization
                 {
                     b32 should_burn_cards = false;
-                    for (u32 residency_index = 0;
-                         residency_index < ResidencyKind_Count;
-                         ++residency_index)
+                    for (ResidencyKind residency_kind = 0;
+                         residency_kind < ResidencyKind_Count;
+                         ++residency_kind)
                     {
-                        Residency *residency = game_state->residencies + residency_index;
+                        Residency *residency = game_state->residencies + residency_kind;
                         if (HasFlag(residency->flags, ResidencyFlags_NeedsReorganizing))
                         {
-                            ReorganizeResidencyCards(game_state, (ResidencyKind)residency_index);
+                            ReorganizeResidencyCards(game_state, (ResidencyKind)residency_kind);
                             if (HasFlag(residency->flags, ResidencyFlags_Burnable))
                             {
-                                // TODO(fakhri): card_number_frequencies can be a field in the Residency
-                                // this way we don't have to recompute it each time we call this function
-                                // but then the complexity of maintaining this frequency table
-                                // will leak to change residency for example
                                 // NOTE(fakhri): count the frequency of each card number in the residency
                                 u32 card_number_freq[Card_Number_Count] = {};
                                 for(u32 entity_id_in_residency = 0;

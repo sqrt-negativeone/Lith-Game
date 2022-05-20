@@ -11,7 +11,7 @@ residency_kind < ResidencyKind_Count;                \
 
 #define EachControllableResidencyKind(residency_kind)  \
 /*for (*/u32 residency_kind = ResidencyKind_Left;    \
-residency_kind < ResidencyKind_Down;                 \
+residency_kind <= ResidencyKind_Down;                 \
 ++residency_kind/*)*/
 
 typedef u32 ResidencyKind;
