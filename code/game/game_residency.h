@@ -60,8 +60,10 @@ struct Residency
 
 struct ResidencyIterator
 {
+    ResidencyKind residency_kind;
     Residency *residency;
-    u32 index;
+    i32 index; // index of the current entity in the residency
+    b32 dont_increment;
 };
 
 #endif //GAME_RESIDENCY_H

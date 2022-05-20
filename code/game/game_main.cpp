@@ -632,7 +632,7 @@ APP_UpdateAndRender(UpdateAndRender)
                 {
                     b32 table_empty = IsResidencyEmpty(game_state, ResidencyKind_Table);
                     
-                    ResidencyIterator iter = MakeResidencyIterator(game_state->residencies + GetResidencyOfCurrentPlayer(game_state));
+                    ResidencyIterator iter = MakeResidencyIterator(game_state, GetResidencyOfCurrentPlayer(game_state));
                     for(EachValidResidencyEntityID(entity_id, iter))
                     {
                         Entity *entity = game_state->entities + entity_id;
@@ -641,11 +641,11 @@ APP_UpdateAndRender(UpdateAndRender)
                             ClearFlag(entity->flags, EntityFlag_Selected);
                             if (table_empty)
                             {
-                                ChangeResidency(game_state, entity_id, ResidencyKind_SelectedCards);
+                                ChangeResidency(game_state, &iter, ResidencyKind_SelectedCards);
                             }
                             else
                             {
-                                ChangeResidency(game_state, entity_id, ResidencyKind_Table);
+                                ChangeResidency(game_state, &iter, ResidencyKind_Table);
                             }
                         }
                     }
@@ -807,16 +807,16 @@ APP_UpdateAndRender(UpdateAndRender)
                 {
                     // NOTE(fakhri): burn the marked cards
                     Assert(ResidencyKind_Down - ResidencyKind_Left + 1  == MAX_PLAYER_COUNT);
-                    for(EachControllableResidencyKind(residency_index))
+                    for(EachControllableResidencyKind(residency_kind))
                     {
-                        ResidencyIterator iter = MakeResidencyIterator(game_state->residencies + residency_index);
+                        ResidencyIterator iter = MakeResidencyIterator(game_state, residency_kind);
                         for(EachValidResidencyEntityID(entity_id, iter))
                         {
                             Entity *entity = game_state->entities + entity_id;
                             if(HasFlag(entity->flags, EntityFlag_MarkedForBurning))
                             {
                                 ClearFlag(entity->flags, EntityFlag_MarkedForBurning);
-                                ChangeResidency(game_state, entity_id, ResidencyKind_Burnt);
+                                ChangeResidency(game_state, &iter, ResidencyKind_Burnt);
                             }
                         }
                         ClearFlag(game_state->flags, StateFlag_ShouldBurnCards);

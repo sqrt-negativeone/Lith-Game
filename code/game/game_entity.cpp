@@ -385,10 +385,8 @@ UpdateCursorEntity(Game_State *game_state, Entity *cursor_entity)
     game_state->highest_entity_under_cursor = 0;
     for (EachValidResidencyKind(residency_kind))
     {
-        Residency *residency = game_state->residencies + residency_kind;
-        
         // NOTE(fakhri): find the card entity with the highest z value in residency
-        ResidencyIterator iter = MakeResidencyIterator(residency);
+        ResidencyIterator iter = MakeResidencyIterator(game_state, residency_kind);
         for(EachValidResidencyEntityID(entity_id, iter))
         {
             Entity *entity = game_state->entities + entity_id;
