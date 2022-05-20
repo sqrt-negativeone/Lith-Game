@@ -380,6 +380,7 @@ internal void
 UpdateCursorEntity(Game_State *game_state, Entity *cursor_entity)
 {
     cursor_entity->center_pos = WorldCoordsFromScreenCoords(&game_state->render_context, os->mouse_position);
+    cursor_entity->center_pos.z = MAX_Z;
     
     f32 max_z = -1;
     game_state->highest_entity_under_cursor = 0;
@@ -408,9 +409,7 @@ UpdateCardEntity(Game_State *game_state, EntityID entity_id, f32 dt)
     Assert(cursor_entity->type == EntityType_Cursor_Entity);
     Assert(ResidencyKind_Nil < entity->residency && entity->residency < ResidencyKind_Count);
     
-    if (HasFlag(entity->flags, EntityFlag_UnderCursor) && 
-        !IsInsideRect(RectCentDim(entity->center_pos.xy, entity->curr_dimension),
-                      cursor_entity->center_pos.xy))
+    if (HasFlag(entity->flags, EntityFlag_UnderCursor) && game_state->highest_entity_under_cursor != entity_id)
     {
         ClearFlag(entity->flags, EntityFlag_UnderCursor);
         entity->target_dimension = Vec2(CARD_WIDTH, CARD_HEIGHT);
@@ -518,12 +517,12 @@ UpdateCompanionEntity(Game_State *game_state, Entity *entity, f32 dt)
 {
     Assert(entity->entity_id_to_follow);
     
+    Assert(IsValidEntityID(entity->entity_id_to_follow) && entity->entity_id_to_follow < game_state->entity_count);
+    Entity *entity_to_follow = game_state->entities + entity->entity_id_to_follow;
+    entity->y_angle = entity_to_follow->y_angle;
+    entity->target_pos.z =  entity_to_follow->center_pos.z + MiliMeter(0.1f);
     MoveEntity(game_state, entity, 85.f, 0.5f, 0.1f, dt);
     
-    Entity *entity_to_follow = game_state->entities + entity->entity_id_to_follow;
-    Assert(entity_to_follow);
-    entity->center_pos.z =  entity_to_follow->center_pos.z + 0.01f;
-    entity->y_angle = entity_to_follow->y_angle;
     
     if (entity_to_follow->residency == ResidencyKind_Nil)
     {
@@ -582,17 +581,17 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
             } break;
             case ButtonEntityKind_QuestionCredibility:
             {
-                if (game_state->prev_played_cards_count)
+                // NOTE(fakhri): if any of the previously played cards are
+                // different from the declared cards then punish the prev player,
+                // else punish the current player
+                Residency *residency = game_state->residencies + ResidencyKind_Table;
+                if (residency->entity_count)
                 {
-                    // NOTE(fakhri): if any of the previously played cards are
-                    // different from the declared cards then punish the prev player,
-                    // else punish the current player
                     b32 prev_player_lied = false;
                     for (u32 index = 0;
                          index < game_state->prev_played_cards_count;
                          ++index)
                     {
-                        Residency *residency = game_state->residencies + ResidencyKind_Table;
                         EntityID entity_id = residency->entity_ids[residency->entity_count - 1 - index];
                         if (game_state->entities[entity_id].card_type.number != game_state->declared_number)
                         {
@@ -607,6 +606,12 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
                     MoveAllFromResidency(game_state, ResidencyKind_Table, player_to_punish->assigned_residency_kind);
                     ChangeCurrentPlayer(game_state);
                     game_state->declared_number = InvalidCardNumber;
+                    game_state->prev_played_cards_count = 0;
+                }
+                else
+                {
+                    GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, Str8Lit("Table empty"),
+                                                          Vec4(1, 1, 1, 1), Vec3(0, 0, MAX_Z), CoordinateType_World,  Seconds(2.0f));
                 }
             } break;
             default: NotImplemented;

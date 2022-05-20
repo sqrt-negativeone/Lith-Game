@@ -1,5 +1,5 @@
 
-#define MAX_Z 100.0f
+#define MAX_Z Meter(10.0f)
 
 internal void
 LoadFrenshSuitedDeck(Frensh_Suited_Cards_Texture *deck_textures)

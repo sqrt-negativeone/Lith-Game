@@ -447,6 +447,7 @@ APP_UpdateAndRender(UpdateAndRender)
     Render_Begin(&game_state->render_context, OS_FrameArena());
     
     Render_PushClear(&game_state->render_context, Vec4(0.4f, 0.4f, 0.4f, 1.f), -MAX_Z);
+    
     // NOTE(fakhri): Debug UI
     {
         M_Temp scratch = GetScratch(0, 0);
@@ -454,11 +455,11 @@ APP_UpdateAndRender(UpdateAndRender)
         // NOTE(fakhri): World coords axix
         {
             Render_PushQuad(&game_state->render_context, 
-                            Vec3(0, 0, 0),
+                            Vec3(0, 0, -MAX_Z),
                             Vec2(Meter(2.0f), MiliMeter(1.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
             
             Render_PushQuad(&game_state->render_context, 
-                            Vec3(0, 0, 0),
+                            Vec3(0, 0, -MAX_Z),
                             Vec2(MiliMeter(1.0f), Meter(2.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
         }
         
@@ -559,6 +560,12 @@ APP_UpdateAndRender(UpdateAndRender)
                         case EntityType_Cursor_Entity:
                         {
                             UpdateCursorEntity(game_state, entity);
+                            
+                            // NOTE(fakhri): render the mouse cursor
+                            Render_PushQuad(&game_state->render_context, 
+                                            entity->center_pos,
+                                            Vec2(MiliMeter(5.f), MiliMeter(5.f)), Vec4(1, .3f, .5f, 1.f), CoordinateType_World);
+                            
                         } break;
                         case EntityType_Card:
                         {
@@ -721,11 +728,11 @@ APP_UpdateAndRender(UpdateAndRender)
                 {
                     b32 did_choose_card = false;
                     
-                    Render_PushQuad(&game_state->render_context, Vec3(0,0,0), Vec2(CentiMeter(80), CentiMeter(50)),Vec4(0.1f, 0.1f, 0.1f, 0.5f), CoordinateType_World);
+                    Render_PushQuad(&game_state->render_context, Vec3(0,0, Meter(1)), Vec2(CentiMeter(80), CentiMeter(50)),Vec4(0.1f, 0.1f, 0.1f, 0.5f), CoordinateType_World);
                     
-                    Render_PushText(&game_state->render_context, Str8Lit("Cards you are going to Play"),  Vec3(0,CentiMeter(15),0), Vec4(1.0f, 1.0f, 1.0f, 1.0f), CoordinateType_World, FontKind_Arial);
+                    Render_PushText(&game_state->render_context, Str8Lit("Cards you are going to Play"),  Vec3(0,CentiMeter(15), Meter(1)), Vec4(1.0f, 1.0f, 1.0f, 1.0f), CoordinateType_World, FontKind_Arial);
                     
-                    Render_PushText(&game_state->render_context, Str8Lit("Select A Card To Declare"),  Vec3(0,CentiMeter(20),0), Vec4(1.0f, 1.0f, 1.0f, 1.0f), CoordinateType_World, FontKind_Arial);
+                    Render_PushText(&game_state->render_context, Str8Lit("Select A Card To Declare"),  Vec3(0,CentiMeter(20),Meter(1)), Vec4(1.0f, 1.0f, 1.0f, 1.0f), CoordinateType_World, FontKind_Arial);
                     
                     // TODO(fakhri): think about how to present this
                 }
@@ -841,11 +848,6 @@ APP_UpdateAndRender(UpdateAndRender)
             GameCommand_EatFirstCommand(&game_state->command_buffer);
         }
     }
-    
-    // NOTE(fakhri): render the mouse cursor
-    Render_PushQuad(&game_state->render_context, 
-                    Vec3(os->mouse_position, 99),
-                    Vec2(MiliMeter(5.f), MiliMeter(5.f)), Vec4(1, .3f, .5f, 1.f), CoordinateType_Screen);
     
     Render_End(&game_state->render_context);
     

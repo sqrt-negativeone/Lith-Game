@@ -102,6 +102,7 @@ InitResidencies(Game_State *game_state)
         Residency *residency = game_state->residencies + ResidencyKind_DeclarationOptions;
         SetFlag(residency->flags, ResidencyFlags_Horizontal);
         residency->controlling_player_id = InvalidePlayerID;
+        residency->base_position = Vec3(0, CentiMeter(0), Meter(1));
     }
     
     // NOTE(fakhri): selected cards for play residency
@@ -109,7 +110,7 @@ InitResidencies(Game_State *game_state)
         Residency *residency = game_state->residencies + ResidencyKind_SelectedCards;
         SetFlag(residency->flags, ResidencyFlags_Horizontal | ResidencyFlags_HostsCards);
         residency->controlling_player_id = InvalidePlayerID;
-        residency->base_position = Vec3(0, CentiMeter(10), 0);
+        residency->base_position = Vec3(0, CentiMeter(10), Meter(1));
     }
     
 }
@@ -129,7 +130,8 @@ ReorganizeResidencyCards(Game_State *game_state, ResidencyKind residency_kind)
             Axis2 axis = Axis2_X;
             Axis2 overflow_axis = Axis2_X;
             Rand_Ctx rand_ctx = {};
-            v3 base_position = residency->base_position;
+            v2 base_position = residency->base_position.xy;
+            f32 z = residency->base_position.z;
             axis_count_limit = residency->entity_count;
             
             if (HasFlag(residency->flags, ResidencyFlags_RandomizedPlacement))
@@ -168,15 +170,14 @@ ReorganizeResidencyCards(Game_State *game_state, ResidencyKind residency_kind)
             
             ResidencyIterator iter = MakeResidencyIterator(game_state, residency_kind);
             for(EachValidResidencyEntityID(entity_id, iter))
-                
             {
-                v3 position = {};
+                v2 position = {};
                 
                 if (HasFlag(residency->flags, ResidencyFlags_RandomizedPlacement))
                 {
                     f32 angle = 2.0f * PI32 * NextRandomNumberNF(&rand_ctx);
                     f32 length;
-                    v3 dir = Vec3(CosF(angle), SinF(angle), 0);
+                    v2 dir = Vec2(CosF(angle), SinF(angle));
                     if (HasFlag(residency->flags, ResidencyFlags_OutsideScreen))
                     {
                         Render_Context *render_context = &game_state->render_context;
@@ -202,15 +203,16 @@ ReorganizeResidencyCards(Game_State *game_state, ResidencyKind residency_kind)
                         {
                             base_position[axis] = -0.5f * remaining_entity_count * advance[axis];
                         }
-                        base_position.z -= CentiMeter(20);
+                        z -= CentiMeter(20);
                     }
                     position = base_position;
                     position[axis] += reorganized_entity_count * advance[axis];
-                    position.z += MiliMeter(20);
+                    z += MiliMeter(1);
                 }
                 
                 Entity *entity = game_state->entities + entity_id;
-                entity->residency_pos = position;
+                entity->residency_pos.xy = position;
+                entity->residency_pos.z = z;
                 if (entity->entity_id_to_follow == InvalidEntityID)
                 {
                     // NOTE(fakhri): go to the residency position if i'm not already following an entitiy
