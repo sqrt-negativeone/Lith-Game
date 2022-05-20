@@ -1,4 +1,6 @@
 
+#define MAX_Z 100.0f
+
 internal void
 LoadFrenshSuitedDeck(Frensh_Suited_Cards_Texture *deck_textures)
 {
@@ -133,17 +135,23 @@ _Render_PushRequest(Push_Buffer *push_buffer, u32 size)
     {
         result = (u8 *)push_buffer->memory + push_buffer->size;
         push_buffer->size += size;
+        ++push_buffer->requests_count;
     }
     return result;
 }
 
 
 internal void
-Render_PushClear(Render_Context *render_context, v4 color)
+Render_PushClear(Render_Context *render_context, v4 color, f32 z)
 {
     RenderRequest_Clear *clear_request = Render_PushRequest(render_context->push_buffer, RenderRequest_Clear);
-    
+    // TODO(fakhri): what the best behaviour for clear?
+    // should we clear every render call that came before it?
+    // or just the ones have lower z?
+    // NOTE(fakhri): currently we clear the ones that have lower z
     clear_request->header.kind = RenderKind_Clear;
+    clear_request->header.z = z;
+    clear_request->header.offset_to_next = sizeof(RenderRequest_Clear);
     clear_request->color = color;
 }
 
@@ -159,7 +167,9 @@ Render_PushQuad(Render_Context *render_context, v3 pos, v2 size_in_meter, v4 col
     RenderRequest_Quad *quad_request = Render_PushRequest(render_context->push_buffer, RenderRequest_Quad);
     
     quad_request->header.kind = RenderKind_Quad;
-    quad_request->screen_coords = pos;
+    quad_request->header.z = pos.z;
+    quad_request->header.offset_to_next = sizeof(RenderRequest_Quad);
+    quad_request->screen_coords = pos.xy;
     quad_request->size = render_context->pixels_per_meter * size_in_meter;
     quad_request->color = color;
     quad_request->y_angle = y_angle;
@@ -181,7 +191,9 @@ Render_PushImage(Render_Context *render_context, Texture2D texture,
     RenderRequest_Image *image_request = Render_PushRequest(render_context->push_buffer, RenderRequest_Image);
     
     image_request->header.kind = RenderKind_Image;
-    image_request->screen_coords = pos;
+    image_request->header.z = pos.z;
+    image_request->header.offset_to_next = sizeof(RenderRequest_Image);
+    image_request->screen_coords = pos.xy;
     image_request->texture = texture;
     image_request->size = is_size_in_meter ? render_context->pixels_per_meter * size : size;
     image_request->y_angle = y_angle;
@@ -239,7 +251,7 @@ AllocatePushBuffer(M_Arena *arena)
 {
     Push_Buffer *push_buffer = (Push_Buffer *)M_ArenaPushZero(arena, Megabytes(1));
     
-    push_buffer->memory = push_buffer + sizeof(*push_buffer);
+    push_buffer->memory = push_buffer + sizeof(Push_Buffer);
     push_buffer->capacity = Megabytes(1) - sizeof(Push_Buffer);
     push_buffer->size = 0;
     
@@ -255,9 +267,9 @@ Render_Begin(Render_Context *render_context, M_Arena *frame_arena)
     if (new_screen != render_context->screen)
     {
         render_context->screen = new_screen;
-        
-        f32 meters_in_half_screen_width = Meter(0.5f);
-        render_context->pixels_per_meter = render_context->screen.width / (2 * meters_in_half_screen_width);
+        // TODO(fakhri): zoom level?
+        f32 meters_in_screen_width = Meter(1.0f);
+        render_context->pixels_per_meter = render_context->screen.width / meters_in_screen_width;
         
         // TODO(fakhri): aspect ratio
     }
@@ -273,29 +285,79 @@ Render_Begin(Render_Context *render_context, M_Arena *frame_arena)
     render_context->push_buffer = AllocatePushBuffer(frame_arena);
 }
 
+internal RenderSortBuffer
+MakeSortBuffer(M_Arena *arena, u32 count)
+{
+    RenderSortBuffer sort_buffer;
+    sort_buffer.elements = PushArray(arena, RenderSortEntry, count);
+    sort_buffer.count = count;
+    return sort_buffer;
+};
+
+internal void
+SortRenderRequests(M_Arena *arnea, RenderSortBuffer *sort_buffer)
+{
+    for (u32 i = 0;
+         i < sort_buffer->count;
+         ++i)
+    {
+        f32 min_z = sort_buffer->elements[i].z;
+        u32 index_min = i;
+        for (u32 j = i + 1;
+             j < sort_buffer->count;
+             ++j)
+        {
+            f32 z_j = sort_buffer->elements[j].z;
+            if (z_j < min_z)
+            {
+                min_z = z_j;
+                index_min = j;
+            }
+        }
+        
+        RenderSortEntry tmp = sort_buffer->elements[i];
+        sort_buffer->elements[i] = sort_buffer->elements[index_min];
+        sort_buffer->elements[index_min] = tmp;
+    }
+}
 
 internal void
 Render_End(Render_Context *render_context)
 {
-    // TODO(fakhri): sort the requests from back to front
     m4 ortho_projection = Orthographic(0.0f, render_context->screen.width, 
                                        render_context->screen.height, 0.0f,
-                                       -100.f, 100.f);
-    
+                                       -MAX_Z, MAX_Z);
     
     Push_Buffer *push_buffer = render_context->push_buffer;
-    u8 *header_ptr = (u8*)render_context->push_buffer->memory;
-    for(;
-        header_ptr < (u8*)push_buffer->memory + push_buffer->size;
-        )
+    RenderSortBuffer sort_buffer = MakeSortBuffer(render_context->frame_arena, push_buffer->requests_count);
+    
+    for(u32 offset = 0, entry_index = 0;
+        offset < push_buffer->size, entry_index < sort_buffer.count;
+        ++entry_index)
     {
-        RenderRequest_Header *header = (RenderRequest_Header *)header_ptr;
+        RenderSortEntry *sort_entry = sort_buffer.elements + entry_index;
+        RenderRequest_Header *header = (RenderRequest_Header *)((byte_ptr)push_buffer->memory + offset);
+        sort_entry->z = header->z;
+        sort_entry->offset = offset;
+        offset += header->offset_to_next;
+        ++sort_entry;
+    }
+    
+    SortRenderRequests(render_context->frame_arena, &sort_buffer);
+    
+    for(u32 entry_index = 0;
+        entry_index < sort_buffer.count;
+        ++entry_index)
+    {
+        RenderSortEntry *sort_entry = sort_buffer.elements + entry_index;
+        RenderRequest_Header *header = (RenderRequest_Header *)((byte_ptr)push_buffer->memory + sort_entry->offset);
         switch(header->kind)
         {
             case RenderKind_Quad:
             {
                 RenderRequest_Quad *quad_request = (RenderRequest_Quad *)header;
-                m4 trans = Translate(quad_request->screen_coords);
+                v3 position = Vec3(quad_request->screen_coords, header->z);
+                m4 trans = Translate(position);
                 m4 scale = Scale(Vec3(quad_request->size, 1.0f));
                 m4 rotat = Rotate(quad_request->y_angle, Vec3(0,1,0));
                 
@@ -304,14 +366,14 @@ Render_End(Render_Context *render_context)
                 Shader_Program *program = render_context->shaders + ShaderKind_Quad;
                 OpenGL_DrawSolidQuad(program, ortho_projection, model, quad_request->color);
                 
-                header_ptr += sizeof(*quad_request);
             } break;
             
             case RenderKind_Image:
             {
                 RenderRequest_Image *image_request = (RenderRequest_Image *)header;
                 
-                m4 trans = Translate(image_request->screen_coords);
+                v3 position = Vec3(image_request->screen_coords, header->z);
+                m4 trans = Translate(position);
                 m4 scale = Scale(Vec3(image_request->size, 1.0f));
                 m4 rotat = Rotate(image_request->y_angle, Vec3(0,1,0));
                 m4 model = trans * rotat * scale;
@@ -319,14 +381,12 @@ Render_End(Render_Context *render_context)
                 Shader_Program *program = render_context->shaders + ShaderKind_Texture;
                 OpenGL_DrawImage(program, image_request->texture, ortho_projection, model, image_request->src, image_request->color);
                 
-                header_ptr += sizeof(*image_request);
             } break;
             
             case RenderKind_Clear:
             {
                 RenderRequest_Clear *clear_request = (RenderRequest_Clear *)header;
                 OpenGL_Clear(clear_request->color);
-                header_ptr += sizeof(*clear_request);
             } break;
             
             default :

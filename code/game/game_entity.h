@@ -36,6 +36,8 @@ enum
     Category_Count,
 };
 
+#define InvalidCardNumber Card_Number_Count
+
 typedef u8 Card_Number;
 enum
 {

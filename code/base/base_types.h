@@ -157,7 +157,7 @@ typedef S32      b32;
 typedef S64      b64;
 typedef float    f32;
 typedef double   f64;
-
+typedef u8      *byte_ptr;
 typedef void VoidFunction(void);
 ////////////////////////////////
 //~ rjf: Limits

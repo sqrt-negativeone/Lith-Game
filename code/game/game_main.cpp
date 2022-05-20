@@ -424,6 +424,7 @@ APP_PermanantLoad(PermanentLoad)
     game_state->my_player_id      = ResidencyKind_Down - ResidencyKind_Left;
     AddDebugEntites(game_state);
 #endif
+    game_state->declared_number = InvalidCardNumber;
 }
 
 
@@ -445,7 +446,7 @@ APP_UpdateAndRender(UpdateAndRender)
     HandleAvailableMessages(game_state);
     Render_Begin(&game_state->render_context, OS_FrameArena());
     
-    Render_PushClear(&game_state->render_context, Vec4(0.4f, 0.4f, 0.4f, 1.f));
+    Render_PushClear(&game_state->render_context, Vec4(0.4f, 0.4f, 0.4f, 1.f), -MAX_Z);
     // NOTE(fakhri): Debug UI
     {
         M_Temp scratch = GetScratch(0, 0);
@@ -730,7 +731,7 @@ APP_UpdateAndRender(UpdateAndRender)
                 }
                 
                 // NOTE(fakhri): display the declared number
-#if 0
+#if 1
                 if (game_state->declared_number < Card_Number_Count)
                 {
                     // TODO(fakhri): think about how to present this

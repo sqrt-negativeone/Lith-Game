@@ -495,11 +495,14 @@ UpdateNumberEntity(Game_State *game_state, EntityID entity_id, f32 dt)
             entity->target_dimension = 1.1f * 3 * Vec2(MiliMeter(6.5f), MiliMeter(10));
         }
         
-        if (game_state->controller.left_mouse.pressed)
+        if (HasFlag(game_state->flags, StateFlag_ShouldDeclareCard))
         {
-            game_state->declared_number = entity->card_type.number;
-            PlaySelectedCards(game_state);
-            MoveAllFromResidency(game_state, ResidencyKind_DeclarationOptions, ResidencyKind_Nonespacial);
+            if (game_state->controller.left_mouse.pressed)
+            {
+                game_state->declared_number = entity->card_type.number;
+                PlaySelectedCards(game_state);
+                MoveAllFromResidency(game_state, ResidencyKind_DeclarationOptions, ResidencyKind_Nonespacial);
+            }
         }
     }
     
@@ -603,7 +606,7 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
                     Player *player_to_punish = game_state->players + player_id_to_punish;
                     MoveAllFromResidency(game_state, ResidencyKind_Table, player_to_punish->assigned_residency_kind);
                     ChangeCurrentPlayer(game_state);
-                    // TODO(fakhri): clear the declared number
+                    game_state->declared_number = InvalidCardNumber;
                 }
             } break;
             default: NotImplemented;
