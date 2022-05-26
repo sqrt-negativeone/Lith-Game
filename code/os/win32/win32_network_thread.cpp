@@ -5,7 +5,7 @@ FetchHostsFromLobby(Socket_Handle lobby_socket, Hosts_Storage *hosts_storage)
 {
     if (!ReceiveBuffer(lobby_socket, &hosts_storage->hosts_count, sizeof(hosts_storage->hosts_count)))
     {
-        LogError("couldn'r read stuff from lobby");
+        LogError("couldn't read stuff from lobby");
         closesocket(lobby_socket);
         return;
     }
@@ -69,51 +69,41 @@ HandlePlayerMessage(Message *message)
 {
     switch(message->type)
     {
-        case MessageType_From_Player_Fetch_Hosts:
+        case PlayerMessage_FetchHosts:
         {
+            
+#if 0            
             Log("fetching hosts from lobby");
             Socket_Handle lobby_socket = ConnectToServer(LOBBY_ADDRESS, LOBBY_PLAYER_PORT);
-            if (lobby_socket == INVALID_SOCKET)
+            if (lobby_socket == InvalidSocket)
             {
                 int last_error = WSAGetLastError();
-                // TODO(fakhri): for now let's assert
-                Assert(false);
+                Assert(!"NetworkThread::COULDN'T REACH LOBBY");
             }
             FetchHostsFromLobby(lobby_socket, message->hosts_storage);
             MemoryBarrier();
             message->hosts_storage->is_fetching = false;
-            closesocket(lobby_socket);
+            CloseSocket(lobby_socket);
+#endif
+            
         } break;
-        case MessageType_From_Player_Connect_To_Host:
+        case PlayerMessage_ConnectToHost:
         {
             char *host_address = "127.0.0.1";
             host_io_context.host_socket = ConnectToServer(host_address, HOST_PORT);
-            if(host_io_context.host_socket != INVALID_SOCKET)
+            if(host_io_context.host_socket != InvalidSocket)
             {
-                CreateIoCompletionPort((HANDLE)host_io_context.host_socket, network_thread_iocp_handle, SERVER_MESSAGE, 1);
+                CreateIoCompletionPort((HANDLE)host_io_context.host_socket, network_thread_iocp_handle, NetworkMessageSource_Host, 1);
                 ReceiveNextMessageType();
             }
             else
             {
                 // NOTE(fakhri): probably the server is full?
             }
-#if 0
-            *connect_socket = ConnectToServer(message->server_address);
-            if (*connect_socket != INVALID_SOCKET)
-            {
-                CreateIoCompletionPort((HANDLE)*connect_socket, global_iocp_handle, SERVER_MESSAGE, 1);
-                Log("Network Thread: Connected to server at address %s", message->server_address.cstr);
-            }
-            else
-            {
-                W32_PushNetworkMessageToPlayer(CreateCouldNotConnectToServerMessage());
-                Log("Network Thread: Coouldn't Connect to server at address %s", message->server_address.cstr);
-            }
-#endif
         } break;
-        case MessageType_From_Player_USERNAME:
+        case PlayerMessage_Username:
         {
-            SendBuffer(host_io_context.host_socket, message->players[0].username, sizeof(message->players[0].username));
+            SendString(host_io_context.host_socket, message->username);
         } break;
         default:
         {
@@ -141,55 +131,72 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
         {
             switch(completion_key)
             {
-                case GAME_MESSAGE:
+                case NetworkMessageSource_Player:
                 {
-                    for(MessageResult message_result = W32_GetNextMessageIfAvailable(&network_sending_queue);
-                        message_result.is_available;
-                        message_result = W32_GetNextMessageIfAvailable(&network_sending_queue)
-                        )
+                    while(!W32_IsMessageQueueEmpty(&player_message_queue))
                     {
-                        HandlePlayerMessage(&message_result.message);
+                        // NOTE(fakhri): peek the head message
+                        Message *message = W32_BeginMessageQueueRead(&player_message_queue);
+                        HandlePlayerMessage(message);
+                        // NOTE(fakhri): make the read visible to other threads
+                        W32_EndMessageQueueRead(&player_message_queue);
                     }
                 } break;
-                case SERVER_MESSAGE:
+                case NetworkMessageSource_Host:
                 {
-                    // NOTE(fakhri): receiving message type completed
-                    Message message = {};
-                    message.type = host_io_context.message_type;
-                    // NOTE(fakhri): read the message from the server
+                    // NOTE(fakhri): get the message that we will write to
+                    // this works because this thread is the only thread that
+                    // push new messages to the host message queue
+                    Message *message = W32_BeginMessageQueueWrite(&host_message_queue);
+                    message->type = host_io_context.message_type;
+                    // NOTE(fakhri): receive the actual message from the host
                     switch(host_io_context.message_type)
                     {
-                        case MessageType_From_Host_Connected_Players_List:
+                        case HostMessage_ConnectedPlayersList:
                         {
-                            ReceiveBuffer(host_io_context.host_socket, &message.players_count, sizeof(message.players_count));
+                            ReceiveBuffer(host_io_context.host_socket, &message->players_count, sizeof(message->players_count));
+                            u32 offset = 0;
                             for (u32 player_index = 0;
-                                 player_index < message.players_count;
+                                 player_index < message->players_count;
                                  ++player_index)
                             {
-                                MessagePlayer *player = message.players + player_index;
-                                ReceiveBuffer(host_io_context.host_socket, player->username, sizeof(player->username));
+                                String8 *player_username = message->players_usernames + player_index;
+                                ReceiveBuffer(host_io_context.host_socket, &player_username->len, sizeof(player_username->len));
+                                Assert(offset + player_username->len < sizeof(message->buffer));
+                                Assert(player_username->len < USERNAME_BUFFER_SIZE);
+                                ReceiveBuffer(host_io_context.host_socket, message->buffer + offset, (i32)player_username->len);
+                                player_username->str = message->buffer + offset;
+                                offset += (i32)player_username->len;
                             }
                         } break;
-                        case MessageType_From_Host_New_Player_Joined:
+                        case HostMessage_NewPlayerJoined:
                         {
-                            ReceiveBuffer(host_io_context.host_socket, &message.player_id, sizeof(message.player_id));
-                            MessagePlayer *player = message.players + message.player_id;
-                            ReceiveBuffer(host_io_context.host_socket, player->username, sizeof(player->username));
+                            ReceiveBuffer(host_io_context.host_socket, &message->new_player_id, sizeof(message->new_player_id));
+                            ReceiveBuffer(host_io_context.host_socket, &message->new_username.len, sizeof(message->new_username.len));
+                            Assert(message->new_username.len < USERNAME_BUFFER_SIZE);
+                            Assert(message->new_username.len < sizeof(message->buffer));
+                            ReceiveBuffer(host_io_context.host_socket, message->buffer, (i32)message->new_username.len);
+                            message->new_username.str = message->buffer;
+                            
                         } break;
-                        case MessageType_From_Host_Shuffled_Deck:
+                        case HostMessage_ShuffledDeck:
                         {
-                            ReceiveBuffer(host_io_context.host_socket, message.compact_deck, sizeof(message.compact_deck));
+                            message->compact_deck = (Compact_Card_Type *)message->buffer;
+                            u32 compact_deck_size = DECK_CARDS_COUNT * sizeof(Compact_Card_Type);
+                            Assert(compact_deck_size < sizeof(message->buffer));
+                            ReceiveBuffer(host_io_context.host_socket, message->compact_deck, compact_deck_size);
                         } break;
-                        case MessageType_From_Host_Change_Player_Turn:
+                        case HostMessage_ChangePlayerTurn:
                         {
-                            ReceiveBuffer(host_io_context.host_socket, &message.player_id, sizeof(message.player_id));
+                            ReceiveBuffer(host_io_context.host_socket, &message->new_player_id, sizeof(message->new_player_id));
                         } break;
                         default :
                         {
-                            Assert(!"MESSAGE TYPE NOT HANDLED YET");
+                            NotImplemented;
                         }
                     }
-                    W32_PushNetworkMessageToPlayer(message);
+                    // NOTE(fakhri): make the changes visible to consumer threads
+                    W32_EndMessageQueueWrite(&host_message_queue);
                     ReceiveNextMessageType();
                 } break;
             }

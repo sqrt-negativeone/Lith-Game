@@ -2,31 +2,34 @@
 // passing a pointer to the message we want to fill instead of return the
 // whole struct
 
-#if 1
-internal Message
-CreateConnectToServerMessage(String8 server_address)
+internal void
+PushCreateConnectToServerMessage(String8 server_address)
 {
-    Message result = {};
-    result.type = MessageType_From_Player_Connect_To_Host;
-    result.server_address = server_address;
-    return result;
+    Message *message = os->BeginPlayerMessageQueueWrite();
+    message->type = PlayerMessage_ConnectToHost;
+    Assert(server_address.size < ArrayCount(message->buffer));
+    MemoryCopy(message->buffer, server_address.str, server_address.size);
+    message->server_address = Str8(message->buffer, server_address.size);
+    os->EndPlayerMessageQueueWrite();
 }
 
-internal Message
-CreateUsernameMessage(String8 username)
+internal void
+PushUsernameNetworkMessage(String8 username)
 {
-    Message result = {};
-    result.type            = MessageType_From_Player_USERNAME;
-    Assert(username.size < ArrayCount(result.players[0].username));
-    MemoryCopy(result.players[0].username, username.cstr, username.size);
-    return result;
+    Message *message = os->BeginPlayerMessageQueueWrite();
+    Assert(username.size < ArrayCount(message->buffer));
+    MemoryCopy(message->buffer, username.str, username.size);
+    message->type     = PlayerMessage_Username;
+    message->username = Str8(message->buffer, username.size);
+    os->EndPlayerMessageQueueWrite();
 }
 
+#if 0
 internal Message
 CreateFetchAvailableHostsMessage(Hosts_Storage *hosts_storage)
 {
     Message result = {};
-    result.type = MessageType_From_Player_Fetch_Hosts;
+    result.type = PlayerMessage_FetchHosts;
     result.hosts_storage = hosts_storage;
     return result;
 }

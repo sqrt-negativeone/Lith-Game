@@ -3,6 +3,7 @@
 //~ NOTE(fakhri): headers
 
 #include "base/base_inc.h"
+#include "game_ids.h"
 #include "network/network_inc.h"
 #include "game/game_inc.h"
 #include "os/os_inc.h"
@@ -44,10 +45,10 @@ PlaySelectedCards(Game_State *game_state)
 }
 
 internal inline void
-AddPlayer(Game_State *game_state, MessagePlayer *message_player, u32 player_id)
+AddPlayer(Game_State *game_state, String8 player_username, u32 player_id)
 {
     Player *player = game_state->players + player_id;
-    player->username = PushStr8F(os->permanent_arena, "%s", message_player->username);
+    player->username = PushStr8Copy(os->permanent_arena, player_username);
     player->joined = true;
     ++game_state->players_joined_so_far;
 }
@@ -55,40 +56,39 @@ AddPlayer(Game_State *game_state, MessagePlayer *message_player, u32 player_id)
 internal void
 HandleAvailableMessages(Game_State *game_state)
 {
-    for(MessageResult message_result = os->GetNextNetworkMessageIfAvailable();
-        message_result.is_available;
-        message_result = os->GetNextNetworkMessageIfAvailable()
-        )
+    while(!os->IsHostMessageQueueEmpty())
     {
-        switch(message_result.message.type)
+        Message *message = os->BeginHostMessageQueueRead();
+#if 1        
+        switch(message->type)
         {
-            case MessageType_From_Host_New_Player_Joined:
+            case HostMessage_NewPlayerJoined:
             {
-                u32 player_id = message_result.message.player_id;
-                MessagePlayer *message_player = message_result.message.players + player_id;
-                AddPlayer(game_state, message_player, player_id);
+                PlayerID player_id = message->new_player_id;
+                String8 player_username = message->new_username;
+                AddPlayer(game_state, player_username, player_id);
             } break;
-            case MessageType_From_Host_Connected_Players_List:
+            case HostMessage_ConnectedPlayersList:
             {
                 // NOTE(fakhri): we receive this message when we first join the host
-                // the host sends a list of all the currly connected players,
+                // the host sends a list of all the currently connected players,
                 // and we are garanteed to be the last one on this list,
                 // so we can safely assume that our id is `player_count - 1`
-                game_state->my_player_id = message_result.message.players_count - 1;
-                for(u32 player_index = 0;
-                    player_index < message_result.message.players_count;
-                    ++player_index)
+                game_state->my_player_id = message->players_count - 1;
+                for(PlayerID player_id = 0;
+                    player_id < message->players_count;
+                    ++player_id)
                 {
-                    MessagePlayer *message_player = message_result.message.players + player_index;
-                    AddPlayer(game_state, message_player, player_index);
+                    String8 player_username = message->players_usernames[player_id];
+                    AddPlayer(game_state, player_username, player_id);
                 }
                 SetFlag(game_state->flags, StateFlag_JoinedGame);
             } break;
-            case MessageType_From_Host_Invalid_Username:
+            case HostMessage_InvalidUsername:
             {
                 SetFlag(game_state->flags, StateFlag_FailedJoinGame);
             } break;
-            case MessageType_From_Host_Shuffled_Deck:
+            case HostMessage_ShuffledDeck:
             {
                 AssignResidencyToPlayers(game_state);
                 // NOTE(fakhri): split the deck between players
@@ -103,14 +103,14 @@ HandleAvailableMessages(Game_State *game_state)
                         ++card_offset)
                     {
                         u32 compact_card_index = card_base + card_offset;
-                        Card_Type card_type = UnpackCompactCardType(message_result.message.compact_deck[compact_card_index]);
+                        Card_Type card_type = UnpackCompactCardType(message->compact_deck[compact_card_index]);
                         b32 is_flipped = (player_index != game_state->my_player_id);
                         AddCardEntity(game_state, card_type, (ResidencyKind)player->assigned_residency_kind, is_flipped);
                     }
                 }
                 SetFlag(game_state->flags, StateFlag_ReceivedCards);
             } break;
-            case MessageType_From_Host_Change_Player_Turn:
+            case HostMessage_ChangePlayerTurn:
             {
                 // TODO(fakhri): change the curr player turn
             } break;
@@ -121,15 +121,21 @@ HandleAvailableMessages(Game_State *game_state)
                 Assert(!"MESSAGE NOT IMPLEMENTED YET");
             }
         }
+#endif
+        
+        os->EndHostMessageQueueRead();
     }
+    
 }
 
+#if 0
 internal inline void
 FetchHosts(Hosts_Storage *hosts_storage)
 {
     os->PushNetworkMessage(CreateFetchAvailableHostsMessage(hosts_storage));
     hosts_storage->is_fetching = true;
 }
+#endif
 
 internal inline void
 OpenMenu(Game_State *game_state, Game_Mode menu_mode)
@@ -166,8 +172,9 @@ void UpdateAndRenderMainMenu(Game_State *game_state, UI_Context *ui_context, Con
         FetchHosts(&game_state->hosts_storage);
         OpenMenu(game_state, GameMode_MENU_JOIN_GAME);
 #else
-        os->PushNetworkMessage(CreateConnectToServerMessage(Str8Lit("")));
-        OpenMenu(game_state, GameMode_MENU_USERNAME);
+        PushCreateConnectToServerMessage(Str8Lit(""));
+        OpenMenu(game_state, GameMode_MENU_Username);
+        
 #endif
     }
     
@@ -216,7 +223,7 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context,
             
             if(username.size)
             {
-                os->PushNetworkMessage(CreateUsernameMessage(username));
+                PushUsernameNetworkMessage(username);
                 SetFlag(game_state->flags, StateFlag_TryingJoinGame);
             }
             else
@@ -415,7 +422,7 @@ APP_PermanantLoad(PermanentLoad)
     
     InitResidencies(game_state);
     game_state->time_scale_factor = 1.f;
-    game_state->selection_limit = 3;
+    game_state->selection_limit = 13;
     // @DebugOnly
 #if 1
     //glDepthFunc(GL_LESS);
@@ -575,7 +582,7 @@ APP_UpdateAndRender(UpdateAndRender)
                                 if (HasFlag(entity->flags, EntityFlag_Selected))
                                 {
                                     Render_PushQuad(&game_state->render_context, 
-                                                    Vec3(entity->center_pos.xy, entity->center_pos.z - 0.01f),
+                                                    Vec3(entity->center_pos.xy, entity->center_pos.z - MiliMeter(.1f)),
                                                     1.05f * entity->curr_dimension, red, CoordinateType_World, entity->y_angle);
                                 }
                                 
@@ -745,7 +752,7 @@ APP_UpdateAndRender(UpdateAndRender)
                     M_Temp scratch = GetScratch(0 ,0);
                     String8 msg = PushStr8F(scratch.arena, 
                                             "Declared Rank is: ", game_state->declared_number);
-                    v3 pos = Vec3(-CentiMeter(30), CentiMeter(24), 0);
+                    v3 pos = Vec3(-CentiMeter(30), CentiMeter(24), MAX_Z);
                     pos.x = Render_PushText(&game_state->render_context, msg, pos, Vec4(0, 0, 0, 1), CoordinateType_World, FontKind_Arial);
                     Texture2D texture = game_state->frensh_deck.red_numbers_up[game_state->declared_number];
                     v2 dim = 0.15f * Vec2(MiliMeter(128.f), MiliMeter(203.f));
@@ -774,7 +781,7 @@ APP_UpdateAndRender(UpdateAndRender)
             UpdateAndRenderMainMenu(game_state, ui_context, controller);
         } break;
         
-        case GameMode_MENU_USERNAME:
+        case GameMode_MENU_Username:
         {
             UpdateAndRenderUserNameMenu(game_state, ui_context, controller);
         } break;

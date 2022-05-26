@@ -13,12 +13,16 @@ typedef U64   OS_PageSize_Function(void);
 typedef void  OS_OutputError_Function(char *, char *, ...);
 
 // NOTE(fakhri): File Functions
-typedef String8       OS_LoadEntireFile_Function(M_Arena *, String8);
-typedef b32           OS_SaveToFile_Function(String8, String8List);
-typedef b32           OS_AppendToFile_Function(String8, String8List);
-typedef void          OS_DeleteFile_Function(String8);
-typedef b32           OS_MakeDirectory_Function(String8);
-typedef MessageResult OS_GetNextNetworkAMessageIfAvailable_Function(void);
-typedef void          OS_PushNetworkMessage_Function(Message);
+typedef String8  OS_LoadEntireFile_Function(M_Arena *, String8);
+typedef b32      OS_SaveToFile_Function(String8, String8List);
+typedef b32      OS_AppendToFile_Function(String8, String8List);
+typedef void     OS_DeleteFile_Function(String8);
+typedef b32      OS_MakeDirectory_Function(String8);
+// NOTE(fakhri): network functions
+typedef b32      OS_IsHostMessageQueueEmpty_Function(void);
+typedef Message *OS_BeginHostMessageQueueRead_Function(void);
+typedef void     OS_EndHostMessageQueueRead_Function(void);
+typedef Message *OS_BeginPlayerMessageQueueWrite_Function(void);
+typedef void     OS_EndPlayerMessageQueueWrite_Function(void);
 
 #endif //OS_FUNCTOINS_H

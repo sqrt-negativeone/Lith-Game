@@ -343,6 +343,8 @@ Render_End(Render_Context *render_context)
         ++sort_entry;
     }
     
+    // TODO(fakhri): sort from front to back with depth on
+    // as optimizations
     SortRenderRequests(render_context->frame_arena, &sort_buffer);
     
     for(u32 entry_index = 0;

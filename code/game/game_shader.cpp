@@ -185,29 +185,19 @@ ComputeHashShaderPath(String8 shader_path)
     return hash;
 }
 
+
+read_only global char *shaders_names[ShaderKind_Count] = {
+    "quad_shader.glsl",
+    "quad_shader.glsl",
+    "texture_shader.glsl",
+};
+
 internal void
 LoadShader(Render_Context *render_context, Shader_Kind shader_kind)
 {
     if (shader_kind == ShaderKind_None) return;
     
-    String8 shader_name = {};
-    switch(shader_kind)
-    {
-        case ShaderKind_None: InvalidPath;
-        case ShaderKind_Quad:
-        {
-            shader_name = Str8Lit("quad_shader.glsl");
-        }break;
-        case ShaderKind_Texture:
-        {
-            shader_name = Str8Lit("texture_shader.glsl");
-        } break;
-        default:
-        {
-            Assert(shader_kind < ShaderKind_Count);
-            NotImplemented;
-        } break;
-    }
+    String8 shader_name = Str8C(shaders_names[shader_kind]);
     
     // NOTE(fakhri): find the shader hash slot
     u32 hash_index  = ComputeHashShaderPath(shader_name);

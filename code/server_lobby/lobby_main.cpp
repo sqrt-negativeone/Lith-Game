@@ -234,8 +234,6 @@ IsWorkQueueEmpty(Work_Queue *socket_queue)
     return result;
 }
 
-
-
 internal b32
 PushWorkQueueEntry(Work_Queue *work_queue, Queue_Entry work_entry)
 {

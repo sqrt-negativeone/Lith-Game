@@ -37,19 +37,22 @@ struct OS_State
     u32 samples_per_second;
     
     // NOTE(fakhri): Platform exposed API
-    OS_Release_Fucntion                           *Release;
-    OS_Reserve_Function                           *Reserve;
-    OS_Commit_Function                            *Commit;
-    OS_Decommit_Function                          *Decommit;
-    OS_PageSize_Function                          *PageSize;
-    OS_OutputError_Function                       *OutputError;
-    OS_SaveToFile_Function                        *SaveToFile;
-    OS_AppendToFile_Function                      *AppendToFile;
-    OS_LoadEntireFile_Function                    *LoadEntireFile;
-    OS_DeleteFile_Function                        *DeleteFile;
-    OS_MakeDirectory_Function                     *MakeDirectory;
-    OS_GetNextNetworkAMessageIfAvailable_Function *GetNextNetworkMessageIfAvailable;
-    OS_PushNetworkMessage_Function                *PushNetworkMessage;
+    OS_Release_Fucntion                      *Release;
+    OS_Reserve_Function                      *Reserve;
+    OS_Commit_Function                       *Commit;
+    OS_Decommit_Function                     *Decommit;
+    OS_PageSize_Function                     *PageSize;
+    OS_OutputError_Function                  *OutputError;
+    OS_SaveToFile_Function                   *SaveToFile;
+    OS_AppendToFile_Function                 *AppendToFile;
+    OS_LoadEntireFile_Function               *LoadEntireFile;
+    OS_DeleteFile_Function                   *DeleteFile;
+    OS_MakeDirectory_Function                *MakeDirectory;
+    OS_IsHostMessageQueueEmpty_Function      *IsHostMessageQueueEmpty;
+    OS_BeginHostMessageQueueRead_Function    *BeginHostMessageQueueRead;
+    OS_EndHostMessageQueueRead_Function      *EndHostMessageQueueRead;
+    OS_BeginPlayerMessageQueueWrite_Function *BeginPlayerMessageQueueWrite;
+    OS_EndPlayerMessageQueueWrite_Function   *EndPlayerMessageQueueWrite;
 };
 
 global OS_State *os;

@@ -9,12 +9,12 @@
 //~ NOTE(fakhri): headers
 
 #include "base/base_inc.h"
+#include "game/game_ids.h"
 #include "network/network_inc.h"
 #include "win32_inc.h"
 #include "game/game_inc.h"
 #include "os/os_inc.h"
 #include "game_server/game_server_inc.h"
-
 
 ////////////////////////////////
 //~ NOTE(fakhri): Globals
@@ -22,7 +22,6 @@ global OS_State   w32_os;
 global W32_Timer  w32_timer;
 global Thread_Ctx w32_main_tctx;
 global HWND w32_window_handle;
-
 global char w32_executable_path[256];
 global char w32_executable_directory[256];
 global char w32_working_directory[256];
@@ -184,6 +183,12 @@ W32_WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param)
             event->key = key;
         }break;
         
+        case WM_MOUSEMOVE:
+        {
+            os->mouse_position.x = (f32)GET_X_LPARAM(l_param); 
+            os->mouse_position.y = (f32)GET_Y_LPARAM(l_param); 
+        } break;
+        
         case WM_SYSCOMMAND:
         {
             switch (w_param)
@@ -284,29 +289,31 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         w32_os.fullscreen                = 0;
         w32_os.window_size.x             = DEFAULT_WINDOW_WIDTH;
         w32_os.window_size.y             = DEFAULT_WINDOW_HEIGHT;
-        w32_os.time.game_time              = 0.f;
-        // TODO(fakhri): we can just target 30fps because we don't need 60fps for a cards game
-        // and use the extra time for server processing and stuff
-        
+        w32_os.time.game_time            = 0.f;
         
         w32_os.target_frames_per_second  = refresh_rate;
         w32_os.time.game_dt_for_frame = 1.f / os->target_frames_per_second; 
         
-        w32_os.sample_out = (f32 *)W32_HeapAlloc(win32_sound_output.samples_per_second * sizeof(f32) * 2);
         w32_os.samples_per_second = win32_sound_output.samples_per_second;
+        w32_os.sample_out         = (f32 *)W32_HeapAlloc(win32_sound_output.samples_per_second * sizeof(f32) * 2);
         
-        w32_os.Reserve                          = W32_Reserve;
-        w32_os.Release                          = W32_Release;
-        w32_os.Commit                           = W32_Commit;
-        w32_os.Decommit                         = W32_Decommit;
-        w32_os.OutputError                      = W32_OutputError;
-        w32_os.SaveToFile                       = W32_SaveToFile;
-        w32_os.AppendToFile                     = W32_AppendToFile;
-        w32_os.LoadEntireFile                   = W32_LoadEntireFile;
-        w32_os.DeleteFile                       = W32_DeleteFile;
-        w32_os.MakeDirectory                    = W32_MakeDirectory;
-        w32_os.PushNetworkMessage               = W32_PushNetworkMessageToServer;
-        w32_os.GetNextNetworkMessageIfAvailable = W32_GetNextNetworkMessageIfAvailable;
+        // NOTE(fakhri): Platform exposed API
+        w32_os.Release                      = W32_Release;
+        w32_os.Reserve                      = W32_Reserve;
+        w32_os.Commit                       = W32_Commit;
+        w32_os.Decommit                     = W32_Decommit;
+        w32_os.PageSize                     = W32_PageSize;
+        w32_os.OutputError                  = W32_OutputError;
+        w32_os.SaveToFile                   = W32_SaveToFile;
+        w32_os.AppendToFile                 = W32_AppendToFile;
+        w32_os.LoadEntireFile               = W32_LoadEntireFile;
+        w32_os.DeleteFile                   = W32_DeleteFile;
+        w32_os.MakeDirectory                = W32_MakeDirectory;
+        w32_os.BeginHostMessageQueueRead    = W32_BeginHostMessageQueueRead;
+        w32_os.EndHostMessageQueueRead      = W32_EndHostMessageQueueRead;
+        w32_os.BeginPlayerMessageQueueWrite = W32_BeginPlayerMessageQueueWrite;
+        w32_os.EndPlayerMessageQueueWrite   = W32_EndPlayerMessageQueueWrite;
+        w32_os.IsHostMessageQueueEmpty      = W32_IsHostMessageQueueEmpty;
         
         w32_os.permanent_arena = M_ArenaAllocDefault();
         for (u32 arena_index = 0;
@@ -316,6 +323,27 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
             w32_os.frame_arenas[arena_index] = M_ArenaAlloc(Gigabytes(16));
         }
         
+    }
+    
+    // NOTE(fakhri): worker threads
+    {
+        u32 initial_count = 0;
+        u32 work_threads_count = 4;
+        
+        w32_work_queue.waiting_worker_threads_semaphore = CreateSemaphoreA(0, initial_count, work_threads_count, 0);
+        w32_work_queue.producer_mutex                   = CreateMutexA(0, FALSE, 0);
+        
+        
+        // NOTE(fakhri): start worker threads
+        for (u32 thread_index = 0;
+             thread_index < work_threads_count;
+             ++thread_index)
+        {
+            
+            Thread_Handle handle = CreateThread(0, 0, W32_WorkerThreadMain, &w32_work_queue, 0, 0);
+            CloseHandle(handle);
+        }
+        Log("Started worker threads");
     }
     
     // NOTE(fakhri): init the main thread context
@@ -355,11 +383,11 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     // NOTE(fakhri): launch network and host server threads
     {
         // NOTE(fakhri): start the host thread now
-        HANDLE host_thread_handle  = CreateThread(0, 0, HostMain, 0, 0, 0);
+        Thread_Handle host_thread_handle  = CreateThread(0, 0, HostMain, 0, 0, 0);
         CloseHandle(host_thread_handle);
         
         // NOTE(fakhri): start the network thread
-        HANDLE network_thread_handle = CreateThread(0, 0, NetworkMain, 0, 0, 0);
+        Thread_Handle network_thread_handle = CreateThread(0, 0, NetworkMain, 0, 0, 0);
         CloseHandle(network_thread_handle);
     }
     
@@ -430,16 +458,6 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
                 TranslateMessage(&message);
                 DispatchMessage(&message);
             }
-        }
-        
-        // NOTE(fakhri): get mouse postion
-        {
-            v2 result = {0};
-            POINT mouse;
-            GetCursorPos(&mouse);
-            ScreenToClient(w32_window_handle, &mouse);
-            os->mouse_position.x = (f32)mouse.x;
-            os->mouse_position.y = (f32)mouse.y;
         }
         
         // NOTE(fakhri): Update window size

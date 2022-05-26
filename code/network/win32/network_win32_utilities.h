@@ -9,7 +9,8 @@
 #define LISTENQ 1024
 typedef SOCKET Socket_Handle;
 
-
+#define Accept(fd, addr, addrlen) accept(fd, addr, addrlen)
+#define CloseSocket(fd) closesocket(fd)
 internal Socket_Handle ConnectToServer(char *server_address, char *port);
 internal Socket_Handle OpenListenSocket(char *port);
 internal b32 SendBuffer(Socket_Handle s, void *data, i32 len);

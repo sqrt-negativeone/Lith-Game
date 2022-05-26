@@ -3,52 +3,44 @@
 #ifndef NETWORK_MESSAGE_H
 #define NETWORK_MESSAGE_H
 
-enum Player_Move_Type
+enum PlayerMove_Type
 {
-    Player_Move_None,
-    Player_Move_Play_Card,
-    Player_Move_Question_Credibility,
+    PlayerMove_None,
+    PlayerMove_PlayCard,
+    PlayerMove_QuestionCredibility,
 };
 
 typedef u8 Compact_Card_Type;
 
 enum MessageType
 {
-    MessageType_From_Player_Begin,
     // NOTE(fakhri): player messages here
-    MessageType_From_Player_Connect_To_Host,
-    MessageType_From_Player_USERNAME,
-    MessageType_From_Player_Fetch_Hosts,
-    MessageType_From_Player_Start_Host_Server,
-    MessageType_From_Player_Stop_Host_Server,
-    MessageType_From_Player_End,
+    PlayerMessage_ConnectToHost,
+    PlayerMessage_Username,
+    PlayerMessage_FetchHosts,
+    PlayerMessage_StartHostServer,
+    PlayerMessage_StopHostServer,
+    PlayerMessage_PlayerMove,
     
-    MessageType_From_Server_Begin,
     // NOTE(fakhri): Host messages here
-    MessageType_From_Host_Invalid_Username,
-    MessageType_From_Host_Host_Full,
-    MessageType_From_Host_New_Player_Joined,
-    MessageType_From_Host_Connected_Players_List,
-    MessageType_From_Host_Shuffled_Deck,
-    MessageType_From_Host_Change_Player_Turn,
-    MessageType_From_Host_Player_Won,
-    MessageType_From_Host_End,
-    
-    MessageType_Player_Move,
+    HostMessage_InvalidUsername,
+    HostMessage_HostFull,
+    HostMessage_NewPlayerJoined,
+    HostMessage_ConnectedPlayersList,
+    HostMessage_ShuffledDeck,
+    HostMessage_ChangePlayerTurn,
+    HostMessage_PlayerWon,
+    HostMessage_PlayerMove,
 };
-
-#define IsNetworkMessageFromServer(type) ((type) > NetworkMessageType_From_Server_Begin && (type) < NetworkMessageType_From_Server_End )
-
-#define IsNetworkMessageFromPlayer(type) ((type) > NetworkMessageType_From_Player_Begin && (type) < NetworkMessageType_From_Player_End )
 
 struct Hosts_Storage;
 struct Player;
 
-struct Player_Move
+struct PlayerMove
 {
-    Player_Move_Type type;
+    PlayerMove_Type type;
     Compact_Card_Type actual_card;
-    Compact_Card_Type claimed_card;
+    Compact_Card_Type declared_card;
 };
 
 #define MAX_PLAYER_COUNT (4u)
@@ -56,32 +48,41 @@ struct Player_Move
 #define DECK_CARDS_COUNT (MAX_PLAYER_COUNT * CARDS_PER_PLAYER)
 #define InvalidePlayerID MAX_PLAYER_COUNT
 
-struct MessagePlayer
-{
-    char username[20];
-};
-
 struct Message
 {
     MessageType type;
-    
-    Hosts_Storage *hosts_storage;
-    
-    String8 server_address;
-    
-    Compact_Card_Type compact_deck[DECK_CARDS_COUNT];
-    
-    Player_Move player_move;
-    MessagePlayer players[MAX_PLAYER_COUNT];
-    u32 player_id;
-    
-    u32 players_count;
-};
-
-struct MessageResult
-{
-    Message message;
-    b32 is_available;
+    u8 buffer[128];
+    union
+    {
+        struct
+        {
+            // NOTE(fakhri): connect to host message
+            String8 server_address;
+        };
+        struct 
+        {
+            // NOTE(fakhri): player usernames message
+            String8 username;
+        };
+        struct 
+        {
+            // NOTE(fakhri): connected players usernames message
+            String8 players_usernames[MAX_PLAYER_COUNT];
+            u32 players_count;
+        };
+        struct 
+        {
+            // NOTE(fakhri): new player joined message
+            String8 new_username;
+            PlayerID new_player_id;
+        };
+        struct 
+        {
+            // NOTE(fakhri): compact deck message
+            Compact_Card_Type *compact_deck;
+            u32 compact_cards_count;
+        };
+    };
 };
 
 #endif //NETWORK_MESSAGE_H

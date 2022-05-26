@@ -1,6 +1,7 @@
 
 //~ NOTE(fakhri): exposed  API
 
+////////////////////////////////
 //- NOTE(fakhri): Memory internals
 
 internal void *
@@ -51,6 +52,7 @@ W32_PageSize(void)
     return w32_system_info.dwPageSize;
 }
 
+////////////////////////////////
 //- NOTE(fakhri): output error internal
 internal void
 W32_OutputError(char *title, char *format, ...)
@@ -75,7 +77,7 @@ W32_OutputError(char *title, char *format, ...)
 }
 
 ////////////////////////////////
-//~ rjf: File System
+//- NOTE(fakhri): file internals
 
 internal String8
 W32_LoadEntireFile(M_Arena *arena, String8 path)
@@ -219,4 +221,43 @@ W32_MakeDirectory(String8 path)
     }
     ReleaseScratch(scratch);
     return result;
+}
+
+
+////////////////////////////////
+//- NOTE(fakhri): Networking internals
+
+internal b32
+W32_IsHostMessageQueueEmpty()
+{
+    b32 result = W32_IsMessageQueueEmpty(&player_message_queue);
+    return result;
+}
+
+internal Message *
+W32_BeginHostMessageQueueRead()
+{
+    Message *result = W32_BeginMessageQueueRead(&host_message_queue);
+    return result;
+}
+
+internal void
+W32_EndHostMessageQueueRead()
+{
+    W32_EndMessageQueueRead(&host_message_queue);
+}
+
+internal Message *
+W32_BeginPlayerMessageQueueWrite()
+{
+    Message *result = W32_BeginMessageQueueWrite(&player_message_queue);
+    return result;
+}
+
+internal void
+W32_EndPlayerMessageQueueWrite()
+{
+    W32_EndMessageQueueWrite(&player_message_queue);
+    u64 completion_key = NetworkMessageSource_Player;
+    PostQueuedCompletionStatus(network_thread_iocp_handle, 0, completion_key, 0);
 }

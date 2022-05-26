@@ -24,6 +24,14 @@ MakeLineraRandomGenerator(u32 seed)
     return result;
 }
 
+internal u32
+NextRandomNumberMinMax(Rand_Ctx *rand_ctx, u32 min, u32 max)
+{
+    u32 random_number = NextRandomNumber(rand_ctx);
+    u32 result = min + random_number / (rand_ctx->m / (max - min) + 1);
+    return result;
+}
+
 internal u32 
 NextRandomNumber(Rand_Ctx *rand_ctx)
 {

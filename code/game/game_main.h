@@ -31,7 +31,7 @@ enum Game_Mode
     
     GameMode_MENU_BEGIN,
     // NOTE(fakhri): begin menu modes
-    GameMode_MENU_USERNAME,
+    GameMode_MENU_Username,
     GameMode_MENU_MAIN,
     GameMode_MENU_JOIN_GAME,
     GameMode_MENU_HOST_GAME,

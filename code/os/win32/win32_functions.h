@@ -24,4 +24,11 @@ internal B32     W32_SaveToFile(String8 path, String8List data);
 internal b32     W32_AppendToFile(String8 path, String8List data);
 internal void    W32_DeleteFile(String8 path);
 internal B32     W32_MakeDirectory(String8 path);
+
+//- NOTE(fakhri): Networking internals
+internal b32      W32_IsHostMessageQueueEmpty();
+internal Message *W32_BeginHostMessageQueueRead();
+internal void     W32_EndHostMessageQueueRead();
+internal Message *W32_BeginPlayerMessageQueueWrite();
+internal void     W32_EndPlayerMessageQueueWrite();
 #endif //WIN32_FUNCTIONS_H
