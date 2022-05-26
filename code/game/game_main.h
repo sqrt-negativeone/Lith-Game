@@ -28,6 +28,7 @@ struct Controller
 enum Game_Mode
 {
     GameMode_GAME,
+    GameMode_TestingNetworking,
     
     GameMode_MENU_BEGIN,
     // NOTE(fakhri): begin menu modes

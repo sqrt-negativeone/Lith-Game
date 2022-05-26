@@ -96,7 +96,8 @@ GetPlayerUsernameWork(void *data)
     // NOTE(fakhri): entrying username operation completed, check if the suername is unique
     for(;;)
     {
-        if (ReceiveBuffer(player->socket, player->username, sizeof(player->username)))
+        player->username.cstr = player->buffer;
+        if (ReceiveString(player->socket, &player->username))
         {
             b32 is_username_unique = true;
             for (u32 test_player_index = 0;
@@ -104,12 +105,14 @@ GetPlayerUsernameWork(void *data)
                  ++test_player_index)
             {
                 Connected_Player *test_player = players_storage->players + test_player_index;
-                if (strcmp (player->username, test_player->username) == 0)
+                if (Str8Match(player->username, test_player->username, 0))
                 {
                     is_username_unique = false;
                     break;
                 }
             }
+            
+            is_username_unique = true;
             
             if (is_username_unique)
             {

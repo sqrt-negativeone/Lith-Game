@@ -437,7 +437,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     
     // NOTE(fakhri): init directory watcher for shader files hotreload
     Directory_Watcher shaders_watcher = {};
-    if (!W32_BeginWatchDirectory(w32_os.permanent_arena, &shaders_watcher, Str8Lit("shaders/")))
+    if (!W32_BeginWatchDirectory(w32_os.permanent_arena, &shaders_watcher, Str8Lit("data/shaders/")))
     {
         InvalidPath;
     }

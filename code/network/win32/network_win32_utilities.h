@@ -15,5 +15,6 @@ internal Socket_Handle ConnectToServer(char *server_address, char *port);
 internal Socket_Handle OpenListenSocket(char *port);
 internal b32 SendBuffer(Socket_Handle s, void *data, i32 len);
 internal b32 ReceiveBuffer(Socket_Handle s, void *data, i32 len);
-
+internal b32 SendString(Socket_Handle s, String8 data);
+internal b32 ReceiveString(Socket_Handle s, String8 *data);
 #endif //NETWORK_UTILITIES_H

@@ -132,6 +132,13 @@ ReceiveBuffer(Socket_Handle s, void *data, i32 len)
 internal b32
 SendString(Socket_Handle s, String8 data)
 {
-    b32 result = SendBuffer(s, data.str, (i32)data.len);
+    b32 result = SendBuffer(s, &data.len, sizeof(data.len)) && SendBuffer(s, data.str, (i32)data.len);
+    return result;
+}
+
+internal b32
+ReceiveString(Socket_Handle s, String8 *data)
+{
+    b32 result = ReceiveBuffer(s, &data->len, sizeof(data->len)) && ReceiveBuffer(s, data->str, (i32)data->len);
     return result;
 }

@@ -230,7 +230,7 @@ W32_MakeDirectory(String8 path)
 internal b32
 W32_IsHostMessageQueueEmpty()
 {
-    b32 result = W32_IsMessageQueueEmpty(&player_message_queue);
+    b32 result = W32_IsMessageQueueEmpty(&host_message_queue);
     return result;
 }
 

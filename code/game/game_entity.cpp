@@ -637,7 +637,6 @@ AddButtonEntity(Game_State *game_state, ButtonEntityKind button_kind, v3 center_
 internal void
 AddDebugEntites(Game_State *game_state)
 {
-    
     for(ResidencyKind residency_kind = ResidencyKind_Nil;
         residency_kind < ResidencyKind_Count;
         ++residency_kind)
@@ -655,7 +654,6 @@ AddDebugEntites(Game_State *game_state)
     
     AddNullEntity(game_state);
     AddCursorEntity(game_state);
-    
     
     game_state->game_mode = GameMode_GAME;
     SetFlag(game_state->flags, StateFlag_ReceivedCards);

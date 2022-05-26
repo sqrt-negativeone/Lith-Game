@@ -59,7 +59,6 @@ HandleAvailableMessages(Game_State *game_state)
     while(!os->IsHostMessageQueueEmpty())
     {
         Message *message = os->BeginHostMessageQueueRead();
-#if 1        
         switch(message->type)
         {
             case HostMessage_NewPlayerJoined:
@@ -121,11 +120,8 @@ HandleAvailableMessages(Game_State *game_state)
                 Assert(!"MESSAGE NOT IMPLEMENTED YET");
             }
         }
-#endif
-        
         os->EndHostMessageQueueRead();
     }
-    
 }
 
 #if 0
@@ -215,24 +211,7 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context,
         UI_InputField(ui_context, Vec2(CentiMeter(50), CentiMeter(4)), MiliMeter(0), -CentiMeter(3),  &game_state->username_buffer, FontKind_MenuItem);
     }
     
-    if (!HasFlag(game_state->flags, StateFlag_TryingJoinGame))
-    {
-        if (UI_Button(ui_context, Str8Lit("Join"), Meter(0), -CentiMeter(20), FontKind_MenuItem))
-        {
-            String8 username =  game_state->username_buffer.content;
-            
-            if(username.size)
-            {
-                PushUsernameNetworkMessage(username);
-                SetFlag(game_state->flags, StateFlag_TryingJoinGame);
-            }
-            else
-            {
-                // TODO(fakhri): dispaly error message
-            }
-        }
-    }
-    else
+    if (HasFlag(game_state->flags, StateFlag_TryingJoinGame))
     {
         UI_Label(ui_context, Str8Lit("joinning the game"), Meter(0), -CentiMeter(20), FontKind_MenuItem, true);
         
@@ -247,6 +226,23 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context,
         {
             // TODO(fakhri): display an error message
             ClearFlag(game_state->flags, StateFlag_TryingJoinGame);
+        }
+    }
+    else
+    {
+        if (UI_Button(ui_context, Str8Lit("Join"), Meter(0), -CentiMeter(20), FontKind_MenuItem))
+        {
+            String8 username =  game_state->username_buffer.content;
+            
+            if(username.size)
+            {
+                PushUsernameNetworkMessage(username);
+                SetFlag(game_state->flags, StateFlag_TryingJoinGame);
+            }
+            else
+            {
+                // TODO(fakhri): dispaly error message
+            }
         }
     }
     UI_EndFrame(ui_context, controller);
@@ -423,8 +419,20 @@ APP_PermanantLoad(PermanentLoad)
     InitResidencies(game_state);
     game_state->time_scale_factor = 1.f;
     game_state->selection_limit = 13;
-    // @DebugOnly
+    
 #if 1
+    
+    AddNullEntity(game_state);
+    AddCursorEntity(game_state);
+    
+    // @DebugOnly
+    game_state->game_mode = GameMode_TestingNetworking;
+    PushCreateConnectToServerMessage(Str8Lit(""));
+    PushUsernameNetworkMessage(Str8Lit("username"));
+    SetFlag(game_state->flags, StateFlag_TryingJoinGame);
+#else
+    
+    // @DebugOnly
     //glDepthFunc(GL_LESS);
     AssignResidencyToPlayers(game_state);
     game_state->curr_player_id = ResidencyKind_Down - ResidencyKind_Left;
@@ -453,7 +461,7 @@ APP_UpdateAndRender(UpdateAndRender)
     HandleAvailableMessages(game_state);
     Render_Begin(&game_state->render_context, OS_FrameArena());
     
-    Render_PushClear(&game_state->render_context, Vec4(0.4f, 0.4f, 0.4f, 1.f), -MAX_Z);
+    Render_PushClear(&game_state->render_context, Vec4(0.4f, 0.4f, 0.5f, 1.f), -MAX_Z);
     
     // NOTE(fakhri): Debug UI
     {
@@ -469,7 +477,6 @@ APP_UpdateAndRender(UpdateAndRender)
                             Vec3(0, 0, -MAX_Z),
                             Vec2(MiliMeter(1.0f), Meter(2.0f)), Vec4(1.0f, 1.0f, 0.f, 1.f), CoordinateType_World);
         }
-        
         
         // NOTE(fakhri): time scale
         {
@@ -533,14 +540,153 @@ APP_UpdateAndRender(UpdateAndRender)
     }
     
     dt = game_state->time_scale_factor * dt;
+    v4 white = Vec4(1, 1, 1,1);
+    v4 red = Vec4(1, 0, 0, 1);
+    
+    // NOTE(fakhri): loop over all the entities and update them
+    for (u32 entity_id = 1;
+         entity_id < game_state->entity_count;
+         ++entity_id)
+    {
+        Entity *entity = game_state->entities + entity_id;
+        switch(entity->type)
+        {
+            case EntityType_Cursor_Entity:
+            {
+                UpdateCursorEntity(game_state, entity);
+                
+                // NOTE(fakhri): render the mouse cursor
+                Render_PushQuad(&game_state->render_context, 
+                                entity->center_pos,
+                                Vec2(MiliMeter(5.f), MiliMeter(5.f)), Vec4(1, .3f, .5f, 1.f), CoordinateType_World);
+                
+            } break;
+            case EntityType_Card:
+            {
+                UpdateCardEntity(game_state, entity_id, dt);
+                if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
+                {
+                    if (HasFlag(entity->flags, EntityFlag_Selected))
+                    {
+                        Render_PushQuad(&game_state->render_context, 
+                                        Vec3(entity->center_pos.xy, entity->center_pos.z - MiliMeter(.1f)),
+                                        1.05f * entity->curr_dimension, red, CoordinateType_World, entity->y_angle);
+                    }
+                    
+                    Render_PushImage(&game_state->render_context, entity->texture, entity->center_pos, entity->curr_dimension, CoordinateType_World,
+                                     entity->y_angle);
+                    
+                    v3 card_back_pos = entity->center_pos;
+                    
+                    Render_PushImage(&game_state->render_context, game_state->frensh_deck.card_back_texture, entity->center_pos, entity->curr_dimension, CoordinateType_World, PI32 - entity->y_angle);
+                    
+                }
+                else
+                {
+                    ClearFlag(entity->flags, EntityFlag_DontDrawThisFrame);
+                }
+            } break;
+            case EntityType_Companion:
+            {
+                UpdateCompanionEntity(game_state, entity, dt);
+                if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
+                {
+                    Render_PushImage(&game_state->render_context, entity->texture, entity->center_pos, entity->curr_dimension, CoordinateType_World,
+                                     entity->y_angle);
+                }
+                else
+                {
+                    ClearFlag(entity->flags, EntityFlag_DontDrawThisFrame);
+                }
+            } break;
+            case EntityType_Button:
+            {
+                UpdateButtonEntity(game_state, entity, dt);
+                if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
+                {
+                    // TODO(fakhri): draw the button entity
+                    v4 button_color = Vec4(251, 73, 197, 255) / 255;
+                    if (entity->button_kind == ButtonEntityKind_PlaySelectedCards)
+                    {
+                        button_color.r = 0;
+                    }
+                    Render_PushQuad(&game_state->render_context, entity->center_pos, entity->curr_dimension, button_color, CoordinateType_World);
+                }
+                else
+                {
+                    ClearFlag(entity->flags, EntityFlag_DontDrawThisFrame);
+                }
+            } break;
+            case EntityType_Numbers:
+            {
+                UpdateNumberEntity(game_state, entity_id, dt);
+                Render_PushImage(&game_state->render_context, entity->texture, entity->center_pos, entity->curr_dimension, CoordinateType_World,
+                                 entity->y_angle);
+            } break;
+            default:
+            {
+                StopExecution;
+            } break;
+        }
+    }
     
     switch(game_state->game_mode)
     {
+        case GameMode_TestingNetworking:
+        {
+            if (HasFlag(game_state->flags, StateFlag_TryingJoinGame))
+            {
+                Render_PushText(&game_state->render_context, Str8Lit("joinning the game"),  Vec3(0,CentiMeter(15), Meter(1)), Vec4(1.0f, 1.0f, 1.0f, 1.0f), CoordinateType_World, FontKind_Arial);
+                
+                if (HasFlag(game_state->flags, StateFlag_JoinedGame))
+                {
+                    // NOTE(fakhri): good, we wait for all players to join and then we start the game
+                    ClearFlag(game_state->flags, StateFlag_TryingJoinGame);
+                }
+                
+                if (HasFlag(game_state->flags, StateFlag_FailedJoinGame))
+                {
+                    // TODO(fakhri): display an error message
+                    LogError("Couldn't join game");
+                    ClearFlag(game_state->flags, StateFlag_TryingJoinGame | StateFlag_FailedJoinGame);
+                }
+            }
+            
+            if (HasFlag(game_state->flags, StateFlag_JoinedGame))
+            {
+                // NOTE(fakhri): render the connected players
+                local_persist v3 positions[] = {
+                    Vec3(-CentiMeter(17),  CentiMeter(17), Meter(1)), Vec3(+CentiMeter(17),  CentiMeter(17), Meter(1)),
+                    Vec3(-CentiMeter(17), -CentiMeter(17), Meter(1)), Vec3(+CentiMeter(17), -CentiMeter(17), Meter(1)),
+                };
+                
+                for (u32 index = 0;
+                     index < ArrayCount(game_state->players);
+                     ++index)
+                {
+                    Player *player = game_state->players + index;
+                    if(player->joined)
+                    {
+                        Render_PushText(&game_state->render_context, player->username, positions[index], Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
+                        
+                    }
+                    else
+                    {
+                        Render_PushText(&game_state->render_context, Str8Lit("waiting player"), positions[index], Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
+                        
+                    }
+                }
+                
+                if (game_state->players_joined_so_far == MAX_PLAYER_COUNT)
+                {
+                    // NOTE(fakhri): enough players have joined
+                    StartGame(game_state);
+                }
+            }
+            
+        } break;
         case GameMode_GAME:
         {
-            v4 white = Vec4(1, 1, 1,1);
-            v4 red = Vec4(1, 0, 0, 1);
-            
             // TODO(fakhri): render a background
             if(HasFlag(game_state->flags, StateFlag_WaitingForCards))
             {
@@ -556,93 +702,6 @@ APP_UpdateAndRender(UpdateAndRender)
             }
             else
             {
-                // NOTE(fakhri): loop over all the entities and update them
-                for (u32 entity_id = 1;
-                     entity_id < game_state->entity_count;
-                     ++entity_id)
-                {
-                    Entity *entity = game_state->entities + entity_id;
-                    switch(entity->type)
-                    {
-                        case EntityType_Cursor_Entity:
-                        {
-                            UpdateCursorEntity(game_state, entity);
-                            
-                            // NOTE(fakhri): render the mouse cursor
-                            Render_PushQuad(&game_state->render_context, 
-                                            entity->center_pos,
-                                            Vec2(MiliMeter(5.f), MiliMeter(5.f)), Vec4(1, .3f, .5f, 1.f), CoordinateType_World);
-                            
-                        } break;
-                        case EntityType_Card:
-                        {
-                            UpdateCardEntity(game_state, entity_id, dt);
-                            if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
-                            {
-                                if (HasFlag(entity->flags, EntityFlag_Selected))
-                                {
-                                    Render_PushQuad(&game_state->render_context, 
-                                                    Vec3(entity->center_pos.xy, entity->center_pos.z - MiliMeter(.1f)),
-                                                    1.05f * entity->curr_dimension, red, CoordinateType_World, entity->y_angle);
-                                }
-                                
-                                Render_PushImage(&game_state->render_context, entity->texture, entity->center_pos, entity->curr_dimension, CoordinateType_World,
-                                                 entity->y_angle);
-                                
-                                v3 card_back_pos = entity->center_pos;
-                                
-                                Render_PushImage(&game_state->render_context, game_state->frensh_deck.card_back_texture, entity->center_pos, entity->curr_dimension, CoordinateType_World, PI32 - entity->y_angle);
-                                
-                            }
-                            else
-                            {
-                                ClearFlag(entity->flags, EntityFlag_DontDrawThisFrame);
-                            }
-                        } break;
-                        case EntityType_Companion:
-                        {
-                            UpdateCompanionEntity(game_state, entity, dt);
-                            if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
-                            {
-                                Render_PushImage(&game_state->render_context, entity->texture, entity->center_pos, entity->curr_dimension, CoordinateType_World,
-                                                 entity->y_angle);
-                            }
-                            else
-                            {
-                                ClearFlag(entity->flags, EntityFlag_DontDrawThisFrame);
-                            }
-                        } break;
-                        case EntityType_Button:
-                        {
-                            UpdateButtonEntity(game_state, entity, dt);
-                            if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
-                            {
-                                // TODO(fakhri): draw the button entity
-                                v4 button_color = Vec4(251, 73, 197, 255) / 255;
-                                if (entity->button_kind == ButtonEntityKind_PlaySelectedCards)
-                                {
-                                    button_color.r = 0;
-                                }
-                                Render_PushQuad(&game_state->render_context, entity->center_pos, entity->curr_dimension, button_color, CoordinateType_World);
-                            }
-                            else
-                            {
-                                ClearFlag(entity->flags, EntityFlag_DontDrawThisFrame);
-                            }
-                        } break;
-                        case EntityType_Numbers:
-                        {
-                            UpdateNumberEntity(game_state, entity_id, dt);
-                            Render_PushImage(&game_state->render_context, entity->texture, entity->center_pos, entity->curr_dimension, CoordinateType_World,
-                                             entity->y_angle);
-                        } break;
-                        default:
-                        {
-                            StopExecution;
-                        } break;
-                    }
-                }
-                
                 if (HasFlag(game_state->flags, StateFlag_PlaySelectedCards))
                 {
                     b32 table_empty = IsResidencyEmpty(game_state, ResidencyKind_Table);

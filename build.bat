@@ -19,5 +19,29 @@ start /b /wait "" "cl.exe"  %build_options% %compile_flags% ../code/game/game_ma
 
 start /b /wait "" "cl.exe"  %build_options% %compile_flags% ../code/os/win32/win32_main.cpp /link %platform_link_flags% /out:%application_name%.exe
 
+if not exist game1 (
+ mkdir game1 
+ cp -r ..\data game1
+)
+
+if not exist game2 (
+ mkdir game2
+ cp -r ..\data game2
+)
+
+if not exist game3 (
+ mkdir game3 
+ cp -r ..\data game3
+)
+
+if not exist game4 (
+ mkdir game4 
+ cp -r ..\data game4
+)
+
+cp %application_name%_code.dll %application_name%.exe game1
+cp %application_name%_code.dll %application_name%.exe game2
+cp %application_name%_code.dll %application_name%.exe game3
+
 popd
 

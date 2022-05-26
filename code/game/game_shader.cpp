@@ -8,7 +8,7 @@ CompileShader(String8 shader_name)
     M_Temp scratch = GetScratch(0, 0);
     {
         String8List path_list = {};
-        Str8ListPush(scratch.arena, &path_list, Str8Lit("shaders/"));
+        Str8ListPush(scratch.arena, &path_list, Str8Lit("data/shaders/"));
         Str8ListPush(scratch.arena, &path_list, shader_name);
         shader_path = Str8ListJoin(scratch.arena, path_list, 0);
     }

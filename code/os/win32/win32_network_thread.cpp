@@ -103,6 +103,9 @@ HandlePlayerMessage(Message *message)
         } break;
         case PlayerMessage_Username:
         {
+            Log("Username request");
+            Log("username is %s", message->username.cstr);
+            Assert(host_io_context.host_socket != InvalidSocket);
             SendString(host_io_context.host_socket, message->username);
         } break;
         default:
@@ -129,10 +132,12 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                                       &Overlapped,
                                       INFINITE))
         {
+            Log("Received network message");
             switch(completion_key)
             {
                 case NetworkMessageSource_Player:
                 {
+                    Log("From Player");
                     while(!W32_IsMessageQueueEmpty(&player_message_queue))
                     {
                         // NOTE(fakhri): peek the head message
@@ -144,9 +149,7 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                 } break;
                 case NetworkMessageSource_Host:
                 {
-                    // NOTE(fakhri): get the message that we will write to
-                    // this works because this thread is the only thread that
-                    // push new messages to the host message queue
+                    Log("From host");
                     Message *message = W32_BeginMessageQueueWrite(&host_message_queue);
                     message->type = host_io_context.message_type;
                     // NOTE(fakhri): receive the actual message from the host
@@ -154,6 +157,7 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                     {
                         case HostMessage_ConnectedPlayersList:
                         {
+                            Log("HostMessage_ConnectedPlayersList");
                             ReceiveBuffer(host_io_context.host_socket, &message->players_count, sizeof(message->players_count));
                             u32 offset = 0;
                             for (u32 player_index = 0;
@@ -171,6 +175,7 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                         } break;
                         case HostMessage_NewPlayerJoined:
                         {
+                            Log("HostMessage_NewPlayerJoined");
                             ReceiveBuffer(host_io_context.host_socket, &message->new_player_id, sizeof(message->new_player_id));
                             ReceiveBuffer(host_io_context.host_socket, &message->new_username.len, sizeof(message->new_username.len));
                             Assert(message->new_username.len < USERNAME_BUFFER_SIZE);
@@ -181,6 +186,7 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                         } break;
                         case HostMessage_ShuffledDeck:
                         {
+                            Log("HostMessage_ShuffledDeck");
                             message->compact_deck = (Compact_Card_Type *)message->buffer;
                             u32 compact_deck_size = DECK_CARDS_COUNT * sizeof(Compact_Card_Type);
                             Assert(compact_deck_size < sizeof(message->buffer));
@@ -188,6 +194,7 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                         } break;
                         case HostMessage_ChangePlayerTurn:
                         {
+                            Log("HostMessage_ChangePlayerTurn");
                             ReceiveBuffer(host_io_context.host_socket, &message->new_player_id, sizeof(message->new_player_id));
                         } break;
                         default :

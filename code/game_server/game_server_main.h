@@ -12,7 +12,8 @@ struct Compact_Card_Hand
 struct Connected_Player
 {
     Socket_Handle socket;
-    char username[20];
+    char buffer[USERNAME_BUFFER_SIZE];
+    String8 username;
 };
 
 typedef u32 CardResidencyKind;
@@ -75,7 +76,6 @@ BroadcastPlayerMove(PlayerMove player_move)
         // NOTE(fakhri): send the message to player
         u32 type = HostMessage_PlayerMove;
         SendBuffer(player->socket, &type, sizeof(type));
-        
         SendBuffer(player->socket, &player_move.type, sizeof(player_move.type));
         if(player_move.type == PlayerMove_PlayCard)
         {
@@ -122,7 +122,7 @@ BroadcastNewPlayerJoinedMessage(Connected_Player *new_player, u32 player_id)
         u32 type = HostMessage_NewPlayerJoined;
         SendBuffer(player->socket, &type, sizeof(type));
         SendBuffer(player->socket, &player_id, sizeof(player_id));
-        SendBuffer(player->socket, new_player->username, sizeof(new_player->username));
+        SendString(player->socket, new_player->username);
     }
 }
 
@@ -189,7 +189,7 @@ SendConnectedPlayersList(Socket_Handle s)
          ++player_index)
     {
         Connected_Player *player = players_storage->players + player_index;
-        SendBuffer(s, player->username, sizeof(player->username));
+        SendString(s, player->username);
     }
 }
 
