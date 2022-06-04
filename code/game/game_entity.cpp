@@ -35,13 +35,13 @@ AddNumberEntity(Game_State *game_state, Card_Number number)
     entity->curr_dimension   = 3 * Vec2(MiliMeter(6.5f), MiliMeter(10));
     entity->dDimension = 20.f;
     
-    entity->texture = game_state->frensh_deck.black_numbers_up[number];
+    entity->texture = TextureID_BlackNumbers_Ace + number;
     
     AddToResidency(game_state, entity_id, ResidencyKind_Nonespacial);
 }
 
 internal void
-AddCompanionEntity(Game_State *game_state, Texture2D texture, v2 companion_dimensions, u32 entity_id_to_follow, v2 followed_offset)
+AddCompanionEntity(Game_State *game_state, TextureID texture, b32 flip_y, v2 companion_dimensions, u32 entity_id_to_follow, v2 followed_offset)
 {
     u32 companion_entity_id = AddEntity(game_state);
     Entity *companion_entity = game_state->entities + companion_entity_id;
@@ -54,184 +54,172 @@ AddCompanionEntity(Game_State *game_state, Texture2D texture, v2 companion_dimen
     companion_entity->entity_id_to_follow = entity_id_to_follow;
     companion_entity->offset_in_follwed_entity = followed_offset;
     companion_entity->texture = texture;
+    companion_entity->flip_y = flip_y;
 }
 
 internal inline void
-AddCompanion_Ace(Game_State *game_state, Texture2D category, v2 companion_size, u32 card_entity_id)
+AddCompanion_Ace(Game_State *game_state, TextureID category, v2 companion_size, u32 card_entity_id)
 {
-    AddCompanionEntity(game_state, category, companion_size, card_entity_id, Vec2(0, 0));
+    AddCompanionEntity(game_state, category, false, companion_size, card_entity_id, Vec2(0, 0));
 }
 
 internal inline void
-AddCompanion_2(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
+AddCompanion_2(Game_State *game_state, TextureID category, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, false, companion_size, card_entity_id, 
                        Vec2(0, MiliMeter(28.85f)));
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, true, companion_size, card_entity_id, 
                        Vec2(0, -MiliMeter(28.85f)));
 }
 
 internal inline void
-AddCompanion_3(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
+AddCompanion_3(Game_State *game_state, TextureID category, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanion_Ace(game_state, category_up, companion_size, card_entity_id);
+    AddCompanion_Ace(game_state, category, companion_size, card_entity_id);
     
-    AddCompanion_2(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+    AddCompanion_2(game_state, category, companion_size, card_dimension, card_entity_id);
 }
 
 internal inline void
-AddCompanion_4(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
+AddCompanion_4(Game_State *game_state, TextureID category, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
     
     v2 companion_offset = Vec2(MiliMeter(11.55f), MiliMeter(28.85f));
     
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, false, companion_size, card_entity_id, 
                        Vec2(-companion_offset.x, companion_offset.y));
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, false, companion_size, card_entity_id, 
                        Vec2(companion_offset.x, companion_offset.y));
     
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, true, companion_size, card_entity_id, 
                        Vec2(-companion_offset.x, -companion_offset.y));
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, true, companion_size, card_entity_id, 
                        Vec2(companion_offset.x, -companion_offset.y));
     
 }
 
 internal inline void
-AddCompanion_5(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
+AddCompanion_5(Game_State *game_state, TextureID category, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanion_Ace(game_state, category_up, companion_size, card_entity_id);
+    AddCompanion_Ace(game_state, category, companion_size, card_entity_id);
     
-    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+    AddCompanion_4(game_state, category, companion_size, card_dimension, card_entity_id);
 }
 
 internal inline  void
-AddCompanion_6(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
+AddCompanion_6(Game_State *game_state, TextureID category, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+    AddCompanion_4(game_state, category, companion_size, card_dimension, card_entity_id);
     
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, false, companion_size, card_entity_id, 
                        Vec2(-MiliMeter(11.55f), 0));
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, false, companion_size, card_entity_id, 
                        Vec2(MiliMeter(11.55f), 0));
     
 }
 
 internal inline void
-AddCompanion_7(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
+AddCompanion_7(Game_State *game_state, TextureID category, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanion_6(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+    AddCompanion_6(game_state, category, companion_size, card_dimension, card_entity_id);
     
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, false, companion_size, card_entity_id, 
                        Vec2(0, MiliMeter(14.45f)));
     
 }
 
 internal inline void
-AddCompanion_8(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
+AddCompanion_8(Game_State *game_state, TextureID category, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanion_7(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+    AddCompanion_7(game_state, category, companion_size, card_dimension, card_entity_id);
     
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, true, companion_size, card_entity_id, 
                        Vec2(0, -MiliMeter(14.45f)));
     
 }
 
 internal inline void
-AddCompanion_9(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
+AddCompanion_9(Game_State *game_state, TextureID category, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    AddCompanion_Ace(game_state, category_up, companion_size, card_entity_id);
+    AddCompanion_Ace(game_state, category, companion_size, card_entity_id);
     
-    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+    AddCompanion_4(game_state, category, companion_size, card_dimension, card_entity_id);
     
     v2 companion_offset = Vec2(MiliMeter(11.55f), MiliMeter(9.55f));
     
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, false, companion_size, card_entity_id, 
                        Vec2(-companion_offset.x, companion_offset.y));
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, false, companion_size, card_entity_id, 
                        Vec2(companion_offset.x, companion_offset.y));
     
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, true, companion_size, card_entity_id, 
                        Vec2(-companion_offset.x, -companion_offset.y));
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, true, companion_size, card_entity_id, 
                        Vec2(companion_offset.x, -companion_offset.y));
     
 }
 
 internal inline void
-AddCompanion_10(Game_State *game_state, Texture2D category_up, Texture2D category_down, v2 companion_size, v2 card_dimension, u32 card_entity_id)
+AddCompanion_10(Game_State *game_state, TextureID category, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
     
-    AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+    AddCompanion_4(game_state, category, companion_size, card_dimension, card_entity_id);
     
     v2 companion_offset = Vec2(MiliMeter(11.55f), MiliMeter(9.55f));
     
     // NOTE(fakhri): the four at the sides
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, false, companion_size, card_entity_id, 
                        Vec2(-companion_offset.x, companion_offset.y));
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, false, companion_size, card_entity_id, 
                        Vec2(companion_offset.x, companion_offset.y));
     
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, true, companion_size, card_entity_id, 
                        Vec2(-companion_offset.x, -companion_offset.y));
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, true, companion_size, card_entity_id, 
                        Vec2(companion_offset.x, -companion_offset.y));
     
     // NOTE(fakhri): middle two
-    AddCompanionEntity(game_state, category_up, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, false, companion_size, card_entity_id, 
                        Vec2(0, MiliMeter(19.15f)));
-    AddCompanionEntity(game_state, category_down, companion_size, card_entity_id, 
+    AddCompanionEntity(game_state, category, true, companion_size, card_entity_id, 
                        Vec2(0, -MiliMeter(19.15f)));
     
 }
 
 internal inline  void
-AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_deck, Card_Type card_type, v2 card_dimension, u32 card_entity_id)
+AddCardCompanions(Game_State *game_state, Card_Type card_type, v2 card_dimension, u32 card_entity_id)
 {
-    Texture2D category_up = {};
-    Texture2D category_down = {};
-    
+    TextureID category_texture = TextureID_None;
     b32 is_black = false;
     switch(card_type.category)
     {
         case Category_Clovers: // black
         {
             is_black = true;
-            category_up   = frensh_deck->clovers_up;
-            category_down = frensh_deck->clovers_down;
+            category_texture = TextureID_Clover;
         } break;
         case Category_Hearts:  // red
         {
             is_black = false;
-            category_up   = frensh_deck->hearts_up;
-            category_down = frensh_deck->hearts_down;
+            category_texture = TextureID_Heart;
         } break;
         case Category_Tiles:   // red
         {
             is_black = false;
-            category_up   = frensh_deck->tiles;
-            category_down = frensh_deck->tiles;
+            category_texture = TextureID_Tiles;
         } break;
         case Category_Pikes:   // black
         {
             is_black = true;
-            category_up   = frensh_deck->pikes_up;
-            category_down = frensh_deck->pikes_down;
+            category_texture = TextureID_Pikes;
         } break;
+        default: NotImplemented;
     }
     
-    Texture2D number_up = {}; 
-    Texture2D number_down = {};
-    if (is_black)
-    {
-        number_up   = frensh_deck->black_numbers_up[card_type.number];
-        number_down = frensh_deck->black_numbers_down[card_type.number];
-    }
-    else
-    {
-        number_up   = frensh_deck->red_numbers_up[card_type.number];
-        number_down = frensh_deck->red_numbers_down[card_type.number];
-    }
+    TextureID number_texture;
+    
+    number_texture = (is_black? TextureID_BlackNumbers_Ace: TextureID_RedNumbers_Ace)
+        + card_type.number;
     
     v2 padding        = 0.6f * Vec2(0.5f, 0.5f);
     v2 companion_size = Vec2(MiliMeter(6.4f), MiliMeter(10));
@@ -240,18 +228,18 @@ AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_de
     
     
     // @Hardcoded
-    AddCompanionEntity(game_state, number_up, Vec2(MiliMeter(6.5f), MiliMeter(10)),
+    AddCompanionEntity(game_state, number_texture, false, Vec2(MiliMeter(6.5f), MiliMeter(10)),
                        card_entity_id,
                        Vec2(-MiliMeter(22.35f), MiliMeter(36.5f)));
     
-    AddCompanionEntity(game_state, category_up, Vec2(MiliMeter(7.2f), MiliMeter(7.2f)),
+    AddCompanionEntity(game_state, category_texture, false, Vec2(MiliMeter(7.2f), MiliMeter(7.2f)),
                        card_entity_id,
                        Vec2(-MiliMeter(22.4f), MiliMeter(26.4f)));
     
-    AddCompanionEntity(game_state, number_down, Vec2(MiliMeter(6.4f), MiliMeter(10)),
+    AddCompanionEntity(game_state, number_texture, true, Vec2(MiliMeter(6.4f), MiliMeter(10)),
                        card_entity_id,
                        Vec2(MiliMeter(22.35f), -MiliMeter(36.5f)));
-    AddCompanionEntity(game_state, category_down, Vec2(MiliMeter(7.2f), MiliMeter(7.2f)),
+    AddCompanionEntity(game_state, category_texture, true, Vec2(MiliMeter(7.2f), MiliMeter(7.2f)),
                        card_entity_id,
                        Vec2(MiliMeter(22.4f), -MiliMeter(26.4f)));
     
@@ -261,62 +249,56 @@ AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_de
     {
         case Card_Number_Ace:
         {
-            AddCompanion_Ace(game_state, category_up, companion_size, card_entity_id);
+            AddCompanion_Ace(game_state, category_texture, companion_size, card_entity_id);
         } break;
         case Card_Number_2:
         {
-            AddCompanion_2(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+            AddCompanion_2(game_state, category_texture, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_3:
         {
-            AddCompanion_3(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+            AddCompanion_3(game_state, category_texture, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_4:
         {
-            AddCompanion_4(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+            AddCompanion_4(game_state, category_texture, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_5:
         {
-            AddCompanion_5(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+            AddCompanion_5(game_state, category_texture, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_6:
         {
-            AddCompanion_6(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+            AddCompanion_6(game_state, category_texture, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_7:
         {
-            AddCompanion_7(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+            AddCompanion_7(game_state, category_texture, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_8:
         {
-            AddCompanion_8(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+            AddCompanion_8(game_state, category_texture, companion_size, card_dimension, card_entity_id);
             
         } break;
         case Card_Number_9:
         {
-            AddCompanion_9(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+            AddCompanion_9(game_state, category_texture, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_10:
         {
-            AddCompanion_10(game_state, category_up, category_down, companion_size, card_dimension, card_entity_id);
+            AddCompanion_10(game_state, category_texture, companion_size, card_dimension, card_entity_id);
         } break;
         case Card_Number_Jack:
         {
-            Texture2D jack = frensh_deck->jacks[card_type.category];
-            
-            AddCompanion_Ace(game_state, jack, Vec2(MiliMeter(36.9f), MiliMeter(62.0f)), card_entity_id);
+            AddCompanion_Ace(game_state, TextureID_Jack + card_type.category, Vec2(MiliMeter(36.9f), MiliMeter(62.0f)), card_entity_id);
         } break;
         case Card_Number_Queen:
         {
-            Texture2D queen = frensh_deck->queens[card_type.category];
-            
-            AddCompanion_Ace(game_state, queen, Vec2(MiliMeter(36.9f), MiliMeter(62.0f)), card_entity_id);
+            AddCompanion_Ace(game_state, TextureID_Queen + card_type.category, Vec2(MiliMeter(36.9f), MiliMeter(62.0f)), card_entity_id);
         } break;
         case Card_Number_King:
         {
-            Texture2D king = frensh_deck->kings[card_type.category];
-            
-            AddCompanion_Ace(game_state, king, Vec2(MiliMeter(36.9f), MiliMeter(62.0f)), card_entity_id);
+            AddCompanion_Ace(game_state, TextureID_King + card_type.category, Vec2(MiliMeter(36.9f), MiliMeter(62.0f)), card_entity_id);
         } break;
     }
 }
@@ -344,10 +326,9 @@ AddCardEntity(Game_State *game_state, Card_Type card_type, ResidencyKind card_re
     
     card->dDimension = 20.f;
     
-    Frensh_Suited_Cards_Texture *frensh_deck = &game_state->frensh_deck;
-    card->texture = frensh_deck->card_frame_texture;
+    card->texture = TextureID_CardFrame;
     
-    AddCardCompanions(game_state, frensh_deck, card_type, card->curr_dimension, card_entity_id);
+    AddCardCompanions(game_state, card_type, card->curr_dimension, card_entity_id);
 } 
 
 

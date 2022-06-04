@@ -3,7 +3,8 @@
 #ifndef GAME_FONTS_H
 #define GAME_FONTS_H
 
-enum Font_Kind
+typedef u32 Font_Kind;
+enum
 {
     FontKind_None,
     FontKind_Arial,

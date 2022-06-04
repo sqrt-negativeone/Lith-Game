@@ -2,44 +2,26 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "third_party/stb_truetype.h"
 
+struct FontInfo
+{
+    String8 path;
+    f32 scale;
+};
+
+read_only global FontInfo fonts_info[FontKind_Count] = {
+    /*[FontKind_None]      =*/ {},
+    /*[FontKind_Arial]     =*/ {Str8LitComp("data/fonts/arial.ttf"), 50.f},
+    /*[FontKind_MenuTitle] =*/ {Str8LitComp("data/fonts/arial.ttf"), 50.f},
+    /*[FontKind_MenuItem]  =*/ {Str8LitComp("data/fonts/arial.ttf"), 50.f},
+};
 
 internal void
 LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
 {
     if (font_kind == FontKind_None) return;
-    
-    String8 path = {};
-    Font *font = 0;
-    f32 scale = 0;
-    switch(font_kind)
-    {
-        case FontKind_Arial:
-        {
-            path = Str8Lit("data/fonts/arial.ttf");
-            font = render_context->fonts + font_kind;
-            scale = 50;
-        } break;
-        case FontKind_MenuTitle:
-        {
-            path = Str8Lit("data/fonts/arial.ttf");
-            scale = 50;
-            font = render_context->fonts + font_kind;
-        } break;
-        case FontKind_MenuItem:
-        {
-            path = Str8Lit("data/fonts/arial.ttf");
-            font = render_context->fonts + font_kind;
-            scale = 50;
-        } break;
-        default:
-        {
-            Assert(FontKind_None < font_kind && font_kind < FontKind_Count);
-            NotImplemented;
-        } break;
-    }
-    
-    Assert(scale);
-    Assert(font);
+    Assert(font_kind < FontKind_Count);
+    Font *font = render_context->fonts + font_kind;
+    FontInfo font_info = fonts_info[font_kind];
     
     M_Temp scratch = GetScratch(&arena, 1);
     
@@ -49,7 +31,7 @@ LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
     v2 oversample = { 1.f, 1.f };
     v2i32 atlas_size = Vec2i32(1024, 1024);
     
-    String8 font_data = os->LoadEntireFile(scratch.arena, path);
+    String8 font_data = os->LoadEntireFile(scratch.arena, font_info.path);
     
     U8 *pixels = PushArrayZero(arena, U8, atlas_size.x * atlas_size.y);
     
@@ -57,7 +39,7 @@ LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
     F32 ascent = 0;
     F32 descent = 0;
     F32 line_gap = 0;
-    stbtt_GetScaledFontVMetrics(font_data.str, 0, scale, &ascent, &descent, &line_gap);
+    stbtt_GetScaledFontVMetrics(font_data.str, 0, font_info.scale, &ascent, &descent, &line_gap);
     F32 line_advance = ascent - descent + line_gap;
     
     stbtt_pack_context ctx = {0};
@@ -66,7 +48,7 @@ LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
     stbtt_packedchar *chardata_for_range = PushArrayZero(scratch.arena, stbtt_packedchar, direct_map_opl-direct_map_first);
     stbtt_pack_range rng =
     {
-        scale,
+        font_info.scale,
         (int)direct_map_first,
         0,
         (int)(direct_map_opl - direct_map_first),

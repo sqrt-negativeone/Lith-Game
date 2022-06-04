@@ -7,7 +7,8 @@ typedef GLuint Shader_ID;
 typedef GLuint Vertex_Array_ID;
 typedef GLuint Vertex_Buffer_ID;
 
-enum Shader_Kind
+typedef u32 Shader_Kind;
+enum
 {
     ShaderKind_None,
     ShaderKind_Quad,

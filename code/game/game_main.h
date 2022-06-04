@@ -89,7 +89,6 @@ struct Game_State
     Game_Mode game_mode;
     GameStateFlags flags;
     Render_Context render_context;
-    Frensh_Suited_Cards_Texture frensh_deck;
     UI_Context ui_context;
     Player players[MAX_PLAYER_COUNT];
     u32 players_joined_so_far;

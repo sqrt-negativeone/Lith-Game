@@ -3,44 +3,6 @@
 #ifndef GAME_RENDER_H
 #define GAME_RENDER_H
 
-struct Frensh_Suited_Cards_Texture
-{
-    Texture2D card_frame_texture;
-    Texture2D card_back_texture;
-    
-    Texture2D clovers_up;
-    Texture2D hearts_up;
-    Texture2D pikes_up;
-    Texture2D clovers_down;
-    Texture2D hearts_down;
-    Texture2D pikes_down;
-    Texture2D tiles;
-    
-    Texture2D black_numbers_up[13];
-    Texture2D black_numbers_down[13];
-    Texture2D red_numbers_up[13];
-    Texture2D red_numbers_down[13];
-    
-    Texture2D jacks[4];
-    Texture2D queens[4];
-    Texture2D kings[4];
-    
-    
-#if 0    
-    // // TODO(fakhri): we can do something like this
-    Texture2D black_numbers[Card_Number_Count];
-    Texture2D red_numbers[Card_Number_Count];
-    
-    Texture2D category_black[Category_Count];
-    Texture2D category_red[Category_Count];
-    
-    Texture2D jacks[Category_Count];
-    Texture2D queens[Category_Count];
-    Texture2D kings[Category_Count];
-#endif
-    
-};
-
 enum Render_Kind
 {
     RenderKind_None,
@@ -81,6 +43,7 @@ struct RenderRequest_Image
     RenderRequest_Header header;
     v2 screen_coords;
     Texture2D texture;
+    b32 flip_y;
     v2 size;
     f32 y_angle;
     v4 color;
@@ -107,6 +70,7 @@ struct Render_Context
     
     Shaders_Hash shaders_hash;
     Shader_Program shaders[ShaderKind_Count];
+    Texture2D textures[TextureID_Count];
     
     Font fonts[FontKind_Count];
     Font_Kind active_font;

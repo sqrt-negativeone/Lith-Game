@@ -485,7 +485,6 @@ APP_PermanantLoad(PermanentLoad)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
     InitRenderer(&game_state->render_context);
-    LoadFrenshSuitedDeck(&game_state->frensh_deck);
     
     UI_Init(&game_state->ui_context, &game_state->render_context);
     
@@ -650,12 +649,12 @@ APP_UpdateAndRender(UpdateAndRender)
                                         1.05f * entity->curr_dimension, red, CoordinateType_World, entity->y_angle);
                     }
                     
-                    Render_PushImage(&game_state->render_context, entity->texture, entity->center_pos, entity->curr_dimension, CoordinateType_World,
+                    Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World, entity->flip_y,
                                      entity->y_angle);
                     
                     v3 card_back_pos = entity->center_pos;
                     
-                    Render_PushImage(&game_state->render_context, game_state->frensh_deck.card_back_texture, entity->center_pos, entity->curr_dimension, CoordinateType_World, PI32 - entity->y_angle);
+                    Render_PushImage(&game_state->render_context, game_state->render_context.textures[TextureID_CardBack],  entity->center_pos, entity->curr_dimension, CoordinateType_World, false, PI32 - entity->y_angle );
                     
                 }
                 else
@@ -668,8 +667,8 @@ APP_UpdateAndRender(UpdateAndRender)
                 UpdateCompanionEntity(game_state, entity, dt);
                 if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
                 {
-                    Render_PushImage(&game_state->render_context, entity->texture, entity->center_pos, entity->curr_dimension, CoordinateType_World,
-                                     entity->y_angle);
+                    Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World,
+                                     entity->flip_y, entity->y_angle );
                 }
                 else
                 {
@@ -697,8 +696,8 @@ APP_UpdateAndRender(UpdateAndRender)
             case EntityType_Numbers:
             {
                 UpdateNumberEntity(game_state, entity_id, dt);
-                Render_PushImage(&game_state->render_context, entity->texture, entity->center_pos, entity->curr_dimension, CoordinateType_World,
-                                 entity->y_angle);
+                Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World,
+                                 false, entity->y_angle);
             } break;
             default:
             {
@@ -903,7 +902,7 @@ APP_UpdateAndRender(UpdateAndRender)
                                             "Declared Rank is: ", game_state->declared_number);
                     v3 pos = Vec3(-CentiMeter(30), CentiMeter(24), MAX_Z);
                     pos.x = Render_PushText(&game_state->render_context, msg, pos, Vec4(0, 0, 0, 1), CoordinateType_World, FontKind_Arial);
-                    Texture2D texture = game_state->frensh_deck.red_numbers_up[game_state->declared_number];
+                    Texture2D texture = game_state->render_context.textures[TextureID_BlackNumbers_Ace + game_state->declared_number];
                     v2 dim = 0.15f * Vec2(MiliMeter(128.f), MiliMeter(203.f));
                     pos.x += 0.5f * dim.x;
                     pos.y += 0.25f * dim.y;

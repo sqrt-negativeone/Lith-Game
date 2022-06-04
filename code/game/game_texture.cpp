@@ -1,6 +1,59 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "third_party/stb_image.h"
 
+read_only global String8 textures_path[TextureID_Count] = {
+    /*[TextureID_None]              */ Str8LitComp(""),
+    /*[TextureID_Clover]            */ Str8LitComp("data/images/clovers_up.png"),
+    /*[TextureID_Heart]             */ Str8LitComp("data/images/hearts_up.png"),
+    /*[TextureID_Pikes]             */ Str8LitComp("data/images/pikes_up.png"),
+    /*[TextureID_Tiles]             */ Str8LitComp("data/images/tiles.png"),
+    /*[TextureID_BlackNumbers_Ace]  */ Str8LitComp("data/images/A_black_up.png"),
+    /*[TextureID_BlackNumbers_2]    */ Str8LitComp("data/images/2_black_up.png"),
+    /*[TextureID_BlackNumbers_3]    */ Str8LitComp("data/images/3_black_up.png"),
+    /*[TextureID_BlackNumbers_4]    */ Str8LitComp("data/images/4_black_up.png"),
+    /*[TextureID_BlackNumbers_5]    */ Str8LitComp("data/images/5_black_up.png"),
+    /*[TextureID_BlackNumbers_6]    */ Str8LitComp("data/images/6_black_up.png"),
+    /*[TextureID_BlackNumbers_7]    */ Str8LitComp("data/images/7_black_up.png"),
+    /*[TextureID_BlackNumbers_8]    */ Str8LitComp("data/images/8_black_up.png"),
+    /*[TextureID_BlackNumbers_9]    */ Str8LitComp("data/images/9_black_up.png"),
+    /*[TextureID_BlackNumbers_10]   */ Str8LitComp("data/images/10_black_up.png"),
+    /*[TextureID_BlackNumbers_Jack] */ Str8LitComp("data/images/J_black_up.png"),
+    /*[TextureID_BlackNumbers_Queen]*/ Str8LitComp("data/images/Q_black_up.png"),
+    /*[TextureID_BlackNumbers_King] */ Str8LitComp("data/images/K_black_up.png"),
+    /*[TextureID_RedNumbers_Ace]    */ Str8LitComp("data/images/A_red_up.png"),
+    /*[TextureID_RedNumbers_2]      */ Str8LitComp("data/images/2_red_up.png"),
+    /*[TextureID_RedNumbers_3]      */ Str8LitComp("data/images/3_red_up.png"),
+    /*[TextureID_RedNumbers_4]      */ Str8LitComp("data/images/4_red_up.png"),
+    /*[TextureID_RedNumbers_5]      */ Str8LitComp("data/images/5_red_up.png"),
+    /*[TextureID_RedNumbers_6]      */ Str8LitComp("data/images/6_red_up.png"),
+    /*[TextureID_RedNumbers_7]      */ Str8LitComp("data/images/7_red_up.png"),
+    /*[TextureID_RedNumbers_8]      */ Str8LitComp("data/images/8_red_up.png"),
+    /*[TextureID_RedNumbers_9]      */ Str8LitComp("data/images/9_red_up.png"),
+    /*[TextureID_RedNumbers_10]     */ Str8LitComp("data/images/10_red_up.png"),
+    /*[TextureID_RedNumbers_Jack]   */ Str8LitComp("data/images/J_red_up.png"),
+    /*[TextureID_RedNumbers_Queen]  */ Str8LitComp("data/images/Q_red_up.png"),
+    /*[TextureID_RedNumbers_King]   */ Str8LitComp("data/images/K_red_up.png"),
+    
+    /*[TextureID_Jack + Category_Hearts]  */ Str8LitComp("data/images/jack_hearts.png"),
+    /*[TextureID_Jack + Category_Tiles]   */ Str8LitComp("data/images/jack_tiles.png"),
+    /*[TextureID_Jack + Category_Clovers] */ Str8LitComp("data/images/jack_clovers.png"),
+    /*[TextureID_Jack + Category_Pikes]   */ Str8LitComp("data/images/jack_pikes.png"),
+    
+    /*[TextureID_Queen + Category_Hearts]  */ Str8LitComp("data/images/queen_hearts.png"),
+    /*[TextureID_Queen + Category_Tiles]   */ Str8LitComp("data/images/queen_tiles.png"),
+    /*[TextureID_Queen + Category_Clovers] */ Str8LitComp("data/images/queen_clovers.png"),
+    /*[TextureID_Queen + Category_Pikes]   */ Str8LitComp("data/images/queen_pikes.png"),
+    
+    /*[TextureID_King + Category_Hearts]  */ Str8LitComp("data/images/king_hearts.png"),
+    /*[TextureID_King + Category_Tiles]   */ Str8LitComp("data/images/king_tiles.png"),
+    /*[TextureID_King + Category_Clovers] */ Str8LitComp("data/images/king_clovers.png"),
+    /*[TextureID_King + Category_Pikes]   */ Str8LitComp("data/images/king_pikes.png"),
+    
+    /*[TextureID_Arrow]             */ Str8LitComp("data/images/arrow.png"),
+    /*[TextureID_CardBack]          */ Str8LitComp("data/images/card_frame.png"),
+    /*[TextureID_CardFrame]         */ Str8LitComp("data/images/card_back.png"),
+};
+
 internal TextureFormat2D
 TextureFormatFromInternalFormat(GLuint format)
 {
@@ -95,12 +148,16 @@ ReleaseTexture2D(Texture2D texture)
     glDeleteTextures(1, &texture.id);
 }
 
-internal Texture2D
-LoadTexture(String8 image_path)
+internal void
+LoadTexture(Render_Context *render_context, TextureID texture_id)
 {
-    Texture2D result = {};
-    glGenTextures(1, &result.id);
-    glBindTexture(GL_TEXTURE_2D, result.id);
+    Assert(texture_id < TextureID_Count);
+    if (texture_id == TextureID_None) return;
+    String8 image_path = textures_path[texture_id];
+    Texture2D *texture = render_context->textures + texture_id;
+    
+    glGenTextures(1, &texture->id);
+    glBindTexture(GL_TEXTURE_2D, texture->id);
     
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -108,7 +165,7 @@ LoadTexture(String8 image_path)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     
     i32 nb_channels;
-    void* data = stbi_load(image_path.cstr, &result.size.width, &result.size.height, &nb_channels, 0);
+    void* data = stbi_load(image_path.cstr, &texture->size.width, &texture->size.height, &nb_channels, 0);
     if (data)
     {
         GLenum format = 0;
@@ -119,14 +176,13 @@ LoadTexture(String8 image_path)
             case 4: format = GL_RGBA; break;
             default: LogWarning("channels count %d not handled when loading image %s", nb_channels, image_path.str);
         }
-        glTexImage2D(GL_TEXTURE_2D, 0, format, result.size.width, result.size.height, 0, format, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, texture->size.width, texture->size.height, 0, format, GL_UNSIGNED_BYTE, data);
         stbi_image_free(data);
         
-        result.format = TextureFormatFromInternalFormat(format);
+        texture->format = TextureFormatFromInternalFormat(format);
     }
     else
     {
         LogWarning("couldn't load image %s", image_path.str);
     }
-    return result;
 }

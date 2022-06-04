@@ -26,37 +26,6 @@ enum Entity_Type
 #define CARD_VIRTICAL_ADVANCE (CARD_HEIGHT + CARD_VIRTICAL_GAP)
 #define THRESHOLD_FOR_BURNING Category_Count
 
-typedef u8 Card_Category;
-enum
-{
-    Category_Hearts,  // red
-    Category_Tiles,   // red
-    Category_Clovers, // black
-    Category_Pikes,   // black
-    Category_Count,
-};
-
-#define InvalidCardNumber Card_Number_Count
-
-typedef u8 Card_Number;
-enum
-{
-    Card_Number_Ace,
-    Card_Number_2,
-    Card_Number_3,
-    Card_Number_4,
-    Card_Number_5,
-    Card_Number_6,
-    Card_Number_7,
-    Card_Number_8,
-    Card_Number_9,
-    Card_Number_10,
-    Card_Number_Jack,
-    Card_Number_Queen,
-    Card_Number_King,
-    Card_Number_Count,
-};
-
 struct Card_Type
 {
     Card_Category category;
@@ -138,7 +107,8 @@ struct Entity
     Card_Type card_type;
     
     ResidencyKind residency;
-    Texture2D texture;
+    TextureID texture;
+    b32 flip_y;
     
     ButtonEntityKind button_kind;
 };

@@ -2,93 +2,29 @@
 #define MAX_Z Meter(10.0f)
 
 internal void
-LoadFrenshSuitedDeck(Frensh_Suited_Cards_Texture *deck_textures)
-{
-    deck_textures->card_frame_texture    = LoadTexture(Str8Lit("data/images/card_frame.png"));
-    deck_textures->card_back_texture     = LoadTexture(Str8Lit("data/images/card_back.png"));
-    deck_textures->clovers_up            = LoadTexture(Str8Lit("data/images/clovers_up.png"));
-    deck_textures->hearts_up             = LoadTexture(Str8Lit("data/images/hearts_up.png"));
-    deck_textures->pikes_up              = LoadTexture(Str8Lit("data/images/pikes_up.png"));
-    deck_textures->clovers_down          = LoadTexture(Str8Lit("data/images/clovers_down.png"));
-    deck_textures->hearts_down           = LoadTexture(Str8Lit("data/images/hearts_down.png"));
-    deck_textures->pikes_down            = LoadTexture(Str8Lit("data/images/pikes_down.png"));
-    deck_textures->tiles                 = LoadTexture(Str8Lit("data/images/tiles.png"));
-    
-    for (u32 number_index = Card_Number_2;
-         number_index <= Card_Number_10;
-         ++number_index)
-    {
-        u32 number = number_index + 1;
-        char buffer[50];
-        
-        sprintf(buffer, "data/images/%d_black_up.png", number);
-        deck_textures->black_numbers_up[number_index]    = LoadTexture(Str8C(buffer));
-        
-        sprintf(buffer, "data/images/%d_black_down.png", number);
-        deck_textures->black_numbers_down[number_index]  = LoadTexture(Str8C(buffer));
-        
-        sprintf(buffer, "data/images/%d_red_up.png", number);
-        deck_textures->red_numbers_up[number_index]      = LoadTexture(Str8C(buffer));
-        
-        sprintf(buffer, "data/images/%d_red_down.png", number);
-        deck_textures->red_numbers_down[number_index]    = LoadTexture(Str8C(buffer));
-    }
-    
-    deck_textures->black_numbers_up[Card_Number_Ace]   = LoadTexture(Str8Lit("data/images/A_black_up.png"));
-    deck_textures->black_numbers_down[Card_Number_Ace] = LoadTexture(Str8Lit("data/images/A_black_down.png"));
-    deck_textures->red_numbers_up[Card_Number_Ace]     = LoadTexture(Str8Lit("data/images/A_red_up.png"));
-    deck_textures->red_numbers_down[Card_Number_Ace]   = LoadTexture(Str8Lit("data/images/A_red_down.png"));
-    
-    deck_textures->black_numbers_up[Card_Number_Jack]   = LoadTexture(Str8Lit("data/images/J_black_up.png"));
-    deck_textures->black_numbers_down[Card_Number_Jack] = LoadTexture(Str8Lit("data/images/J_black_down.png"));
-    deck_textures->red_numbers_up[Card_Number_Jack]     = LoadTexture(Str8Lit("data/images/J_red_up.png"));
-    deck_textures->red_numbers_down[Card_Number_Jack]   = LoadTexture(Str8Lit("data/images/J_red_down.png"));
-    
-    deck_textures->black_numbers_up[Card_Number_Queen]   = LoadTexture(Str8Lit("data/images/Q_black_up.png"));
-    deck_textures->black_numbers_down[Card_Number_Queen] = LoadTexture(Str8Lit("data/images/Q_black_down.png"));
-    deck_textures->red_numbers_up[Card_Number_Queen]     = LoadTexture(Str8Lit("data/images/Q_red_up.png"));
-    deck_textures->red_numbers_down[Card_Number_Queen]   = LoadTexture(Str8Lit("data/images/Q_red_down.png"));
-    
-    deck_textures->black_numbers_up[Card_Number_King]   = LoadTexture(Str8Lit("data/images/K_black_up.png"));
-    deck_textures->black_numbers_down[Card_Number_King] = LoadTexture(Str8Lit("data/images/K_black_down.png"));
-    deck_textures->red_numbers_up[Card_Number_King]     = LoadTexture(Str8Lit("data/images/K_red_up.png"));
-    deck_textures->red_numbers_down[Card_Number_King]   = LoadTexture(Str8Lit("data/images/K_red_down.png"));
-    
-    deck_textures->jacks[Category_Clovers]  = LoadTexture(Str8Lit("data/images/jack_clovers.png"));
-    deck_textures->queens[Category_Clovers] = LoadTexture(Str8Lit("data/images/queen_clovers.png"));
-    deck_textures->kings[Category_Clovers]  = LoadTexture(Str8Lit("data/images/king_clovers.png"));
-    
-    deck_textures->jacks[Category_Hearts]  = LoadTexture(Str8Lit("data/images/jack_hearts.png"));
-    deck_textures->queens[Category_Hearts] = LoadTexture(Str8Lit("data/images/queen_hearts.png"));
-    deck_textures->kings[Category_Hearts]  = LoadTexture(Str8Lit("data/images/king_hearts.png"));
-    
-    deck_textures->jacks[Category_Pikes]  = LoadTexture(Str8Lit("data/images/jack_pikes.png"));
-    deck_textures->queens[Category_Pikes] = LoadTexture(Str8Lit("data/images/queen_pikes.png"));
-    deck_textures->kings[Category_Pikes]  = LoadTexture(Str8Lit("data/images/king_pikes.png"));
-    
-    deck_textures->jacks[Category_Tiles]  = LoadTexture(Str8Lit("data/images/jack_tiles.png"));
-    deck_textures->queens[Category_Tiles] = LoadTexture(Str8Lit("data/images/queen_tiles.png"));
-    deck_textures->kings[Category_Tiles]  = LoadTexture(Str8Lit("data/images/king_tiles.png"));
-    
-}
-
-internal void
 InitRenderer(Render_Context *render_context)
 {
     // NOTE(fakhri): load shaders
-    for (u32 shader_type_index = ShaderKind_None;
-         shader_type_index < ShaderKind_Count;
-         ++shader_type_index)
+    for (Shader_Kind shader_kind = ShaderKind_None;
+         shader_kind < ShaderKind_Count;
+         ++shader_kind)
     {
-        LoadShader(render_context, (Shader_Kind)shader_type_index);
+        LoadShader(render_context, shader_kind);
     }
     
     // NOTE(fakhri): load fonts
-    for (u32 font_index = FontKind_None;
-         font_index < FontKind_Count;
-         ++font_index)
+    for (Font_Kind font_kind = FontKind_None;
+         font_kind < FontKind_Count;
+         ++font_kind)
     {
-        LoadFont(render_context, os->permanent_arena, (Font_Kind)font_index);
+        LoadFont(render_context, os->permanent_arena, font_kind);
+    }
+    
+    for (TextureID texture_id = TextureID_None;
+         texture_id < TextureID_Count;
+         ++texture_id)
+    {
+        LoadTexture(render_context, texture_id);
     }
     
 }
@@ -183,7 +119,7 @@ Render_PushQuad(Render_Context *render_context, v3 pos, v2 size_in_meter, v4 col
 internal void
 Render_PushImage(Render_Context *render_context, Texture2D texture,
                  v3 pos, v2 size, 
-                 Coordinate_Type coord_type, 
+                 Coordinate_Type coord_type, b32 flip_y = false,
                  f32 y_angle = 0, b32 is_size_in_meter = true, v4 color = Vec4(1, 1, 1, 1), v4 src = Vec4(0, 0, 1, 1))
 {
     Assert(coord_type < CoordinateType_Count);
@@ -199,6 +135,7 @@ Render_PushImage(Render_Context *render_context, Texture2D texture,
     image_request->header.offset_to_next = sizeof(RenderRequest_Image);
     image_request->screen_coords = pos.xy;
     image_request->texture = texture;
+    image_request->flip_y = flip_y;
     image_request->size = is_size_in_meter ? render_context->pixels_per_meter * size : size;
     image_request->y_angle = y_angle;
     image_request->color = color;
@@ -237,7 +174,7 @@ Render_PushText(Render_Context *render_context, String text, v3 pos, v4 color, C
             pos.xy = glyph_pos;
             Render_PushImage(render_context, font->texture, 
                              pos, glyph.size, 
-                             CoordinateType_Screen,
+                             CoordinateType_Screen, 0,
                              0, 0, color, glyph.src.compact_rect);
             
             curr_point.x += glyph.advance;
