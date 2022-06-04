@@ -322,7 +322,7 @@ Render_End(Render_Context *render_context)
                 m4 model = trans * rotat * scale;
                 
                 Shader_Program *program = render_context->shaders + ShaderKind_Texture;
-                OpenGL_DrawImage(program, image_request->texture, ortho_projection, model, image_request->src, image_request->color);
+                OpenGL_DrawImage(program, image_request->texture, image_request->flip_y, ortho_projection, model, image_request->src, image_request->color);
                 
             } break;
             

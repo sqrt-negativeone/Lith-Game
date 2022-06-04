@@ -3,7 +3,6 @@
 #ifndef GAME_TEXTURE_H
 #define GAME_TEXTURE_H
 
-
 enum TextureFormat2D
 {
     TextureFormat2D_Null,
@@ -97,12 +96,5 @@ enum
     TextureID_CardBack,
     TextureID_Count,
 };
-
-#if 0
-Category_Hearts,  // red
-Category_Tiles,   // red
-Category_Clovers, // black
-Category_Pikes,   // black
-#endif
 
 #endif //GAME_TEXTURE_H

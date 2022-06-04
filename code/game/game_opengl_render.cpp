@@ -1,6 +1,6 @@
 
 internal void
-OpenGL_DrawImage(Shader_Program *program, Texture2D texture, m4 projection, m4 model, v4 src, v4 color)
+OpenGL_DrawImage(Shader_Program *program, Texture2D texture, b32 flip_y, m4 projection, m4 model, v4 src, v4 color)
 {
     glUseProgram(program->id);
     
@@ -10,6 +10,7 @@ OpenGL_DrawImage(Shader_Program *program, Texture2D texture, m4 projection, m4 m
         glUniformMatrix4fv(glGetUniformLocation(program->id, "model"), 1, GL_FALSE, (f32*)&model);
         glUniform4fv(glGetUniformLocation(program->id, "src"), 1, (f32 *)&src);
         glUniform4fv(glGetUniformLocation(program->id, "tilting_color"), 1, (f32 *)&color);
+        glUniform1i(glGetUniformLocation(program->id, "flip_y"), flip_y);
     }
     
     glActiveTexture(GL_TEXTURE0);

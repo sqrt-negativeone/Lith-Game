@@ -218,6 +218,7 @@ DWORD WINAPI HostMain(LPVOID param)
         CardResidency *deck_residency = host_context.residencies + CardResidencyKind_Deck;
         Game_Step step = GameStep_ShuffleDeck;
         b32 stop = false;
+        // TODO(fakhri): handle when a player disconnect
         while(!stop)
         {
             switch(step)
