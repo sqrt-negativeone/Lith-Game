@@ -5,12 +5,13 @@
 
 enum Entity_Type
 {
-    EntityType_Null_Entity,
-    EntityType_Cursor_Entity, // NOTE(fakhri): always following mouse
+    EntityType_Null,
+    EntityType_Cursor, // NOTE(fakhri): always following mouse
     EntityType_Card,
     EntityType_Companion,
     EntityType_Button,
     EntityType_Numbers,
+    EntityType_Arrow, // NOTE(fakhri): points to the current player
 };
 
 #define TEST_ONE_CARD 0

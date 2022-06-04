@@ -12,7 +12,32 @@ AddNullEntity(Game_State *game_state)
 {
     u32 entity_id = AddEntity(game_state);
     Entity *entity = game_state->entities + entity_id;
-    entity->type = EntityType_Null_Entity;
+    entity->type = EntityType_Null;
+}
+
+internal void
+AddButtonEntity(Game_State *game_state, ButtonEntityKind button_kind, v3 center_pos, v2 dimension)
+{
+    u32 button_entity_id = AddEntity(game_state);
+    Entity *button = game_state->entities + button_entity_id;
+    MemoryZero(button, sizeof(Entity));
+    
+    button->type             = EntityType_Button;
+    button->button_kind      = button_kind;
+    button->center_pos       = center_pos;
+    button->target_dimension = dimension;
+    button->curr_dimension   = dimension;
+    button->dDimension       = 20.f;
+}
+
+internal void
+AddArrowEntity(Game_State *game_state)
+{
+    u32 entity_id = AddEntity(game_state);
+    Entity *entity = game_state->entities + entity_id;
+    entity->type = EntityType_Arrow;
+    entity->texture = TextureID_Arrow;
+    entity->curr_dimension = Vec2(MiliMeter(30), MiliMeter(30));
 }
 
 internal void
@@ -20,7 +45,7 @@ AddCursorEntity(Game_State *game_state)
 {
     u32 entity_id = AddEntity(game_state);
     Entity *entity = game_state->entities + entity_id;
-    entity->type = EntityType_Cursor_Entity;
+    entity->type = EntityType_Cursor;
 }
 
 internal void
@@ -83,7 +108,6 @@ AddCompanion_3(Game_State *game_state, TextureID category, v2 companion_size, v2
 internal inline void
 AddCompanion_4(Game_State *game_state, TextureID category, v2 companion_size, v2 card_dimension, u32 card_entity_id)
 {
-    
     v2 companion_offset = Vec2(MiliMeter(11.55f), MiliMeter(28.85f));
     
     AddCompanionEntity(game_state, category, false, companion_size, card_entity_id, 
@@ -95,7 +119,6 @@ AddCompanion_4(Game_State *game_state, TextureID category, v2 companion_size, v2
                        Vec2(-companion_offset.x, -companion_offset.y));
     AddCompanionEntity(game_state, category, true, companion_size, card_entity_id, 
                        Vec2(companion_offset.x, -companion_offset.y));
-    
 }
 
 internal inline void
@@ -381,8 +404,8 @@ internal void
 UpdateCardEntity(Game_State *game_state, EntityID entity_id, f32 dt)
 {
     Entity *entity = game_state->entities + entity_id;
-    Entity *cursor_entity = game_state->entities + (u32)EntityType_Cursor_Entity;
-    Assert(cursor_entity->type == EntityType_Cursor_Entity);
+    Entity *cursor_entity = game_state->entities + (u32)EntityType_Cursor;
+    Assert(cursor_entity->type == EntityType_Cursor);
     Assert(ResidencyKind_Nil < entity->residency && entity->residency < ResidencyKind_Count);
     
     if (HasFlag(entity->flags, EntityFlag_UnderCursor) && game_state->highest_entity_under_cursor != entity_id)
@@ -450,7 +473,7 @@ internal void
 UpdateNumberEntity(Game_State *game_state, EntityID entity_id, f32 dt)
 {
     Entity *entity = game_state->entities + entity_id;
-    Entity *cursor_entity = game_state->entities + (u32)EntityType_Cursor_Entity;
+    Entity *cursor_entity = game_state->entities + (u32)EntityType_Cursor;
     MoveEntity(game_state, entity, 100, 10, 0.5f, dt);
     
     if (HasFlag(entity->flags, EntityFlag_UnderCursor) && 
@@ -509,7 +532,7 @@ UpdateCompanionEntity(Game_State *game_state, Entity *entity, f32 dt)
 internal void
 UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
 {
-    Entity *cursor_entity = game_state->entities + (u32)EntityType_Cursor_Entity;
+    Entity *cursor_entity = game_state->entities + (u32)EntityType_Cursor;
     
     b32 clicked = 0;
     b32 mouse_inside = IsInsideRect(RectCentDim(entity->center_pos.xy, entity->curr_dimension),
@@ -575,18 +598,35 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
 }
 
 internal void
-AddButtonEntity(Game_State *game_state, ButtonEntityKind button_kind, v3 center_pos, v2 dimension)
+UpdateArrowEntity(Game_State *game_state, Entity *entity, f32 dt)
 {
-    u32 button_entity_id = AddEntity(game_state);
-    Entity *button = game_state->entities + button_entity_id;
-    MemoryZero(button, sizeof(Entity));
+    ResidencyKind curr_player_residency = game_state->players[game_state->curr_player_id].assigned_residency_kind;
     
-    button->type             = EntityType_Button;
-    button->button_kind      = button_kind;
-    button->center_pos       = center_pos;
-    button->target_dimension = dimension;
-    button->curr_dimension   = dimension;
-    button->dDimension       = 20.f;
+    if (curr_player_residency != entity->residency)
+    {
+        entity->residency = curr_player_residency;
+        switch(entity->residency)
+        {
+            case ResidencyKind_Down:
+            {
+                entity->target_pos = Vec3(0, -CentiMeter(10), 0);
+            } break;
+            case ResidencyKind_Up:
+            {
+                entity->target_pos = Vec3(0, +CentiMeter(10), 0);
+            } break;
+            case ResidencyKind_Left:
+            {
+                entity->target_pos = Vec3(-CentiMeter(10), 0, 0);
+            } break;
+            case ResidencyKind_Right:
+            {
+                entity->target_pos = Vec3(CentiMeter(10), 0, 0);
+            } break;
+        }
+    }
+    
+    MoveEntity(game_state, entity, 100, 10, 0.5f, dt);
 }
 
 internal void
@@ -609,6 +649,7 @@ AddDebugEntites(Game_State *game_state)
     
     AddNullEntity(game_state);
     AddCursorEntity(game_state);
+    AddArrowEntity(game_state);
     
     game_state->game_mode = GameMode_GAME;
     SetFlag(game_state->flags, StateFlag_ReceivedCards);

@@ -322,6 +322,27 @@ internal void
 AssignResidencyToPlayers(Game_State *game_state)
 {
     u32 residency = ResidencyKind_Left;
+    
+    PlayerID player_id = game_state->my_player_id;
+    game_state->players[player_id].assigned_residency_kind = ResidencyKind_Down;
+    game_state->residencies[ResidencyKind_Down].controlling_player_id = player_id;
+    player_id += 1;
+    player_id %= ArrayCount(game_state->players);
+    
+    game_state->players[player_id].assigned_residency_kind = ResidencyKind_Left;
+    game_state->residencies[ResidencyKind_Left].controlling_player_id = player_id;
+    player_id += 1;
+    player_id %= ArrayCount(game_state->players);
+    
+    game_state->players[player_id].assigned_residency_kind = ResidencyKind_Up;
+    game_state->residencies[ResidencyKind_Up].controlling_player_id = player_id;
+    player_id += 1;
+    player_id %= ArrayCount(game_state->players);
+    
+    game_state->players[player_id].assigned_residency_kind = ResidencyKind_Right;
+    game_state->residencies[ResidencyKind_Right].controlling_player_id = player_id;
+    
+#if 0    
     for(u32 player_index = 0;
         player_index < ArrayCount(game_state->players);
         ++player_index)
@@ -340,6 +361,8 @@ AssignResidencyToPlayers(Game_State *game_state)
             ++residency;
         }
     }
+#endif
+    
 }
 
 internal b32

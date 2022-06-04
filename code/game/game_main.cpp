@@ -1,4 +1,6 @@
 
+#define TEST_NETWORKING 1
+
 ////////////////////////////////
 //~ NOTE(fakhri): headers
 
@@ -496,8 +498,7 @@ APP_PermanantLoad(PermanentLoad)
     game_state->time_scale_factor = 1.f;
     game_state->selection_limit = 13;
     
-#if 1
-    
+#if TEST_NETWORKING
     AddNullEntity(game_state);
     AddCursorEntity(game_state);
     
@@ -627,7 +628,7 @@ APP_UpdateAndRender(UpdateAndRender)
         Entity *entity = game_state->entities + entity_id;
         switch(entity->type)
         {
-            case EntityType_Cursor_Entity:
+            case EntityType_Cursor:
             {
                 UpdateCursorEntity(game_state, entity);
                 
@@ -696,6 +697,12 @@ APP_UpdateAndRender(UpdateAndRender)
             case EntityType_Numbers:
             {
                 UpdateNumberEntity(game_state, entity_id, dt);
+                Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World,
+                                 false, entity->y_angle);
+            } break;
+            case EntityType_Arrow:
+            {
+                UpdateArrowEntity(game_state, entity, dt);
                 Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World,
                                  false, entity->y_angle);
             } break;
@@ -778,6 +785,8 @@ APP_UpdateAndRender(UpdateAndRender)
                     
                     AddButtonEntity(game_state, ButtonEntityKind_QuestionCredibility, Vec3(MiliMeter(150), MiliMeter(0), 0), Vec2(MiliMeter(50), MiliMeter(30)));
                     AddButtonEntity(game_state, ButtonEntityKind_PlaySelectedCards, Vec3(MiliMeter(150), -MiliMeter(40), 0), Vec2(MiliMeter(50), MiliMeter(30)));
+                    
+                    AddArrowEntity(game_state);
                     
                     for (Card_Number number = Card_Number_Ace;
                          number < Card_Number_Count;

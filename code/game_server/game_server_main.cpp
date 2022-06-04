@@ -26,7 +26,7 @@ RemoveGaps(CardResidency *residency)
         card_index < residency->count;
         ++card_index)
     {
-        Card_Number card_number = (u32)residency->cards[card_index].number;
+        Card_Number card_number = residency->cards[card_index].number;
         if(card_number != InvalidCardNumber)
         {
             residency->cards[min_empty++] =  residency->cards[card_index];
@@ -59,7 +59,7 @@ BurnExtraCards(CardResidencyKind residency_kind)
         Card_Number card_number = residency->cards[card_index].number;
         if(card_number_freq[card_number] == Category_Count)
         {
-            residency->cards[card_index].number = Card_Number_Count;
+            residency->cards[card_index].number = InvalidCardNumber;
             AddCardToResidency(CardResidencyKind_Burnt, residency->cards[card_index]);
             should_burn = true;
         }
@@ -374,14 +374,15 @@ DWORD WINAPI HostMain(LPVOID param)
                             }
                             
                             PlayerID punished_player = prev_player_lied? prev_player_id:curr_player_id;
+                            CardResidencyKind punished_residency = CardResidencyKind_Player0 + punished_player;
                             for (u32 card_index = 0;
                                  card_index < table_res->count;
                                  ++card_index)
                             {
-                                AddCardToResidency(CardResidencyKind_Player0 + punished_player, table_res->cards[card_index]);
+                                AddCardToResidency(punished_residency, table_res->cards[card_index]);
                             }
                             table_res->count = 0;
-                            
+                            BurnExtraCards(punished_residency);
                             // NOTE(fakhri): broadcast the move to other players
                             {
                                 MessageType host_msg_type = HostMessage_QuestionCredibility;
