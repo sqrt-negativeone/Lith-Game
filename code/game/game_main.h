@@ -58,12 +58,14 @@ enum
     StateFlag_ShouldBurnCards         = (1 << 11),
     StateFlag_ShouldDeclareCard       = (1 << 12),
     StateFlag_PlaySelectedCards       = (1 << 13),
+    StateFlag_QuestionCredibility     = (1 << 14),
+    StateFlag_PlayedCardThisFrame     = (1 << 15),
 };
 
 enum GameStateFlagsGroup
 {
     GameStateFlagsGroup_NoSelect = StateFlag_ShouldDeclareCard | StateFlag_ShouldBurnCards | StateFlag_ShouldOpenDeclaringMenu,
-    GameStateFlagsGroup_ValidOnlyForOneFrame = StateFlag_PlaySelectedCards,
+    GameStateFlagsGroup_ValidOnlyForOneFrame = StateFlag_PlaySelectedCards | StateFlag_QuestionCredibility,
 };
 
 struct Hosts_Storage
@@ -108,6 +110,7 @@ struct Game_State
     u32 prev_played_cards_count;
     u32 selection_count;
     Card_Number declared_number;
+    EntityID card_type_to_entity_id_map[Category_Count][Card_Number_Count];
 };
 
 #endif //GAME_MAIN_H

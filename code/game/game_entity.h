@@ -63,6 +63,13 @@ struct Card_Type
     Card_Number   number;
 };
 
+internal b32
+IsCardTypeTheSame(Card_Type a, Card_Type b)
+{
+    b32 result = (a.category == b.category) && (a.number == b.number);
+    return result;
+}
+
 internal Card_Type
 MakeCardType(Card_Category category, Card_Number number)
 {

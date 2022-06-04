@@ -38,17 +38,34 @@ InitResidencies(Game_State *game_state)
     // NOTE(fakhri): none spacial residency
     {
         Residency *residency = game_state->residencies + ResidencyKind_Nonespacial;
-        // TODO(fakhri): make use of these flags
         SetFlag(residency->flags, ResidencyFlags_OutsideScreen | ResidencyFlags_RandomizedPlacement);
         residency->controlling_player_id = InvalidePlayerID;
+    }
+    
+    // NOTE(fakhri): left residency
+    {
+        Residency *residency = game_state->residencies + ResidencyKind_Left;
+        SetFlag(residency->flags, ResidencyFlags_Burnable | ResidencyFlags_HostsCards | ResidencyFlags_Hidden);
+        residency->controlling_player_id = InvalidePlayerID;
+        residency->base_position = Vec3(-CentiMeter(40), 0, 0);
+        residency->advance_direction = 1.0f;
     }
     
     // NOTE(fakhri): up residency
     {
         Residency *residency = game_state->residencies + ResidencyKind_Up;
-        SetFlag(residency->flags, ResidencyFlags_Horizontal | ResidencyFlags_Burnable | ResidencyFlags_HostsCards);
+        SetFlag(residency->flags, ResidencyFlags_Horizontal | ResidencyFlags_Burnable | ResidencyFlags_HostsCards | ResidencyFlags_Hidden);
         residency->controlling_player_id = InvalidePlayerID;
         residency->base_position = Vec3(0, CentiMeter(20), 0);
+        residency->advance_direction = -1.0f;
+    }
+    
+    // NOTE(fakhri): right residency
+    {
+        Residency *residency = game_state->residencies + ResidencyKind_Right;
+        SetFlag(residency->flags, ResidencyFlags_Burnable | ResidencyFlags_HostsCards | ResidencyFlags_Hidden);
+        residency->controlling_player_id = InvalidePlayerID;
+        residency->base_position = Vec3(CentiMeter(40), 0, 0);
         residency->advance_direction = -1.0f;
     }
     
@@ -59,24 +76,6 @@ InitResidencies(Game_State *game_state)
         residency->controlling_player_id = InvalidePlayerID;
         residency->base_position = Vec3(0, -CentiMeter(20), 0);
         residency->advance_direction = 1.0f;
-    }
-    
-    // NOTE(fakhri): left residency
-    {
-        Residency *residency = game_state->residencies + ResidencyKind_Left;
-        SetFlag(residency->flags, ResidencyFlags_Burnable | ResidencyFlags_HostsCards);
-        residency->controlling_player_id = InvalidePlayerID;
-        residency->base_position = Vec3(-CentiMeter(40), 0, 0);
-        residency->advance_direction = 1.0f;
-    }
-    
-    // NOTE(fakhri): right residency
-    {
-        Residency *residency = game_state->residencies + ResidencyKind_Right;
-        SetFlag(residency->flags, ResidencyFlags_Burnable | ResidencyFlags_HostsCards);
-        residency->controlling_player_id = InvalidePlayerID;
-        residency->base_position = Vec3(CentiMeter(40), 0, 0);
-        residency->advance_direction = -1.0f;
     }
     
     // NOTE(fakhri): table residency
@@ -229,24 +228,8 @@ AddToResidency(Game_State *game_state, u32 entity_id, ResidencyKind residency_ki
 {
     Entity *entity = game_state->entities + entity_id;
     Residency *residency = game_state->residencies + residency_kind;
-    // NOTE(fakhri): find an empty position where to place the entity
     
-#if 0    
-    u32 entity_place = 0;
-    for (;
-         entity_place < ArrayCount(entity_residency->entity_ids);
-         ++entity_place)
-    {
-        EntityID entity_id = entity_residency->entity_ids[entity_place];
-        if (entity_id == InvalidEntityID)
-        {
-            break;
-        }
-    }
-#else
     u32 entity_place = residency->entity_count;
-#endif
-    
     Assert(entity_place < ArrayCount(residency->entity_ids));
     
     residency->entity_ids[entity_place] = entity_id;
@@ -285,6 +268,41 @@ ChangeResidency(Game_State *game_state, ResidencyIterator *res_iter, ResidencyKi
                 residency->entity_ids[index] = residency->entity_ids[index + 1];
             }
             res_iter->dont_increment = 1;
+        }
+        AddToResidency(game_state, entity_id, residency_kind);
+    }
+}
+
+internal void
+ChangeResidency(Game_State *game_state, EntityID entity_id, ResidencyKind residency_kind)
+{
+    Entity *entity = game_state->entities + entity_id;
+    ResidencyKind old_residency_kind = entity->residency;;
+    Residency *old_residency = game_state->residencies + old_residency_kind;
+    if (old_residency_kind != residency_kind)
+    {
+        // NOTE(fakhri): remove the entity from the old residency
+        if (old_residency_kind != ResidencyKind_Nil)
+        {
+            SetFlag(old_residency->flags, ResidencyFlags_NeedsReorganizing);
+            u32 index_in_res = 0;
+            for(;
+                index_in_res < old_residency->entity_count;
+                ++index_in_res)
+            {
+                if (old_residency->entity_ids[index_in_res] == entity_id)
+                {
+                    break;
+                }
+            }
+            Assert(index_in_res < old_residency->entity_count);
+            --old_residency->entity_count;
+            for (;
+                 index_in_res < old_residency->entity_count;
+                 ++index_in_res)
+            {
+                old_residency->entity_ids[index_in_res] = old_residency->entity_ids[index_in_res + 1];
+            }
         }
         AddToResidency(game_state, entity_id, residency_kind);
     }

@@ -140,17 +140,21 @@ _Render_PushRequest(Push_Buffer *push_buffer, u32 size)
     return result;
 }
 
+internal void
+Render_ClearBuffer(Push_Buffer *push_buffer)
+{
+    push_buffer->size = 0;
+    push_buffer->requests_count = 0;
+};
 
 internal void
-Render_PushClear(Render_Context *render_context, v4 color, f32 z)
+Render_PushClear(Render_Context *render_context, v4 color)
 {
+    // NOTE(fakhri): clear all render request that came before this
+    Render_ClearBuffer(render_context->push_buffer);
     RenderRequest_Clear *clear_request = Render_PushRequest(render_context->push_buffer, RenderRequest_Clear);
-    // TODO(fakhri): what the best behaviour for clear?
-    // should we clear every render call that came before it?
-    // or just the ones have lower z?
-    // NOTE(fakhri): currently we clear the ones that have lower z
     clear_request->header.kind = RenderKind_Clear;
-    clear_request->header.z = z;
+    clear_request->header.z = -MAX_Z;
     clear_request->header.offset_to_next = sizeof(RenderRequest_Clear);
     clear_request->color = color;
 }

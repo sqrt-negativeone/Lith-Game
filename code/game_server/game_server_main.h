@@ -60,30 +60,12 @@ struct Host_Context
     
     CardResidency residencies[CardResidencyKind_Count];
     u64 completed_username_work;
+    u32 prev_played_card_count;
+    Card_Number declared_number;
     volatile b32 host_running;
 };
 
 global Host_Context host_context;
-
-internal void
-BroadcastPlayerMove(PlayerMove player_move)
-{
-    for (u32 player_index = 0;
-         player_index < host_context.players_storage.count;
-         ++player_index)
-    {
-        Connected_Player *player = host_context.players_storage.players + player_index;
-        // NOTE(fakhri): send the message to player
-        u32 type = HostMessage_PlayerMove;
-        SendBuffer(player->socket, &type, sizeof(type));
-        SendBuffer(player->socket, &player_move.type, sizeof(player_move.type));
-        if(player_move.type == PlayerMove_PlayCard)
-        {
-            SendBuffer(player->socket, &player_move.actual_card, sizeof(player_move.actual_card));
-            SendBuffer(player->socket, &player_move.declared_card, sizeof(player_move.declared_card));
-        }
-    }
-}
 
 internal void
 BroadcastShuffledDeckMessage()
@@ -98,14 +80,14 @@ BroadcastShuffledDeckMessage()
         compact_deck[index] = MakeCompactCardType(card.category, card.number);
     }
     
-    u32 type = HostMessage_ShuffledDeck;
+    MessageType type = HostMessage_ShuffledDeck;
     for (u32 player_index = 0;
          player_index < host_context.players_storage.count;
          ++player_index)
     {
         Connected_Player *player = host_context.players_storage.players + player_index;
         // NOTE(fakhri): send the message to player
-        SendBuffer(player->socket, &type, sizeof(type));
+        NetworkSendValue(player->socket, type);
         SendBuffer(player->socket, compact_deck, sizeof(compact_deck));
     }
 }
@@ -119,15 +101,15 @@ BroadcastNewPlayerJoinedMessage(Connected_Player *new_player, u32 player_id)
     {
         Connected_Player *player = host_context.players_storage.players + player_index;
         // NOTE(fakhri): send the message to player
-        u32 type = HostMessage_NewPlayerJoined;
-        SendBuffer(player->socket, &type, sizeof(type));
-        SendBuffer(player->socket, &player_id, sizeof(player_id));
+        MessageType type = HostMessage_NewPlayerJoined;
+        NetworkSendValue(player->socket, type);
+        NetworkSendValue(player->socket, player_id);
         SendString(player->socket, new_player->username);
     }
 }
 
 internal void
-BroadcastChangeTurnMessage(u32 player_id)
+BroadcastChangeTurnMessage(PlayerID player_id)
 {
     for (u32 player_index = 0;
          player_index < host_context.players_storage.count;
@@ -135,9 +117,9 @@ BroadcastChangeTurnMessage(u32 player_id)
     {
         Connected_Player *player = host_context.players_storage.players + player_index;
         // NOTE(fakhri): send the message to player
-        u32 type = HostMessage_ChangePlayerTurn;
-        SendBuffer(player->socket, &type, sizeof(type));
-        SendBuffer(player->socket, &player_id, sizeof(player_id));
+        MessageType type = HostMessage_ChangePlayerTurn;
+        NetworkSendValue(player->socket, type);
+        NetworkSendValue(player->socket, player_id);
     }
 }
 
@@ -150,40 +132,19 @@ BroadcastPlayerWon(u32 winner_id)
     {
         Connected_Player *player = host_context.players_storage.players + player_index;
         // NOTE(fakhri): send the message to player
-        u32 type = HostMessage_PlayerWon;
-        SendBuffer(player->socket, &type, sizeof(type));
-        SendBuffer(player->socket, &winner_id, sizeof(winner_id));
+        MessageType type = HostMessage_PlayerWon;
+        NetworkSendValue(player->socket, type);
+        NetworkSendValue(player->socket, winner_id);
     }
-}
-
-internal b32
-ReceivePlayerMove(Socket_Handle s, PlayerMove *player_move)
-{
-    b32 result = false;
-    u32 type;
-    ReceiveBuffer(s, &type, sizeof(type));
-    
-    if(type == PlayerMessage_PlayerMove)
-    {
-        result = true;
-        ReceiveBuffer(s, &player_move->type, sizeof(player_move->type));
-        if(player_move->type == PlayerMove_PlayCard)
-        {
-            ReceiveBuffer(s, &player_move->actual_card, sizeof(player_move->actual_card));
-            ReceiveBuffer(s, &player_move->declared_card, sizeof(player_move->declared_card));
-        }
-    }
-    return result;
 }
 
 internal void
 SendConnectedPlayersList(Socket_Handle s)
 {
-    u32 type = HostMessage_ConnectedPlayersList;
-    SendBuffer(s, &type, sizeof(type));
-    
+    MessageType type = HostMessage_ConnectedPlayersList;
+    NetworkSendValue(s, type);
     Players_Storage *players_storage = &host_context.players_storage;
-    SendBuffer(s, &players_storage->count, sizeof(players_storage->count));
+    NetworkSendValue(s, players_storage->count);
     for (u32 player_index = 0;
          player_index < players_storage->count;
          ++player_index)

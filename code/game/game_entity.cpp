@@ -323,24 +323,19 @@ AddCardCompanions(Game_State *game_state, Frensh_Suited_Cards_Texture *frensh_de
 
 
 internal void
-AddCardEntity(Game_State *game_state, Card_Type card_type, ResidencyKind card_residency, b32 is_fliped = false)
+AddCardEntity(Game_State *game_state, Card_Type card_type, ResidencyKind card_residency)
 {
     u32 card_entity_id = AddEntity(game_state);
     Entity *card = game_state->entities + card_entity_id;
     *card = {};
     card->type = EntityType_Card;
     card->card_type = card_type;
+    game_state->card_type_to_entity_id_map[card_type.category][card_type.number] = card_entity_id;
     card->target_dimension   = Vec2(CARD_WIDTH, CARD_HEIGHT);
     card->curr_dimension  = Vec2(CARD_WIDTH, CARD_HEIGHT);
     AddToResidency(game_state, card_entity_id, card_residency);
     
     card->dy_angle = 4 * PI32;
-    
-    if (is_fliped)
-    {
-        card->target_y_angle = PI32;
-        card->y_angle = PI32;
-    }
     
 #if TEST_ONE_CARD
     card->target_pos.xy = Vec2(0, 0);
@@ -427,7 +422,7 @@ UpdateCardEntity(Game_State *game_state, EntityID entity_id, f32 dt)
         if (game_state->controller.left_mouse.pressed)
         {
             Player *curr_player = game_state->players + game_state->curr_player_id;
-            if (entity->residency == curr_player->assigned_residency_kind)
+            if ((game_state->curr_player_id == game_state->my_player_id) && (entity->residency == curr_player->assigned_residency_kind))
             {
                 if (HasFlag(entity->flags, EntityFlag_Selected))
                 {
@@ -530,7 +525,6 @@ UpdateCompanionEntity(Game_State *game_state, Entity *entity, f32 dt)
     }
 }
 
-internal void ChangeCurrentPlayer(Game_State *game_state);
 internal void
 UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
 {
@@ -564,7 +558,7 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
                                              dt * entity->dDimension);
     
     
-    if (clicked)
+    if ((game_state->curr_player_id == game_state->my_player_id) && clicked)
     {
         switch(entity->button_kind)
         {
@@ -572,6 +566,7 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
             {
                 if (game_state->selection_count)
                 {
+                    // NOTE(fakhri): defer handling the button click
                     SetFlag(game_state->flags, StateFlag_PlaySelectedCards);
                 }
                 else
@@ -581,32 +576,11 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
             } break;
             case ButtonEntityKind_QuestionCredibility:
             {
-                // NOTE(fakhri): if any of the previously played cards are
-                // different from the declared cards then punish the prev player,
-                // else punish the current player
                 Residency *residency = game_state->residencies + ResidencyKind_Table;
-                if (residency->entity_count)
+                if (game_state->prev_played_cards_count)
                 {
-                    b32 prev_player_lied = false;
-                    for (u32 index = 0;
-                         index < game_state->prev_played_cards_count;
-                         ++index)
-                    {
-                        EntityID entity_id = residency->entity_ids[residency->entity_count - 1 - index];
-                        if (game_state->entities[entity_id].card_type.number != game_state->declared_number)
-                        {
-                            prev_player_lied = true;
-                            break;
-                        }
-                    } 
-                    
-                    PlayerID player_id_to_punish = prev_player_lied?
-                        game_state->prev_player_id : game_state->curr_player_id;
-                    Player *player_to_punish = game_state->players + player_id_to_punish;
-                    MoveAllFromResidency(game_state, ResidencyKind_Table, player_to_punish->assigned_residency_kind);
-                    ChangeCurrentPlayer(game_state);
-                    game_state->declared_number = InvalidCardNumber;
-                    game_state->prev_played_cards_count = 0;
+                    // NOTE(fakhri): defer handling the button click
+                    SetFlag(game_state->flags, StateFlag_QuestionCredibility);
                 }
                 else
                 {
@@ -719,5 +693,6 @@ AddDebugEntites(Game_State *game_state)
     
     AddButtonEntity(game_state, ButtonEntityKind_QuestionCredibility, Vec3(MiliMeter(150), MiliMeter(0), 0), Vec2(MiliMeter(50), MiliMeter(30)));
     AddButtonEntity(game_state, ButtonEntityKind_PlaySelectedCards, Vec3(MiliMeter(150), -MiliMeter(40), 0), Vec2(MiliMeter(50), MiliMeter(30)));
+    
 #endif
 }

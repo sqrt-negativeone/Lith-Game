@@ -17,4 +17,11 @@ internal b32 SendBuffer(Socket_Handle s, void *data, i32 len);
 internal b32 ReceiveBuffer(Socket_Handle s, void *data, i32 len);
 internal b32 SendString(Socket_Handle s, String8 data);
 internal b32 ReceiveString(Socket_Handle s, String8 *data);
+
+#define NetworkSendValue(s, v) do {SendBuffer(s, &(v), sizeof(v));} while(0)
+#define NetworkReceiveValue(s, v) do {ReceiveBuffer(s, &(v), sizeof(v));} while(0)
+
+#define NetworkSendArray(s, arr, cnt, T) do {NetworkSendValue(s, cnt); SendBuffer(s, arr, (cnt) * sizeof(T));} while(0)
+#define NetworkReceiveArray(s, arr, cnt, T) do { NetworkReceiveValue(s, cnt); ReceiveBuffer(s, arr, (cnt) * sizeof(T));} while(0)
+
 #endif //NETWORK_UTILITIES_H

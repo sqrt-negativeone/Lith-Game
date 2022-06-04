@@ -85,7 +85,6 @@ HandlePlayerMessage(Message *message)
             message->hosts_storage->is_fetching = false;
             CloseSocket(lobby_socket);
 #endif
-            
         } break;
         case PlayerMessage_ConnectToHost:
         {
@@ -107,6 +106,21 @@ HandlePlayerMessage(Message *message)
             Log("username is %s", message->username.cstr);
             Assert(host_io_context.host_socket != InvalidSocket);
             SendString(host_io_context.host_socket, message->username);
+        } break;
+        case PlayerMessage_PlayCard:
+        {
+            PlayerMoveKind move_kind = PlayerMove_PlayCard;
+            NetworkSendValue(host_io_context.host_socket, move_kind);
+            NetworkSendArray(host_io_context.host_socket,
+                             message->player_move.actual_cards, 
+                             message->player_move.played_cards_count, 
+                             Compact_Card_Type);
+            NetworkSendValue(host_io_context.host_socket, message->player_move.declared_number);
+        } break;
+        case PlayerMessage_QuestionCredibility:
+        {
+            PlayerMoveKind move_kind = PlayerMove_QuestionCredibility;
+            NetworkSendValue(host_io_context.host_socket, move_kind);
         } break;
         default:
         {
@@ -155,17 +169,31 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                     // NOTE(fakhri): receive the actual message from the host
                     switch(host_io_context.message_type)
                     {
+                        case HostMessage_PlayCard:
+                        {
+                            message->player_move.actual_cards = (Compact_Card_Type *)message->buffer;
+                            NetworkReceiveArray(host_io_context.host_socket, 
+                                                message->player_move.actual_cards, 
+                                                message->player_move.played_cards_count, 
+                                                Compact_Card_Type);
+                            NetworkReceiveValue(host_io_context.host_socket, message->player_move.declared_number);
+                        } break;
+                        case HostMessage_QuestionCredibility:
+                        {
+                            // NOTE(fakhri): just type is enough
+                        } break;
                         case HostMessage_ConnectedPlayersList:
                         {
                             Log("HostMessage_ConnectedPlayersList");
-                            ReceiveBuffer(host_io_context.host_socket, &message->players_count, sizeof(message->players_count));
+                            NetworkReceiveValue(host_io_context.host_socket, message->players_count);
+                            
                             u32 offset = 0;
                             for (u32 player_index = 0;
                                  player_index < message->players_count;
                                  ++player_index)
                             {
                                 String8 *player_username = message->players_usernames + player_index;
-                                ReceiveBuffer(host_io_context.host_socket, &player_username->len, sizeof(player_username->len));
+                                NetworkReceiveValue(host_io_context.host_socket, player_username->len);
                                 Assert(offset + player_username->len < sizeof(message->buffer));
                                 Assert(player_username->len < USERNAME_BUFFER_SIZE);
                                 ReceiveBuffer(host_io_context.host_socket, message->buffer + offset, (i32)player_username->len);
@@ -195,7 +223,7 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                         case HostMessage_ChangePlayerTurn:
                         {
                             Log("HostMessage_ChangePlayerTurn");
-                            ReceiveBuffer(host_io_context.host_socket, &message->new_player_id, sizeof(message->new_player_id));
+                            NetworkReceiveValue(host_io_context.host_socket, message->next_player_id);
                         } break;
                         default :
                         {

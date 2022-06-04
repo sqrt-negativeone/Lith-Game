@@ -129,6 +129,22 @@ ReceiveBuffer(Socket_Handle s, void *data, i32 len)
     return result;
 }
 
+#if 0
+internal b32
+SendU32(Socket_Handle s, u32 *data)
+{
+    b32 result = SendBuffer(s, data, sizeof(u32));
+    return result;
+}
+
+internal b32
+ReceiveU32(Socket_Handle s, u32 *data)
+{
+    b32 result = ReceiveBuffer(s, data, sizeof(u32));
+    return result;
+}
+#endif
+
 internal b32
 SendString(Socket_Handle s, String8 data)
 {

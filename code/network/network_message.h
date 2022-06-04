@@ -3,7 +3,13 @@
 #ifndef NETWORK_MESSAGE_H
 #define NETWORK_MESSAGE_H
 
-enum PlayerMove_Type
+#define MAX_PLAYER_COUNT (4u)
+#define CARDS_PER_PLAYER (13)
+#define DECK_CARDS_COUNT (MAX_PLAYER_COUNT * CARDS_PER_PLAYER)
+#define InvalidePlayerID MAX_PLAYER_COUNT
+
+typedef u8 PlayerMoveKind;
+enum
 {
     PlayerMove_None,
     PlayerMove_PlayCard,
@@ -12,7 +18,8 @@ enum PlayerMove_Type
 
 typedef u8 Compact_Card_Type;
 
-enum MessageType
+typedef u8 MessageType;
+enum
 {
     // NOTE(fakhri): player messages here
     PlayerMessage_ConnectToHost,
@@ -20,7 +27,8 @@ enum MessageType
     PlayerMessage_FetchHosts,
     PlayerMessage_StartHostServer,
     PlayerMessage_StopHostServer,
-    PlayerMessage_PlayerMove,
+    PlayerMessage_PlayCard,
+    PlayerMessage_QuestionCredibility,
     
     // NOTE(fakhri): Host messages here
     HostMessage_InvalidUsername,
@@ -30,23 +38,20 @@ enum MessageType
     HostMessage_ShuffledDeck,
     HostMessage_ChangePlayerTurn,
     HostMessage_PlayerWon,
-    HostMessage_PlayerMove,
+    HostMessage_PlayCard,
+    HostMessage_QuestionCredibility,
 };
 
 struct Hosts_Storage;
 struct Player;
 
-struct PlayerMove
+struct PlayCardMove
 {
-    PlayerMove_Type type;
-    Compact_Card_Type actual_card;
-    Compact_Card_Type declared_card;
+    // NOTE(fakhri): game move struct
+    Compact_Card_Type *actual_cards;
+    u32 played_cards_count;
+    Compact_Card_Type declared_number;
 };
-
-#define MAX_PLAYER_COUNT (4u)
-#define CARDS_PER_PLAYER (13)
-#define DECK_CARDS_COUNT (MAX_PLAYER_COUNT * CARDS_PER_PLAYER)
-#define InvalidePlayerID MAX_PLAYER_COUNT
 
 struct Message
 {
@@ -82,6 +87,8 @@ struct Message
             Compact_Card_Type *compact_deck;
             u32 compact_cards_count;
         };
+        PlayCardMove player_move;
+        PlayerID next_player_id;
     };
 };
 

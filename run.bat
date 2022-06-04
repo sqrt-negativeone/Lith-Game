@@ -1,4 +1,13 @@
 
-start "Start Game 1" build\game1\Lith.exe
-start "Start Game 2" build\game2\Lith.exe
-start "Start Game 3" build\game3\Lith.exe
+pushd build\game1
+start "Start Game 1" Lith.exe
+popd
+
+
+pushd build\game2
+start "Start Game 2" Lith.exe
+popd
+
+pushd build\game3
+start "Start Game 3" Lith.exe
+popd

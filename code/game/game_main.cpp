@@ -18,29 +18,28 @@
 global Thread_Ctx game_tctx;
 
 internal void
-ChangeCurrentPlayer(Game_State *game_state)
+ChangeCurrentPlayer(Game_State *game_state, PlayerID next_player_id)
 {
-    u32 new_player_id = (game_state->curr_player_id + 1) % MAX_PLAYER_COUNT;
-    
+    Assert(next_player_id < game_state->players_joined_so_far);
     M_Temp scratch = GetScratch(0 ,0);
     String8 msg = PushStr8F(scratch.arena, 
-                            "Player's %d Turn!", new_player_id);
+                            "Player %.s's Turn!", game_state->players[next_player_id].username);
     GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, msg, 
                                           Vec4(0, 1, 1, 1), Vec3(0, CentiMeter(10), 0), CoordinateType_World, 
                                           Seconds(1));
     ReleaseScratch(scratch);
     
     game_state->prev_player_id = game_state->curr_player_id;
-    game_state->curr_player_id = new_player_id;
+    game_state->curr_player_id = next_player_id;
 }
 
 internal void
 PlaySelectedCards(Game_State *game_state)
 {
+    SetFlag(game_state->flags, StateFlag_PlayedCardThisFrame);
     game_state->prev_played_cards_count = game_state->selection_count;
     game_state->selection_count = 0;
     MoveAllFromResidency(game_state, ResidencyKind_SelectedCards, ResidencyKind_Table);
-    ChangeCurrentPlayer(game_state);
     ClearFlag(game_state->flags, StateFlag_ShouldDeclareCard);
 }
 
@@ -51,6 +50,76 @@ AddPlayer(Game_State *game_state, String8 player_username, u32 player_id)
     player->username = PushStr8Copy(os->permanent_arena, player_username);
     player->joined = true;
     ++game_state->players_joined_so_far;
+}
+
+internal void
+PlayPlayedCards(Game_State *game_state, PlayCardMove player_move)
+{
+    ResidencyKind curr_player_residency = game_state->players[game_state->curr_player_id].assigned_residency_kind;
+    
+    if (IsResidencyEmpty(game_state, ResidencyKind_Table))
+    {
+        Assert(player_move.declared_number < Card_Number_Count);
+        if (player_move.declared_number < Card_Number_Count)
+        {
+            game_state->declared_number = player_move.declared_number;
+        }
+    }
+    
+    for (u32 index = 0;
+         index < player_move.played_cards_count;
+         ++index)
+    {
+        Card_Type card_type = UnpackCompactCardType(player_move.actual_cards[index]);
+        EntityID entity_id = game_state->card_type_to_entity_id_map[card_type.category][card_type.number];
+        Entity *entity = game_state->entities + entity_id;
+        if (curr_player_residency == entity->residency)
+        {
+            ChangeResidency(game_state, entity_id, ResidencyKind_Table);
+        }
+    }
+    
+    game_state->prev_played_cards_count = player_move.played_cards_count;
+}
+
+internal void
+QuestionPreviousPlayerCredibility(Game_State *game_state)
+{
+    // NOTE(fakhri): if any of the previously played cards are
+    // different from the declared cards then punish the prev player,
+    // else punish the current player
+    b32 prev_player_lied = false;
+    Residency *residency = game_state->residencies + ResidencyKind_Table;
+    for (u32 index = 0;
+         index < game_state->prev_played_cards_count;
+         ++index)
+    {
+        EntityID entity_id = residency->entity_ids[residency->entity_count - 1 - index];
+        if (game_state->entities[entity_id].card_type.number != game_state->declared_number)
+        {
+            prev_player_lied = true;
+            break;
+        }
+    } 
+    
+    // NOTE(fakhri): clear any card the current player has selected
+    {
+        ResidencyIterator iter = MakeResidencyIterator(game_state, 
+                                                       GetResidencyOfCurrentPlayer(game_state));
+        for(EachValidResidencyEntityID(entity_id, iter))
+        {
+            Entity *entity = game_state->entities + entity_id;
+            ClearFlag(entity->flags, EntityFlag_Selected);
+        }
+    }
+    
+    PlayerID player_id_to_punish = prev_player_lied?
+        game_state->prev_player_id : game_state->curr_player_id;
+    Player *player_to_punish = game_state->players + player_id_to_punish;
+    MoveAllFromResidency(game_state, ResidencyKind_Table, player_to_punish->assigned_residency_kind);
+    game_state->declared_number = InvalidCardNumber;
+    game_state->prev_played_cards_count = 0;
+    
 }
 
 internal void
@@ -103,43 +172,36 @@ HandleAvailableMessages(Game_State *game_state)
                     {
                         u32 compact_card_index = card_base + card_offset;
                         Card_Type card_type = UnpackCompactCardType(message->compact_deck[compact_card_index]);
-                        b32 is_flipped = (player_index != game_state->my_player_id);
-                        AddCardEntity(game_state, card_type, (ResidencyKind)player->assigned_residency_kind, is_flipped);
+                        AddCardEntity(game_state, card_type, player->assigned_residency_kind);
                     }
                 }
                 SetFlag(game_state->flags, StateFlag_ReceivedCards);
             } break;
             case HostMessage_ChangePlayerTurn:
             {
-                // TODO(fakhri): change the curr player turn
+                ChangeCurrentPlayer(game_state, message->next_player_id);
+            } break;
+            case HostMessage_PlayCard:
+            {
+                if (game_state->curr_player_id != game_state->my_player_id)
+                {
+                    PlayPlayedCards(game_state, message->player_move);
+                }
+            } break;
+            case HostMessage_QuestionCredibility:
+            {
+                if (game_state->curr_player_id != game_state->my_player_id)
+                {
+                    QuestionPreviousPlayerCredibility(game_state);
+                }
             } break;
             default:
             {
-                // NOTE(fakhri): unhandled message
-                // NOTE(fakhri): unhandled message
-                Assert(!"MESSAGE NOT IMPLEMENTED YET");
+                NotImplemented;
             }
         }
         os->EndHostMessageQueueRead();
     }
-}
-
-#if 0
-internal inline void
-FetchHosts(Hosts_Storage *hosts_storage)
-{
-    os->PushNetworkMessage(CreateFetchAvailableHostsMessage(hosts_storage));
-    hosts_storage->is_fetching = true;
-}
-#endif
-
-internal inline void
-OpenMenu(Game_State *game_state, Game_Mode menu_mode)
-{
-    Assert(GameMode_MENU_BEGIN < menu_mode && menu_mode < GameMode_MENU_END);
-    game_state->game_mode = menu_mode;
-    game_state->ui_context.pressed_item = -1;
-    glDepthFunc(GL_ALWAYS);
 }
 
 internal void
@@ -150,6 +212,22 @@ StartGame(Game_State *game_state)
     glDepthFunc(GL_LESS);
 }
 
+#if 0
+internal inline void
+FetchHosts(Hosts_Storage *hosts_storage)
+{
+    os->PushNetworkMessage(CreateFetchAvailableHostsMessage(hosts_storage));
+    hosts_storage->is_fetching = true;
+}
+
+internal inline void
+OpenMenu(Game_State *game_state, Game_Mode menu_mode)
+{
+    Assert(GameMode_MENU_BEGIN < menu_mode && menu_mode < GameMode_MENU_END);
+    game_state->game_mode = menu_mode;
+    game_state->ui_context.pressed_item = -1;
+    glDepthFunc(GL_ALWAYS);
+}
 
 internal
 void UpdateAndRenderMainMenu(Game_State *game_state, UI_Context *ui_context, Controller *controller)
@@ -249,7 +327,7 @@ void UpdateAndRenderUserNameMenu(Game_State *game_state, UI_Context *ui_context,
     
 }
 
-#if 0
+
 internal
 void UpdateAndRenderWaitingPlayersMenu(Game_State *game_state, UI_Context *ui_context, Controller *controller)
 {
@@ -414,7 +492,6 @@ APP_PermanantLoad(PermanentLoad)
     game_state->host_address_buffer = InitBuffer(os->permanent_arena, SERVER_ADDRESS_BUFFER_SIZE);
     game_state->username_buffer = InitBuffer(os->permanent_arena, USERNAME_BUFFER_SIZE);
     game_state->command_buffer.arena = os->permanent_arena;
-    OpenMenu(game_state, GameMode_MENU_MAIN);
     
     InitResidencies(game_state);
     game_state->time_scale_factor = 1.f;
@@ -461,7 +538,7 @@ APP_UpdateAndRender(UpdateAndRender)
     HandleAvailableMessages(game_state);
     Render_Begin(&game_state->render_context, OS_FrameArena());
     
-    Render_PushClear(&game_state->render_context, Vec4(0.4f, 0.4f, 0.5f, 1.f), -MAX_Z);
+    Render_PushClear(&game_state->render_context, Vec4(0.4f, 0.4f, 0.5f, 1.f));
     
     // NOTE(fakhri): Debug UI
     {
@@ -698,29 +775,42 @@ APP_UpdateAndRender(UpdateAndRender)
                 if(HasFlag(game_state->flags, StateFlag_ReceivedCards))
                 {
                     ClearFlag(game_state->flags, StateFlag_WaitingForCards);
+                    
+                    
+                    AddButtonEntity(game_state, ButtonEntityKind_QuestionCredibility, Vec3(MiliMeter(150), MiliMeter(0), 0), Vec2(MiliMeter(50), MiliMeter(30)));
+                    AddButtonEntity(game_state, ButtonEntityKind_PlaySelectedCards, Vec3(MiliMeter(150), -MiliMeter(40), 0), Vec2(MiliMeter(50), MiliMeter(30)));
+                    
+                    for (Card_Number number = Card_Number_Ace;
+                         number < Card_Number_Count;
+                         ++number)
+                    {
+                        AddNumberEntity(game_state, number);
+                    }
                 }
             }
             else
             {
+                if (HasFlag(game_state->flags, StateFlag_QuestionCredibility))
+                {
+                    PushQuestionCredibilityNetworkMessage();
+                    QuestionPreviousPlayerCredibility(game_state);
+                }
+                
                 if (HasFlag(game_state->flags, StateFlag_PlaySelectedCards))
                 {
                     b32 table_empty = IsResidencyEmpty(game_state, ResidencyKind_Table);
                     
-                    ResidencyIterator iter = MakeResidencyIterator(game_state, GetResidencyOfCurrentPlayer(game_state));
+                    ResidencyKind target_residency = table_empty? 
+                        ResidencyKind_SelectedCards : ResidencyKind_Table;
+                    ResidencyIterator iter = MakeResidencyIterator(game_state, 
+                                                                   GetResidencyOfCurrentPlayer(game_state));
                     for(EachValidResidencyEntityID(entity_id, iter))
                     {
                         Entity *entity = game_state->entities + entity_id;
                         if (HasFlag(entity->flags, EntityFlag_Selected))
                         {
                             ClearFlag(entity->flags, EntityFlag_Selected);
-                            if (table_empty)
-                            {
-                                ChangeResidency(game_state, &iter, ResidencyKind_SelectedCards);
-                            }
-                            else
-                            {
-                                ChangeResidency(game_state, &iter, ResidencyKind_Table);
-                            }
+                            ChangeResidency(game_state, &iter, target_residency);
                         }
                     }
                     
@@ -803,8 +893,8 @@ APP_UpdateAndRender(UpdateAndRender)
                     // TODO(fakhri): think about how to present this
                 }
                 
-                // NOTE(fakhri): display the declared number
 #if 1
+                // NOTE(fakhri): display the declared number
                 if (game_state->declared_number < Card_Number_Count)
                 {
                     // TODO(fakhri): think about how to present this
@@ -834,7 +924,10 @@ APP_UpdateAndRender(UpdateAndRender)
                     AddDebugEntites(game_state);
                 }
             }
+            
         } break;
+        
+#if 0        
         case GameMode_MENU_MAIN:
         {
             UpdateAndRenderMainMenu(game_state, ui_context, controller);
@@ -844,8 +937,6 @@ APP_UpdateAndRender(UpdateAndRender)
         {
             UpdateAndRenderUserNameMenu(game_state, ui_context, controller);
         } break;
-        
-#if 0        
         
         case GameMode_MENU_WAITING_PLAYERS: 
         {
@@ -860,7 +951,7 @@ APP_UpdateAndRender(UpdateAndRender)
         default: NotImplemented;
     }
     
-    // NOTE(fakhri): buffered commands
+    // NOTE(fakhri): command buffer
     {
         for(;;)
         {
@@ -916,6 +1007,12 @@ APP_UpdateAndRender(UpdateAndRender)
     }
     
     Render_End(&game_state->render_context);
+    
+    if (HasFlag(game_state->flags, StateFlag_PlayedCardThisFrame))
+    {
+        PushPlayedCardNetworkMessage(game_state);
+        ClearFlag(game_state->flags, StateFlag_PlayedCardThisFrame);
+    }
     
     if (game_state->controller.toggle_fullscreen.pressed)
     {

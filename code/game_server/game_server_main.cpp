@@ -1,7 +1,6 @@
 
 // NOTE(fakhri): IMPORTANT: we assume that all the platforms we target are LITTLE ENDIAN
 
-
 internal void
 AddCardToResidency(CardResidencyKind kind, Card_Type card_type)
 {
@@ -16,6 +15,24 @@ RemoveCardFromHand(Compact_Card_Hand *card_hand, u32 card_index)
 {
     --card_hand->cards_count;
     card_hand->cards[card_index] = card_hand->cards[card_hand->cards_count];
+}
+
+internal void
+RemoveGaps(CardResidency *residency)
+{
+    // NOTE(fakhri): remove the marked cards from the compact hand
+    u32 min_empty = 0;
+    for(u32 card_index = 0;
+        card_index < residency->count;
+        ++card_index)
+    {
+        Card_Number card_number = (u32)residency->cards[card_index].number;
+        if(card_number != InvalidCardNumber)
+        {
+            residency->cards[min_empty++] =  residency->cards[card_index];
+        }
+    }
+    residency->count = min_empty;
 }
 
 internal void
@@ -50,40 +67,9 @@ BurnExtraCards(CardResidencyKind residency_kind)
     
     if(should_burn)
     {
-        // NOTE(fakhri): remove the marked cards from the compact hand
-        u32 min_empty = 0;
-        for(u32 card_index = 0;
-            card_index < residency->count;
-            ++card_index)
-        {
-            Card_Number card_number = (u32)residency->cards[card_index].number;
-            if(card_number != Card_Number_Count)
-            {
-                residency->cards[min_empty++] =  residency->cards[card_index];
-            }
-        }
-        residency->count = min_empty;
+        RemoveGaps(residency);
     }
-    
 }
-
-#if 0
-internal void
-AddTableCardsToPlayerHand(Compact_Card_Hand *punished_hand, Compact_Card_Hand *table,  Compact_Card_Hand *burnt_hand)
-{
-    // NOTE(fakhri): move the cards from the table to the hand
-    for (u32 card_index = 0;
-         card_index < table->cards_count;
-         ++card_index)
-    {
-        Compact_Card_Type card = table->cards[card_index];
-        AddCardToHand(punished_hand, card);
-    }
-    table->cards_count = 0;
-    
-    BurnExtraCards(punished_hand, burnt_hand);
-}
-#endif
 
 internal void
 GetPlayerUsernameWork(void *data)
@@ -213,7 +199,6 @@ DWORD WINAPI HostMain(LPVOID param)
         // that we work with, and only compress them when we want to send them over network
         
         u32 curr_player_id = 0;
-        PlayerMove prev_move = {};
         Assert(Category_Count < 16);
         Assert(Card_Number_Count < 16);
         
@@ -270,7 +255,12 @@ DWORD WINAPI HostMain(LPVOID param)
                         BurnExtraCards(player_residency);
                     }
                     
+#if 0
                     curr_player_id = NextRandomNumber(&rand_ctx);
+#else
+                    curr_player_id = MAX_PLAYER_COUNT - 2;
+#endif
+                    
                     step = GameStep_ChangePlayerTurn;
                 } break;
                 case GameStep_ChangePlayerTurn:
@@ -287,35 +277,125 @@ DWORD WINAPI HostMain(LPVOID param)
                     u32 prev_player_id = (curr_player_id - 1) % MAX_PLAYER_COUNT;
                     CardResidency *curr_player_residency = host_context.residencies + CardResidencyKind_Player0 + curr_player_id;
                     CardResidency *prev_player_residency = host_context.residencies + CardResidencyKind_Player0 + prev_player_id;
-                    PlayerMove player_move;
-                    if (ReceivePlayerMove(curr_player->socket, &player_move))
+                    
+                    PlayerMoveKind kind;
+                    NetworkReceiveValue(curr_player->socket, kind);
+                    
+                    switch(kind)
                     {
-                        
-                        Connected_Player *prev_player = host_context.players_storage.players + prev_player_id;
-                        // NOTE(fakhri): update our state
-                        switch(player_move.type)
+                        case PlayerMove_PlayCard:
                         {
-                            case PlayerMove_PlayCard:
+                            Compact_Card_Type actual_cards[DECK_CARDS_COUNT];
+                            u32 played_cards_count;
+                            NetworkReceiveArray(curr_player->socket, 
+                                                actual_cards, 
+                                                played_cards_count, 
+                                                Compact_Card_Type);
+                            Card_Number declared_number;
+                            NetworkReceiveValue(curr_player->socket, declared_number);
+                            
+                            if (!host_context.prev_played_card_count)
                             {
-                                // TODO(fakhri): make sure that the player own the cards he says he played
-                                // TODO(fakhri): remove the cards from his residency and add them to the table
-                            } break;
-                            case PlayerMove_QuestionCredibility:
+                                Assert(declared_number != InvalidCardNumber);
+                                host_context.declared_number = declared_number;
+                            }
+                            
+                            u32 found_cnt = 0;
+                            for (u32 residency_index = 0;
+                                 residency_index < curr_player_residency->count;
+                                 ++residency_index)
                             {
-                                // TODO(fakhri): implement this
-                            } break;
-                            default: NotImplemented; break;
-                        }
-                        prev_move = player_move;
-                        // NOTE(fakhri): let all the players know what the move was
-                        BroadcastPlayerMove(player_move);
-                        // TODO(fakhri): check for winning condition!
-                        step = GameStep_ChangePlayerTurn;
+                                Card_Type card_type = curr_player_residency->cards[residency_index];
+                                b32 found = false;
+                                for (u32 played_card_index = 0;
+                                     played_card_index < played_cards_count;
+                                     ++played_card_index)
+                                {
+                                    if (IsCardTypeTheSame(card_type, UnpackCompactCardType(actual_cards[played_card_index])))
+                                    {
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                                
+                                if (found)
+                                {
+                                    AddCardToResidency(CardResidencyKind_Table, card_type);
+                                    curr_player_residency->cards[residency_index].number = InvalidCardNumber;
+                                    ++found_cnt;
+                                }
+                            }
+                            
+                            Assert(found_cnt == played_cards_count);
+                            
+                            RemoveGaps(curr_player_residency);
+                            host_context.prev_played_card_count = played_cards_count;
+                            
+                            // NOTE(fakhri): broadcast the move to other players
+                            {
+                                MessageType host_msg_type = HostMessage_PlayCard;
+                                for (u32 player_index = 0;
+                                     player_index < host_context.players_storage.count;
+                                     ++player_index)
+                                {
+                                    Connected_Player *player = host_context.players_storage.players + player_index;
+                                    
+                                    NetworkSendValue(player->socket, host_msg_type);
+                                    NetworkSendArray(player->socket, 
+                                                     actual_cards, 
+                                                     played_cards_count, 
+                                                     Compact_Card_Type);
+                                    NetworkSendValue(player->socket, declared_number);
+                                    
+                                }
+                            }
+                        } break;
+                        case PlayerMove_QuestionCredibility:
+                        {
+                            if (!host_context.prev_played_card_count)
+                            {
+                                InvalidPath;
+                                goto skip;
+                            }
+                            
+                            CardResidency *table_res = host_context.residencies + CardResidencyKind_Table;
+                            b32 prev_player_lied = false;
+                            for (u32 index = 0;
+                                 index < host_context.prev_played_card_count;
+                                 ++index)
+                            {
+                                Card_Number card_number = table_res->cards[table_res->count - 1 - index].number;
+                                if (card_number != host_context.declared_number)
+                                {
+                                    prev_player_lied = true;
+                                    break;
+                                }
+                            }
+                            
+                            PlayerID punished_player = prev_player_lied? prev_player_id:curr_player_id;
+                            for (u32 card_index = 0;
+                                 card_index < table_res->count;
+                                 ++card_index)
+                            {
+                                AddCardToResidency(CardResidencyKind_Player0 + punished_player, table_res->cards[card_index]);
+                            }
+                            table_res->count = 0;
+                            
+                            // NOTE(fakhri): broadcast the move to other players
+                            {
+                                MessageType host_msg_type = HostMessage_QuestionCredibility;
+                                for (u32 player_index = 0;
+                                     player_index < host_context.players_storage.count;
+                                     ++player_index)
+                                {
+                                    Connected_Player *player = host_context.players_storage.players + player_index;
+                                    NetworkSendValue(player->socket, host_msg_type);
+                                }
+                            }
+                        } break;
+                        default: NotImplemented;
                     }
-                    else
-                    {
-                        step = GameStep_InvalidMove;
-                    }
+                    step = GameStep_ChangePlayerTurn;
                 } break;
                 case GameStep_Finished:
                 {
@@ -327,6 +407,7 @@ DWORD WINAPI HostMain(LPVOID param)
                     break;
                 }
             }
+            skip:;
         }
         
         // NOTE(fakhri): close the players that are still connected
