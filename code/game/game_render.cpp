@@ -96,7 +96,7 @@ Render_PushClear(Render_Context *render_context, v4 color)
 }
 
 internal void
-Render_PushQuad(Render_Context *render_context, v3 pos, v2 size_in_meter, v4 color, Coordinate_Type coord_type, f32 y_angle = 0.0f)
+Render_PushQuad(Render_Context *render_context, v3 pos, v2 size_in_meter, v4 color, Coordinate_Type coord_type, v3 orientation = {})
 {
     Assert(coord_type < CoordinateType_Count);
     if (coord_type == CoordinateType_World)
@@ -112,7 +112,7 @@ Render_PushQuad(Render_Context *render_context, v3 pos, v2 size_in_meter, v4 col
     quad_request->screen_coords = pos.xy;
     quad_request->size = render_context->pixels_per_meter * size_in_meter;
     quad_request->color = color;
-    quad_request->y_angle = y_angle;
+    quad_request->orientation = orientation;
     
 }
 
@@ -120,7 +120,7 @@ internal void
 Render_PushImage(Render_Context *render_context, Texture2D texture,
                  v3 pos, v2 size, 
                  Coordinate_Type coord_type, b32 flip_y = false,
-                 f32 y_angle = 0, b32 is_size_in_meter = true, v4 color = Vec4(1, 1, 1, 1), v4 src = Vec4(0, 0, 1, 1))
+                 v3 orientation = {}, b32 is_size_in_meter = true, v4 color = Vec4(1, 1, 1, 1), v4 src = Vec4(0, 0, 1, 1))
 {
     Assert(coord_type < CoordinateType_Count);
     if (coord_type == CoordinateType_World)
@@ -137,7 +137,7 @@ Render_PushImage(Render_Context *render_context, Texture2D texture,
     image_request->texture = texture;
     image_request->flip_y = flip_y;
     image_request->size = is_size_in_meter ? render_context->pixels_per_meter * size : size;
-    image_request->y_angle = y_angle;
+    image_request->orientation = orientation;
     image_request->color = color;
     image_request->src = src;
 }
@@ -175,7 +175,7 @@ Render_PushText(Render_Context *render_context, String text, v3 pos, v4 color, C
             Render_PushImage(render_context, font->texture, 
                              pos, glyph.size, 
                              CoordinateType_Screen, 0,
-                             0, 0, color, glyph.src.compact_rect);
+                             Vec3(0, 0, 0), 0, color, glyph.src.compact_rect);
             
             curr_point.x += glyph.advance;
         }
@@ -302,7 +302,8 @@ Render_End(Render_Context *render_context)
                 v3 position = Vec3(quad_request->screen_coords, header->z);
                 m4 trans = Translate(position);
                 m4 scale = Scale(Vec3(quad_request->size, 1.0f));
-                m4 rotat = Rotate(quad_request->y_angle, Vec3(0,1,0));
+                m4 rotat = (Rotate(quad_request->orientation.z, Vec3(0,0,1)) * 
+                            Rotate(quad_request->orientation.y, Vec3(0,1,0)));
                 
                 m4 model = trans * rotat * scale;
                 
@@ -318,7 +319,9 @@ Render_End(Render_Context *render_context)
                 v3 position = Vec3(image_request->screen_coords, header->z);
                 m4 trans = Translate(position);
                 m4 scale = Scale(Vec3(image_request->size, 1.0f));
-                m4 rotat = Rotate(image_request->y_angle, Vec3(0,1,0));
+                m4 rotat = (Rotate(image_request->orientation.z, Vec3(0,0,1)) * 
+                            Rotate(image_request->orientation.y, Vec3(0,1,0)));
+                
                 m4 model = trans * rotat * scale;
                 
                 Shader_Program *program = render_context->shaders + ShaderKind_Texture;

@@ -2774,14 +2774,6 @@ Vec2f32FromVec2i32(vec2i32 a)
 
 
 
-inline v2
-Vec2MoveTowards(v2 start, v2 end, f32 amount)
-{
-    v2 result = start + amount * NormalizeVec2(end - start);
-    result = ClampInsideRect(RectTwoPoints(start, end), result);
-    return result;
-}
-
 inline f32
 MoveTowards(f32 start, f32 end, f32 amount)
 {
@@ -2795,12 +2787,39 @@ MoveTowards(f32 start, f32 end, f32 amount)
 }
 
 
+inline v2
+Vec2MoveTowards(v2 start, v2 end, f32 amount)
+{
+    v2 result = start + amount * NormalizeVec2(end - start);
+    result = ClampInsideRect(RectTwoPoints(start, end), result);
+    return result;
+}
+
 internal inline v3 
 Lerp(v3 A, f32 Time, v3 B)
 {
     v3 Result = (1.0f - Time) * A + Time * B;
-    
     return (Result);
+}
+
+inline v3
+Vec3MoveTowards(v3 start, v3 end, v3 amount)
+{
+    v3 result;
+    result.x = MoveTowards(start.x, end.x, amount.x);
+    result.y = MoveTowards(start.y, end.y, amount.y);
+    result.z = MoveTowards(start.z, end.z, amount.z);
+    return result;
+}
+
+inline v3
+LerpVec3(v3 start, v3 time, v3 end)
+{
+    v3 result;
+    result.x = Lerp(start.x, time.x, end.x);
+    result.y = Lerp(start.y, time.y, end.y);
+    result.x = Lerp(start.z, time.z, end.z);
+    return result;
 }
 
 #endif //BASE_MATH_H

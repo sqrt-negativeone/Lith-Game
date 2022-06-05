@@ -35,7 +35,7 @@ struct RenderRequest_Quad
     v2 screen_coords;
     v4 color;
     v2 size;
-    f32 y_angle;
+    v3 orientation;
 };
 
 struct RenderRequest_Image
@@ -45,7 +45,7 @@ struct RenderRequest_Image
     Texture2D texture;
     b32 flip_y;
     v2 size;
-    f32 y_angle;
+    v3 orientation;
     v4 color;
     v4 src;
 };

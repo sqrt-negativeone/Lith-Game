@@ -239,11 +239,12 @@ AddToResidency(Game_State *game_state, u32 entity_id, ResidencyKind residency_ki
     
     if (HasFlag(residency->flags, ResidencyFlags_Hidden))
     {
-        entity->target_y_angle = PI32;
+        entity->target_orientation.y = PI32;
+        
     }
     else
     {
-        entity->target_y_angle = 0.0f;
+        entity->target_orientation.y = 0.0f;
     }
     
 }

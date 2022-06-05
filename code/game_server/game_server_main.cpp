@@ -160,6 +160,8 @@ DWORD WINAPI HostMain(LPVOID param)
     for(;;)
     {
         // TODO(fakhri): wait for the main thread to tell us to start the server
+        // TODO(fakhri): use thw thread workers to launch this routine when 
+        // we want to host a game 
         Socket_Handle host_socket = OpenListenSocket(HOST_PORT);
         if(host_socket == InvalidSocket)
         {
@@ -195,7 +197,7 @@ DWORD WINAPI HostMain(LPVOID param)
         }
         
         // NOTE(fakhri): we have all the players needed connected
-        // TODO(fakhri): maybe we keep an uncompressed version of the cards in memory
+        // NOTE(fakhri): we keep an uncompressed version of the cards in memory
         // that we work with, and only compress them when we want to send them over network
         
         u32 curr_player_id = 0;

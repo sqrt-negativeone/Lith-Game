@@ -647,15 +647,17 @@ APP_UpdateAndRender(UpdateAndRender)
                     {
                         Render_PushQuad(&game_state->render_context, 
                                         Vec3(entity->center_pos.xy, entity->center_pos.z - MiliMeter(.1f)),
-                                        1.05f * entity->curr_dimension, red, CoordinateType_World, entity->y_angle);
+                                        1.05f * entity->curr_dimension, red, CoordinateType_World, entity->orientation);
                     }
                     
                     Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World, entity->flip_y,
-                                     entity->y_angle);
+                                     entity->orientation);
                     
                     v3 card_back_pos = entity->center_pos;
                     
-                    Render_PushImage(&game_state->render_context, game_state->render_context.textures[TextureID_CardBack],  entity->center_pos, entity->curr_dimension, CoordinateType_World, false, PI32 - entity->y_angle );
+                    v3 card_back_orientation = entity->orientation;
+                    card_back_orientation.y = PI32 - card_back_orientation.y;
+                    Render_PushImage(&game_state->render_context, game_state->render_context.textures[TextureID_CardBack],  entity->center_pos, entity->curr_dimension, CoordinateType_World, false, card_back_orientation);
                     
                 }
                 else
@@ -669,7 +671,7 @@ APP_UpdateAndRender(UpdateAndRender)
                 if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
                 {
                     Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World,
-                                     entity->flip_y, entity->y_angle );
+                                     entity->flip_y, entity->orientation);
                 }
                 else
                 {
@@ -698,13 +700,13 @@ APP_UpdateAndRender(UpdateAndRender)
             {
                 UpdateNumberEntity(game_state, entity_id, dt);
                 Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World,
-                                 false, entity->y_angle);
+                                 false, entity->orientation);
             } break;
             case EntityType_Arrow:
             {
                 UpdateArrowEntity(game_state, entity, dt);
                 Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World,
-                                 false, entity->y_angle);
+                                 false, entity->orientation);
             } break;
             default:
             {

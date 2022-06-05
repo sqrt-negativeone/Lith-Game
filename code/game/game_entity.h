@@ -89,9 +89,9 @@ struct Entity
     v3 center_pos;
     v3 target_pos;
     
-    f32 y_angle;
-    f32 target_y_angle;
-    f32 dy_angle;
+    v3 orientation;
+    v3 target_orientation;
+    v3 d_orientation;
     
     v2 curr_dimension;
     v2 target_dimension;

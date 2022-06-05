@@ -37,7 +37,10 @@ AddArrowEntity(Game_State *game_state)
     Entity *entity = game_state->entities + entity_id;
     entity->type = EntityType_Arrow;
     entity->texture = TextureID_Arrow;
+    entity->residency = ResidencyKind_Nil;
     entity->curr_dimension = Vec2(MiliMeter(30), MiliMeter(30));
+    entity->d_orientation.z = 4 * PI32;
+    
 }
 
 internal void
@@ -340,7 +343,8 @@ AddCardEntity(Game_State *game_state, Card_Type card_type, ResidencyKind card_re
     card->curr_dimension  = Vec2(CARD_WIDTH, CARD_HEIGHT);
     AddToResidency(game_state, card_entity_id, card_residency);
     
-    card->dy_angle = 4 * PI32;
+    card->d_orientation.y = 4 * PI32;
+    card->d_orientation.z = 4 * PI32;
     
 #if TEST_ONE_CARD
     card->target_pos.xy = Vec2(0, 0);
@@ -458,8 +462,7 @@ UpdateCardEntity(Game_State *game_state, EntityID entity_id, f32 dt)
         }
     }
     
-    entity->y_angle = MoveTowards(entity->y_angle, entity->target_y_angle, entity->dy_angle * dt);
-    
+    entity->orientation = Vec3MoveTowards(entity->orientation, entity->target_orientation, entity->d_orientation * dt);
     // NOTE(fakhri): update dimension
     entity->curr_dimension = Vec2MoveTowards(entity->curr_dimension,
                                              entity->target_dimension,
@@ -518,7 +521,7 @@ UpdateCompanionEntity(Game_State *game_state, Entity *entity, f32 dt)
     
     Assert(IsValidEntityID(entity->entity_id_to_follow) && entity->entity_id_to_follow < game_state->entity_count);
     Entity *entity_to_follow = game_state->entities + entity->entity_id_to_follow;
-    entity->y_angle = entity_to_follow->y_angle;
+    entity->orientation.y = entity_to_follow->orientation.y;
     entity->target_pos.z =  entity_to_follow->center_pos.z + MiliMeter(0.1f);
     MoveEntity(game_state, entity, 85.f, 0.5f, 0.1f, dt);
     
@@ -610,22 +613,26 @@ UpdateArrowEntity(Game_State *game_state, Entity *entity, f32 dt)
             case ResidencyKind_Down:
             {
                 entity->target_pos = Vec3(0, -CentiMeter(10), 0);
+                entity->target_orientation.z = PI32 / 2;
             } break;
             case ResidencyKind_Up:
             {
                 entity->target_pos = Vec3(0, +CentiMeter(10), 0);
+                entity->target_orientation.z = -PI32 / 2;
             } break;
             case ResidencyKind_Left:
             {
                 entity->target_pos = Vec3(-CentiMeter(10), 0, 0);
+                entity->target_orientation.z = PI32;
             } break;
             case ResidencyKind_Right:
             {
                 entity->target_pos = Vec3(CentiMeter(10), 0, 0);
+                entity->target_orientation.z = 0;
             } break;
         }
     }
-    
+    entity->orientation = Vec3MoveTowards(entity->orientation, entity->target_orientation, entity->d_orientation * dt);
     MoveEntity(game_state, entity, 100, 10, 0.5f, dt);
 }
 
