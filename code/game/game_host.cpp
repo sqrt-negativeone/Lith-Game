@@ -2,9 +2,9 @@
 // NOTE(fakhri): IMPORTANT: we assume that all the platforms we target are LITTLE ENDIAN
 
 internal void
-GameHost_AddCardToResidency(CardResidencyKind kind, Card_Type card_type)
+GameHost_AddCardToResidency(Host_Context *host_context, CardResidencyKind kind, Card_Type card_type)
 {
-    CardResidency *card_residency = host_context.residencies + kind;
+    CardResidency *card_residency = host_context->residencies + kind;
     Assert(card_residency->count < ArrayCount(card_residency->cards));
     card_residency->cards[card_residency->count] = card_type;
     ++card_residency->count;
@@ -36,10 +36,10 @@ GameHost_RemoveGaps(CardResidency *residency)
 }
 
 internal void
-GameHost_BurnExtraCards(CardResidencyKind residency_kind)
+GameHost_BurnExtraCards(Host_Context *host_context, CardResidencyKind residency_kind)
 {
-    CardResidency *residency = host_context.residencies + residency_kind;
-    CardResidency *burnt = host_context.residencies + CardResidencyKind_Burnt;
+    CardResidency *residency = host_context->residencies + residency_kind;
+    CardResidency *burnt = host_context->residencies + CardResidencyKind_Burnt;
     
     // NOTE(fakhri): count the frequency of each card
     u32 card_number_freq[Card_Number_Count] = {};
@@ -60,7 +60,7 @@ GameHost_BurnExtraCards(CardResidencyKind residency_kind)
         if(card_number_freq[card_number] == Category_Count)
         {
             residency->cards[card_index].number = InvalidCardNumber;
-            GameHost_AddCardToResidency(CardResidencyKind_Burnt, residency->cards[card_index]);
+            GameHost_AddCardToResidency(host_context, CardResidencyKind_Burnt, residency->cards[card_index]);
             should_burn = true;
         }
     }
@@ -71,13 +71,19 @@ GameHost_BurnExtraCards(CardResidencyKind residency_kind)
     }
 }
 
+struct PlayerUsernameWorkInput
+{
+    Host_Context *host_context;
+    u32 tmp_player_index;
+};
+
 internal void
 GameHost_GetPlayerUsernameWork(void *data)
 {
-    u64 tmp_player_index = (u64)data;
-    Assert(tmp_player_index < ArrayCount(host_context.temporary_storage.players));
-    Connected_Player *player = host_context.temporary_storage.players + tmp_player_index;
-    Players_Storage *players_storage = &host_context.players_storage;
+    PlayerUsernameWorkInput *input = (PlayerUsernameWorkInput *)data;
+    Assert(input->tmp_player_index < ArrayCount(input->host_context->temporary_storage.players));
+    Connected_Player *player = input->host_context->temporary_storage.players + input->tmp_player_index;
+    Players_Storage *players_storage = &input->host_context->players_storage;
     
     // NOTE(fakhri): entrying username operation completed, check if the suername is unique
     for(;;)
@@ -110,9 +116,9 @@ GameHost_GetPlayerUsernameWork(void *data)
                     // about it
                     u32 player_id = players_storage->count;
                     players_storage->players[player_id] = *player;
-                    BroadcastNewPlayerJoinedMessage(player, player_id);
+                    BroadcastNewPlayerJoinedMessage(input->host_context, player, player_id);
                     ++players_storage->count;
-                    SendConnectedPlayersList(player->socket);
+                    SendConnectedPlayersList(input->host_context, player->socket);
                 }
                 else
                 {
@@ -138,8 +144,8 @@ GameHost_GetPlayerUsernameWork(void *data)
     }
     
     // NOTE(fakhri): try to increment the compeleted usernames count
-    u64 old_count = host_context.completed_username_work;
-    volatile u64 *destination = (volatile u64*)&host_context.completed_username_work;
+    u64 old_count = input->host_context->completed_username_work;
+    volatile u64 *destination = (volatile u64*)&input->host_context->completed_username_work;
     while(InterlockedCompareExchange(destination, old_count + 1, old_count) != old_count);
 }
 
@@ -147,8 +153,8 @@ GameHost_GetPlayerUsernameWork(void *data)
 void
 GameHostWork(void *data)
 {
+    Host_Context host_context = {};
     host_context.players_storage.players_mutex = os->CreateMutex();
-    host_context.host_running = true;
     
     for (u32 player_index = 0;
          player_index < ArrayCount(host_context.players_storage.players);
@@ -172,27 +178,41 @@ GameHostWork(void *data)
         // TODO(fakhri): tell the lobby that we exist
         
         // NOTE(fakhri): wait for enough players to join
-        while(host_context.players_storage.count < MAX_PLAYER_COUNT)
         {
-            u64 players_needed = MAX_PLAYER_COUNT - host_context.players_storage.count;
-            for(u64 tmp_player_index = 0;
-                tmp_player_index < players_needed;
-                ++tmp_player_index)
+            
+            PlayerUsernameWorkInput username_work_inputs[MAX_PLAYER_COUNT];
+            for (u32 index = 0;
+                 index < MAX_PLAYER_COUNT;
+                 ++index)
             {
-                Connected_Player *player = host_context.temporary_storage.players + tmp_player_index;
-                player->socket = InvalidSocket;
-                while(player->socket == InvalidSocket)
-                {
-                    player->socket = os->AcceptSocket(host_socket, 0, 0);
-                }
-                os->PushWorkQueueEntry(GameHost_GetPlayerUsernameWork, (void*)tmp_player_index);
+                PlayerUsernameWorkInput *input = username_work_inputs + index;
+                input->host_context = &host_context;
+                input->tmp_player_index = index;
             }
-            // NOTE(fakhri): make sure that all the players entered a valid username
-            while(host_context.completed_username_work < players_needed)
+            
+            while(host_context.players_storage.count < MAX_PLAYER_COUNT)
             {
-                // NOTE(fakhri): make this thread help the worker thread
-                // instead of just waiting
-                os->ProcessOneWorkQueueEntry();
+                u64 players_needed = MAX_PLAYER_COUNT - host_context.players_storage.count;
+                for(u32 tmp_player_index = 0;
+                    tmp_player_index < players_needed;
+                    ++tmp_player_index)
+                {
+                    Connected_Player *player = host_context.temporary_storage.players + tmp_player_index;
+                    PlayerUsernameWorkInput *input = username_work_inputs + tmp_player_index;
+                    player->socket = InvalidSocket;
+                    while(player->socket == InvalidSocket)
+                    {
+                        player->socket = os->AcceptSocket(host_socket, 0, 0);
+                    }
+                    os->PushWorkQueueEntry(GameHost_GetPlayerUsernameWork, input);
+                }
+                // NOTE(fakhri): make sure that all the players entered a valid username
+                while(host_context.completed_username_work < players_needed)
+                {
+                    // NOTE(fakhri): make this thread help the worker thread
+                    // instead of just waiting
+                    os->ProcessOneWorkQueueEntry();
+                }
             }
         }
         
@@ -212,7 +232,7 @@ GameHostWork(void *data)
                  number < Card_Number_Count;
                  ++number, ++index)
             {
-                GameHost_AddCardToResidency(CardResidencyKind_Deck, MakeCardType(category, number));
+                GameHost_AddCardToResidency(&host_context, CardResidencyKind_Deck, MakeCardType(category, number));
             }
         }
         
@@ -241,7 +261,7 @@ GameHostWork(void *data)
                 {
                     // NOTE(fakhri): send the deck to the players
                     // each player knows the what portion of the deck he gets based on his id
-                    BroadcastShuffledDeckMessage();
+                    BroadcastShuffledDeckMessage(&host_context);
                     
                     // NOTE(fakhri): split the deck between players
                     for(u32 player_index = 0, card_index = 0;
@@ -253,9 +273,9 @@ GameHostWork(void *data)
                             card_offset < CARDS_PER_PLAYER;
                             ++card_offset, ++card_index)
                         {
-                            GameHost_AddCardToResidency(player_residency, deck_residency->cards[card_index]);
+                            GameHost_AddCardToResidency(&host_context, player_residency, deck_residency->cards[card_index]);
                         }
-                        GameHost_BurnExtraCards(player_residency);
+                        GameHost_BurnExtraCards(&host_context, player_residency);
                     }
                     
 #if 0
@@ -271,7 +291,7 @@ GameHostWork(void *data)
                     // NOTE(fakhri): go in a cercle
                     ++curr_player_id; 
                     curr_player_id %= MAX_PLAYER_COUNT;
-                    BroadcastChangeTurnMessage(curr_player_id);
+                    BroadcastChangeTurnMessage(&host_context, curr_player_id);
                     step = GameStep_WaitForPlayerMove;
                 } break;
                 case GameStep_WaitForPlayerMove:
@@ -323,7 +343,7 @@ GameHostWork(void *data)
                                 
                                 if (found)
                                 {
-                                    GameHost_AddCardToResidency(CardResidencyKind_Table, card_type);
+                                    GameHost_AddCardToResidency(&host_context, CardResidencyKind_Table, card_type);
                                     curr_player_residency->cards[residency_index].number = InvalidCardNumber;
                                     ++found_cnt;
                                 }
@@ -381,10 +401,10 @@ GameHostWork(void *data)
                                  card_index < table_res->count;
                                  ++card_index)
                             {
-                                GameHost_AddCardToResidency(punished_residency, table_res->cards[card_index]);
+                                GameHost_AddCardToResidency(&host_context, punished_residency, table_res->cards[card_index]);
                             }
                             table_res->count = 0;
-                            GameHost_BurnExtraCards(punished_residency);
+                            GameHost_BurnExtraCards(&host_context, punished_residency);
                             // NOTE(fakhri): broadcast the move to other players
                             {
                                 MessageType host_msg_type = HostMessage_QuestionCredibility;

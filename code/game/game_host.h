@@ -64,15 +64,12 @@ struct Host_Context
     u64 completed_username_work;
     u32 prev_played_card_count;
     Card_Number declared_number;
-    volatile b32 host_running;
 };
 
-global Host_Context host_context;
-
 internal void
-BroadcastShuffledDeckMessage()
+BroadcastShuffledDeckMessage(Host_Context *host_context)
 {
-    CardResidency *deck_residency = host_context.residencies + CardResidencyKind_Deck;
+    CardResidency *deck_residency = host_context->residencies + CardResidencyKind_Deck;
     Compact_Card_Type compact_deck[DECK_CARDS_COUNT];
     for(u32 index = 0;
         index < deck_residency->count;
@@ -84,10 +81,10 @@ BroadcastShuffledDeckMessage()
     
     MessageType type = HostMessage_ShuffledDeck;
     for (u32 player_index = 0;
-         player_index < host_context.players_storage.count;
+         player_index < host_context->players_storage.count;
          ++player_index)
     {
-        Connected_Player *player = host_context.players_storage.players + player_index;
+        Connected_Player *player = host_context->players_storage.players + player_index;
         // NOTE(fakhri): send the message to player
         NetworkSendValue(player->socket, type);
         os->SendBuffer(player->socket, compact_deck, sizeof(compact_deck));
@@ -95,13 +92,13 @@ BroadcastShuffledDeckMessage()
 }
 
 internal void
-BroadcastNewPlayerJoinedMessage(Connected_Player *new_player, u32 player_id)
+BroadcastNewPlayerJoinedMessage(Host_Context *host_context, Connected_Player *new_player, u32 player_id)
 {
     for (u32 player_index = 0;
-         player_index < host_context.players_storage.count;
+         player_index < host_context->players_storage.count;
          ++player_index)
     {
-        Connected_Player *player = host_context.players_storage.players + player_index;
+        Connected_Player *player = host_context->players_storage.players + player_index;
         // NOTE(fakhri): send the message to player
         MessageType type = HostMessage_NewPlayerJoined;
         NetworkSendValue(player->socket, type);
@@ -111,13 +108,13 @@ BroadcastNewPlayerJoinedMessage(Connected_Player *new_player, u32 player_id)
 }
 
 internal void
-BroadcastChangeTurnMessage(PlayerID player_id)
+BroadcastChangeTurnMessage(Host_Context *host_context, PlayerID player_id)
 {
     for (u32 player_index = 0;
-         player_index < host_context.players_storage.count;
+         player_index < host_context->players_storage.count;
          ++player_index)
     {
-        Connected_Player *player = host_context.players_storage.players + player_index;
+        Connected_Player *player = host_context->players_storage.players + player_index;
         // NOTE(fakhri): send the message to player
         MessageType type = HostMessage_ChangePlayerTurn;
         NetworkSendValue(player->socket, type);
@@ -126,13 +123,13 @@ BroadcastChangeTurnMessage(PlayerID player_id)
 }
 
 internal void
-BroadcastPlayerWon(u32 winner_id)
+BroadcastPlayerWon(Host_Context *host_context, u32 winner_id)
 {
     for (u32 player_index = 0;
-         player_index < host_context.players_storage.count;
+         player_index < host_context->players_storage.count;
          ++player_index)
     {
-        Connected_Player *player = host_context.players_storage.players + player_index;
+        Connected_Player *player = host_context->players_storage.players + player_index;
         // NOTE(fakhri): send the message to player
         MessageType type = HostMessage_PlayerWon;
         NetworkSendValue(player->socket, type);
@@ -141,11 +138,11 @@ BroadcastPlayerWon(u32 winner_id)
 }
 
 internal void
-SendConnectedPlayersList(Socket_Handle s)
+SendConnectedPlayersList(Host_Context *host_context, Socket_Handle s)
 {
     MessageType type = HostMessage_ConnectedPlayersList;
     NetworkSendValue(s, type);
-    Players_Storage *players_storage = &host_context.players_storage;
+    Players_Storage *players_storage = &host_context->players_storage;
     NetworkSendValue(s, players_storage->count);
     for (u32 player_index = 0;
          player_index < players_storage->count;
