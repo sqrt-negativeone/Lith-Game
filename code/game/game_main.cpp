@@ -7,15 +7,15 @@
 #include "base/base_inc.h"
 #include "game_ids.h"
 #include "network/network_inc.h"
-#include "game/game_inc.h"
 #include "os/os_inc.h"
+#include "game/game_inc.h"
 
 ////////////////////////////////
 //~ NOTE(fakhri): implementations
 #include "base/base_inc.cpp"
+#include "network/network_inc.cpp"
 #include "os/os_inc.cpp"
 #include "game_inc.cpp"
-#include "network/network_inc.cpp"
 
 global Thread_Ctx game_tctx;
 
@@ -501,7 +501,8 @@ APP_PermanantLoad(PermanentLoad)
 #if TEST_NETWORKING
     AddNullEntity(game_state);
     AddCursorEntity(game_state);
-    
+    // NOTE(fakhri): host the game
+    os->PushWorkQueueEntry(GameHostWork, 0);
     // @DebugOnly
     game_state->game_mode = GameMode_TestingNetworking;
     PushCreateConnectToServerMessage(Str8Lit(""));

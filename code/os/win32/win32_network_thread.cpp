@@ -3,7 +3,7 @@
 internal void
 FetchHostsFromLobby(Socket_Handle lobby_socket, Hosts_Storage *hosts_storage)
 {
-    if (!ReceiveBuffer(lobby_socket, &hosts_storage->hosts_count, sizeof(hosts_storage->hosts_count)))
+    if (!W32_ReceiveBuffer(lobby_socket, &hosts_storage->hosts_count, sizeof(hosts_storage->hosts_count)))
     {
         LogError("couldn't read stuff from lobby");
         closesocket(lobby_socket);
@@ -89,7 +89,7 @@ HandlePlayerMessage(Message *message)
         case PlayerMessage_ConnectToHost:
         {
             char *host_address = "127.0.0.1";
-            host_io_context.host_socket = ConnectToServer(host_address, HOST_PORT);
+            host_io_context.host_socket = W32_ConnectToServer(host_address, HOST_PORT);
             if(host_io_context.host_socket != InvalidSocket)
             {
                 CreateIoCompletionPort((HANDLE)host_io_context.host_socket, network_thread_iocp_handle, NetworkMessageSource_Host, 1);
@@ -105,7 +105,7 @@ HandlePlayerMessage(Message *message)
             Log("Username request");
             Log("username is %s", message->username.cstr);
             Assert(host_io_context.host_socket != InvalidSocket);
-            SendString(host_io_context.host_socket, message->username);
+            W32_SendString(host_io_context.host_socket, message->username);
         } break;
         case PlayerMessage_PlayCard:
         {
@@ -196,7 +196,7 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                                 NetworkReceiveValue(host_io_context.host_socket, player_username->len);
                                 Assert(offset + player_username->len < sizeof(message->buffer));
                                 Assert(player_username->len < USERNAME_BUFFER_SIZE);
-                                ReceiveBuffer(host_io_context.host_socket, message->buffer + offset, (i32)player_username->len);
+                                W32_ReceiveBuffer(host_io_context.host_socket, message->buffer + offset, (i32)player_username->len);
                                 player_username->str = message->buffer + offset;
                                 offset += (i32)player_username->len;
                             }
@@ -204,11 +204,11 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                         case HostMessage_NewPlayerJoined:
                         {
                             Log("HostMessage_NewPlayerJoined");
-                            ReceiveBuffer(host_io_context.host_socket, &message->new_player_id, sizeof(message->new_player_id));
-                            ReceiveBuffer(host_io_context.host_socket, &message->new_username.len, sizeof(message->new_username.len));
+                            W32_ReceiveBuffer(host_io_context.host_socket, &message->new_player_id, sizeof(message->new_player_id));
+                            W32_ReceiveBuffer(host_io_context.host_socket, &message->new_username.len, sizeof(message->new_username.len));
                             Assert(message->new_username.len < USERNAME_BUFFER_SIZE);
                             Assert(message->new_username.len < sizeof(message->buffer));
-                            ReceiveBuffer(host_io_context.host_socket, message->buffer, (i32)message->new_username.len);
+                            W32_ReceiveBuffer(host_io_context.host_socket, message->buffer, (i32)message->new_username.len);
                             message->new_username.str = message->buffer;
                             
                         } break;
@@ -218,7 +218,7 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                             message->compact_deck = (Compact_Card_Type *)message->buffer;
                             u32 compact_deck_size = DECK_CARDS_COUNT * sizeof(Compact_Card_Type);
                             Assert(compact_deck_size < sizeof(message->buffer));
-                            ReceiveBuffer(host_io_context.host_socket, message->compact_deck, compact_deck_size);
+                            W32_ReceiveBuffer(host_io_context.host_socket, message->compact_deck, compact_deck_size);
                         } break;
                         case HostMessage_ChangePlayerTurn:
                         {

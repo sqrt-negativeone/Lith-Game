@@ -261,3 +261,263 @@ W32_EndPlayerMessageQueueWrite()
     u64 completion_key = NetworkMessageSource_Player;
     PostQueuedCompletionStatus(network_thread_iocp_handle, 0, completion_key, 0);
 }
+
+internal Socket_Handle 
+W32_AcceptSocket(Socket_Handle s, void *addr, int *addrlen)
+{
+    Socket_Handle result = accept(s, (sockaddr*)addr, addrlen);
+    return result;
+}
+
+internal void 
+W32_CloseSocket(Socket_Handle s)
+{
+    closesocket(s);
+}
+
+internal Socket_Handle 
+W32_ConnectToServer(char *server_address, char *port)
+{
+    Socket_Handle result = INVALID_SOCKET;
+    struct addrinfo hints, *addrinfo_result, *p;
+    hints = {};
+    
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    
+    getaddrinfo(server_address, port, &hints, &addrinfo_result);
+    for (p = addrinfo_result; p; p = p->ai_next)
+    {
+        
+        result = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (result == INVALID_SOCKET) 
+        {
+            LogError("socket failed with error: %ld", WSAGetLastError());
+            continue;
+        }
+        
+        // NOTE(fakhri): connect to the socket
+        if (connect(result, p->ai_addr, (int)p->ai_addrlen) == SOCKET_ERROR) 
+        {
+            LogError("socket failed with error: %ld", WSAGetLastError());
+            closesocket(result);
+            continue;
+        }
+        break;
+    }
+    freeaddrinfo(addrinfo_result);
+    if (!p) result = INVALID_SOCKET;
+    return result;
+}
+
+#define LISTENQ 1024
+
+internal Socket_Handle 
+W32_OpenListenSocket(char *port)
+{
+    Socket_Handle listenfd = INVALID_SOCKET;
+    const char optionval = 1;
+    struct addrinfo hints = {}, *addrinfo_result, *p;
+    
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    hints.ai_flags = AI_PASSIVE;
+    
+    if (getaddrinfo(0, port, &hints, &addrinfo_result) == 0)
+    {
+        
+        for (p = addrinfo_result; p; p = p->ai_next)
+        {
+            listenfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+            if (listenfd == INVALID_SOCKET) continue;
+            setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &optionval, sizeof(i32));
+            if (bind(listenfd, p->ai_addr, (i32)p->ai_addrlen) != SOCKET_ERROR) break;
+            closesocket(listenfd);
+        }
+        
+        freeaddrinfo(addrinfo_result);
+        if (!p) return INVALID_SOCKET;
+        
+        if (listen(listenfd, LISTENQ) == SOCKET_ERROR )
+        {
+            closesocket(listenfd);
+            listenfd = INVALID_SOCKET;
+        }
+    }
+    return listenfd;
+}
+internal b32
+W32_SendBuffer(Socket_Handle s, void *data, i32 len)
+{
+    char *buffer = (char *)data;
+    b32 result = true;
+    i32 bytes_to_send = len;
+    i32 total_bytes_sent = 0;
+    
+    while(bytes_to_send)
+    {
+        i32 bytes_sent = send(s, buffer + total_bytes_sent, bytes_to_send, 0);
+        if (bytes_sent == SOCKET_ERROR)
+        {
+            int last_error = WSAGetLastError();
+            LogError("send call failed with error %d", last_error);
+            result = false;
+            break;
+        }
+        total_bytes_sent += bytes_sent;
+        bytes_to_send -= bytes_sent;
+    }
+    
+    return result;
+}
+
+internal b32
+W32_ReceiveBuffer(Socket_Handle s, void *data, i32 len)
+{
+    char *buffer = (char *)data;
+    b32 result = true;
+    i32 bytes_to_receive = len;
+    i32 total_bytes_received = 0;
+    
+    while(bytes_to_receive)
+    {
+        i32 bytes_received = recv(s, buffer + total_bytes_received, bytes_to_receive, 0);
+        if (bytes_received == SOCKET_ERROR)
+        {
+            int last_error = WSAGetLastError();
+            LogError("receive call failed with error %d", last_error);
+            result = false;
+            break;
+        }
+        if (bytes_received == 0)
+        {
+            Log("socket closed from other end");
+            result = false;
+            break;
+        }
+        
+        total_bytes_received += bytes_received;
+        bytes_to_receive -= bytes_received;
+    }
+    
+    return result;
+}
+internal b32
+W32_SendString(Socket_Handle s, String8 data)
+{
+    b32 result = W32_SendBuffer(s, &data.len, sizeof(data.len)) && W32_SendBuffer(s, data.str, (i32)data.len);
+    return result;
+}
+
+internal b32
+W32_ReceiveString(Socket_Handle s, String8 *data)
+{
+    b32 result = W32_ReceiveBuffer(s, &data->len, sizeof(data->len)) && W32_ReceiveBuffer(s, data->str, (i32)data->len);
+    return result;
+}
+
+// NOTE(fakhri): OS handles
+internal void
+W32_WaitForSemaphore(Semaphore_Handle semaphore)
+{
+    WaitForSingleObject(semaphore, INFINITE);
+}
+
+internal void
+W32_ReleaseSemaphore(Semaphore_Handle semaphore)
+{
+    ReleaseSemaphore(semaphore, 1, 0);
+}
+
+internal void
+W32_WaitForMutex(Mutex_Handle mutex)
+{
+    WaitForSingleObject(mutex, INFINITE);
+}
+
+internal Mutex_Handle
+W32_CreateMutex()
+{
+    Mutex_Handle result = CreateMutexA(0, FALSE, 0);
+    return result;
+}
+
+internal void
+W32_ReleaseMutex(Mutex_Handle mutex)
+{
+    ReleaseMutex(mutex);
+}
+
+//- NOTE(fakhri): work queue functions
+internal b32
+W32_ProcessOneWorkQueueEntry()
+{
+    b32 result = false;
+    while(!W32_IsWorkQueueEmpty())
+    {
+        OS_PopQueueResult pop_result = W32_PopQueueEntry();
+        if (pop_result.valid)
+        {
+            result = true;
+            OS_WorkQueue_Entry work_entry = pop_result.work_entry;
+            work_entry.work(work_entry.data);
+            break;
+        }
+    }
+    return result;
+}
+
+internal b32
+W32_PushWorkQueueEntrySP(OS_WorkThreadWork *work, void *data)
+{
+    // NOTE(fakhri): safe to call this without mutex if single producer
+    b32 result = false;
+    if (w32_work_queue.tail - w32_work_queue.head < ArrayCount(w32_work_queue.queue))
+    {
+        result = true;
+        u64 entry_index = w32_work_queue.tail % ArrayCount(w32_work_queue.queue);
+        w32_work_queue.queue[entry_index].work = work;
+        w32_work_queue.queue[entry_index].data = data;
+        MemoryBarrier();
+        ++w32_work_queue.tail;
+        // NOTE(fakhri): wake a sleeping thread if there are any
+        ReleaseSemaphore(w32_work_queue.waiting_worker_threads_semaphore, 1, 0);
+    }
+    return result;
+}
+
+internal b32
+W32_PushWorkQueueEntry(OS_WorkThreadWork *work, void *data)
+{
+    b32 result = false;
+    
+    WaitForSingleObject(w32_work_queue.producer_mutex, INFINITE);
+    result = W32_PushWorkQueueEntrySP(work, data);
+    ReleaseMutex(w32_work_queue.producer_mutex);
+    
+    return result;
+}
+
+internal OS_PopQueueResult
+W32_PopQueueEntry()
+{
+    OS_PopQueueResult result = {};
+    u64 old_head = w32_work_queue.head;
+    u64 head_index = old_head % ArrayCount(w32_work_queue.queue);
+    result.work_entry = w32_work_queue.queue[head_index];
+    volatile u64 *destination = (volatile u64*)&w32_work_queue.head;
+    if (InterlockedCompareExchange(destination, old_head + 1, old_head) == old_head)
+    {
+        result.valid = true;
+    }
+    return result;
+}
+
+internal b32
+W32_IsWorkQueueEmpty()
+{
+    b32 result = (w32_work_queue.tail == w32_work_queue.head);
+    return result;
+}

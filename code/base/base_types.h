@@ -3,6 +3,14 @@
 #ifndef BASE_TYPES_H
 #define BASE_TYPES_H
 
+#if OS_WINDOWS
+# ifndef WIN32_LEAN_AND_MEAN
+#  define WIN32_LEAN_AND_MEAN
+# endif
+# include <winsock2.h>
+# include <ws2tcpip.h>
+#endif
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -159,6 +167,16 @@ typedef float    f32;
 typedef double   f64;
 typedef u8      *byte_ptr;
 typedef void VoidFunction(void);
+
+#if OS_WINDOWS
+#define InvalidSocket INVALID_SOCKET
+typedef HANDLE Semaphore_Handle;
+typedef HANDLE Mutex_Handle;
+typedef HANDLE Thread_Handle;
+typedef SOCKET Socket_Handle;
+#else
+#error Provide platform handles equivalents
+#endif
 
 ////////////////////////////////
 //~ rjf: Limits

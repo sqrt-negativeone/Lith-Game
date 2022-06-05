@@ -11,10 +11,9 @@
 #include "base/base_inc.h"
 #include "game/game_ids.h"
 #include "network/network_inc.h"
+#include "os/os_inc.h"
 #include "win32_inc.h"
 #include "game/game_inc.h"
-#include "os/os_inc.h"
-#include "game_server/game_server_inc.h"
 
 ////////////////////////////////
 //~ NOTE(fakhri): Globals
@@ -27,13 +26,12 @@ global char w32_executable_directory[256];
 global char w32_working_directory[256];
 global char w32_app_dll_path[256];
 global char w32_temp_app_dll_path[256];
-
+global OS_WorkQueue w32_work_queue;
 ////////////////////////////////
 //~ NOTE(fakhri): implementations
 #include "base/base_inc.cpp"
 #include "network/network_inc.cpp"
 #include "os/os_inc.cpp"
-#include "game_server/game_server_inc.cpp"
 #include "win32_inc.cpp"
 
 ////////////////////////////////
@@ -239,6 +237,21 @@ W32_WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param)
     return result;
 }
 
+internal DWORD WINAPI 
+W32_WorkerThreadMain(LPVOID param)
+{
+    OS_WorkQueue *work_queue = (OS_WorkQueue *)param;
+    
+    for(;;)
+    {
+        b32 did_work = W32_ProcessOneWorkQueueEntry();
+        if (!did_work)
+        {
+            // NOTE(fakhri): queue is empty
+            WaitForSingleObject(w32_work_queue.waiting_worker_threads_semaphore, INFINITE);
+        }
+    }
+}
 int
 WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_show_cmd)
 {
@@ -314,6 +327,24 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         w32_os.BeginPlayerMessageQueueWrite = W32_BeginPlayerMessageQueueWrite;
         w32_os.EndPlayerMessageQueueWrite   = W32_EndPlayerMessageQueueWrite;
         w32_os.IsHostMessageQueueEmpty      = W32_IsHostMessageQueueEmpty;
+        w32_os.AcceptSocket                 = W32_AcceptSocket;
+        w32_os.CloseSocket                  = W32_CloseSocket;
+        w32_os.ConnectToServer              = W32_ConnectToServer;
+        w32_os.OpenListenSocket             = W32_OpenListenSocket;
+        w32_os.SendBuffer                   = W32_SendBuffer;
+        w32_os.ReceiveBuffer                = W32_ReceiveBuffer;
+        w32_os.SendString                   = W32_SendString;
+        w32_os.ReceiveString                = W32_ReceiveString;
+        w32_os.WaitForSemaphore             = W32_WaitForSemaphore;
+        w32_os.ReleaseSemaphore             = W32_ReleaseSemaphore;
+        w32_os.WaitForMutex                 = W32_WaitForMutex;
+        w32_os.CreateMutex                  = W32_CreateMutex;
+        w32_os.ReleaseMutex                 = W32_ReleaseMutex;
+        w32_os.PopQueueEntry                = W32_PopQueueEntry;
+        w32_os.ProcessOneWorkQueueEntry     = W32_ProcessOneWorkQueueEntry;
+        w32_os.PushWorkQueueEntrySP         = W32_PushWorkQueueEntrySP;
+        w32_os.PushWorkQueueEntry           = W32_PushWorkQueueEntry;
+        w32_os.IsWorkQueueEmpty             = W32_IsWorkQueueEmpty;
         
         w32_os.permanent_arena = M_ArenaAllocDefault();
         for (u32 arena_index = 0;
@@ -382,10 +413,6 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     
     // NOTE(fakhri): launch network and host server threads
     {
-        // NOTE(fakhri): start the host thread now
-        Thread_Handle host_thread_handle  = CreateThread(0, 0, HostMain, 0, 0, 0);
-        CloseHandle(host_thread_handle);
-        
         // NOTE(fakhri): start the network thread
         Thread_Handle network_thread_handle = CreateThread(0, 0, NetworkMain, 0, 0, 0);
         CloseHandle(network_thread_handle);

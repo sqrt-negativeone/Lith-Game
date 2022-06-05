@@ -16,3 +16,4 @@
 #include "game_command.h"
 
 #include "game_main.h"
+#include "game_host.h"

@@ -53,6 +53,25 @@ struct OS_State
     OS_EndHostMessageQueueRead_Function      *EndHostMessageQueueRead;
     OS_BeginPlayerMessageQueueWrite_Function *BeginPlayerMessageQueueWrite;
     OS_EndPlayerMessageQueueWrite_Function   *EndPlayerMessageQueueWrite;
+    OS_AcceptSocket_Function                 *AcceptSocket;
+    OS_CloseSocket_Function                  *CloseSocket;
+    OS_ConnectToServer_Function              *ConnectToServer;
+    OS_OpenListenSocket_Function             *OpenListenSocket;
+    OS_SendBuffer_Function                   *SendBuffer;
+    OS_ReceiveBuffer_Function                *ReceiveBuffer;
+    OS_SendString_Function                   *SendString;
+    OS_ReceiveString_Function                *ReceiveString;
+    OS_WaitForSemaphore_Function             *WaitForSemaphore;
+    OS_ReleaseSemaphore_Function             *ReleaseSemaphore;
+    OS_WaitForMutex_Function                 *WaitForMutex;
+    OS_CreateMutex_Function                  *CreateMutex;
+    OS_ReleaseMutex_Function                 *ReleaseMutex;
+    OS_PopQueueEntry_Function                *PopQueueEntry;
+    OS_ProcessOneWorkQueueEntry_Function     *ProcessOneWorkQueueEntry;
+    OS_PushWorkQueueEntrySP_Function         *PushWorkQueueEntrySP;
+    OS_PushWorkQueueEntry_Function           *PushWorkQueueEntry;
+    OS_IsWorkQueueEmpty_Function             *IsWorkQueueEmpty;
+    
 };
 
 global OS_State *os;
@@ -61,7 +80,7 @@ global OS_State *os;
 //~ NOTE(fakhri): app layer interface
 
 // NOTE(fakhri): permanant load, called once at the start of the program
-#define APP_PermanantLoad(name) void name(OS_State *_os, Game_State *game_state)
+#define APP_PermanantLoad(name) void name(OS_State *_os, struct Game_State *game_state)
 typedef APP_PermanantLoad(APP_PermanentLoad_Function);
 internal APP_PermanantLoad(APP_PermanentLoadStub) {}
 

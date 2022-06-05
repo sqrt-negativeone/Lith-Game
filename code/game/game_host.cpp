@@ -2,7 +2,7 @@
 // NOTE(fakhri): IMPORTANT: we assume that all the platforms we target are LITTLE ENDIAN
 
 internal void
-AddCardToResidency(CardResidencyKind kind, Card_Type card_type)
+GameHost_AddCardToResidency(CardResidencyKind kind, Card_Type card_type)
 {
     CardResidency *card_residency = host_context.residencies + kind;
     Assert(card_residency->count < ArrayCount(card_residency->cards));
@@ -11,14 +11,14 @@ AddCardToResidency(CardResidencyKind kind, Card_Type card_type)
 };
 
 internal inline void
-RemoveCardFromHand(Compact_Card_Hand *card_hand, u32 card_index)
+GameHost_RemoveCardFromHand(Compact_Card_Hand *card_hand, u32 card_index)
 {
     --card_hand->cards_count;
     card_hand->cards[card_index] = card_hand->cards[card_hand->cards_count];
 }
 
 internal void
-RemoveGaps(CardResidency *residency)
+GameHost_RemoveGaps(CardResidency *residency)
 {
     // NOTE(fakhri): remove the marked cards from the compact hand
     u32 min_empty = 0;
@@ -36,7 +36,7 @@ RemoveGaps(CardResidency *residency)
 }
 
 internal void
-BurnExtraCards(CardResidencyKind residency_kind)
+GameHost_BurnExtraCards(CardResidencyKind residency_kind)
 {
     CardResidency *residency = host_context.residencies + residency_kind;
     CardResidency *burnt = host_context.residencies + CardResidencyKind_Burnt;
@@ -60,19 +60,19 @@ BurnExtraCards(CardResidencyKind residency_kind)
         if(card_number_freq[card_number] == Category_Count)
         {
             residency->cards[card_index].number = InvalidCardNumber;
-            AddCardToResidency(CardResidencyKind_Burnt, residency->cards[card_index]);
+            GameHost_AddCardToResidency(CardResidencyKind_Burnt, residency->cards[card_index]);
             should_burn = true;
         }
     }
     
     if(should_burn)
     {
-        RemoveGaps(residency);
+        GameHost_RemoveGaps(residency);
     }
 }
 
 internal void
-GetPlayerUsernameWork(void *data)
+GameHost_GetPlayerUsernameWork(void *data)
 {
     u64 tmp_player_index = (u64)data;
     Assert(tmp_player_index < ArrayCount(host_context.temporary_storage.players));
@@ -83,7 +83,7 @@ GetPlayerUsernameWork(void *data)
     for(;;)
     {
         player->username.cstr = player->buffer;
-        if (ReceiveString(player->socket, &player->username))
+        if (os->ReceiveString(player->socket, &player->username))
         {
             b32 is_username_unique = true;
             for (u32 test_player_index = 0;
@@ -103,7 +103,7 @@ GetPlayerUsernameWork(void *data)
             if (is_username_unique)
             {
                 // NOTE(fakhri): good, check if we still have place for him
-                W32_WaitForMutex(players_storage->players_mutex);
+                os->WaitForMutex(players_storage->players_mutex);
                 if (players_storage->count < ArrayCount(players_storage->players))
                 {
                     // NOTE(fakhri): add the player to the connected players array and notify the players
@@ -118,19 +118,19 @@ GetPlayerUsernameWork(void *data)
                 {
                     // NOTE(fakhri): sorry no room for you budd
                     MessageType type = HostMessage_HostFull;
-                    SendBuffer(player->socket, &type, sizeof(type));
-                    CloseSocket(player->socket);
+                    os->SendBuffer(player->socket, &type, sizeof(type));
+                    os->CloseSocket(player->socket);
                 }
-                W32_ReleaseMutex(players_storage->players_mutex);
+                os->ReleaseMutex(players_storage->players_mutex);
                 break;
             }
             else
             {
                 MessageType type = HostMessage_InvalidUsername;
-                SendBuffer(player->socket, &type, sizeof(type));
-                if (!SendBuffer(player->socket, &type, sizeof(type)))
+                os->SendBuffer(player->socket, &type, sizeof(type));
+                if (!os->SendBuffer(player->socket, &type, sizeof(type)))
                 {
-                    CloseSocket(player->socket);
+                    os->CloseSocket(player->socket);
                     break;
                 }
             }
@@ -143,11 +143,11 @@ GetPlayerUsernameWork(void *data)
     while(InterlockedCompareExchange(destination, old_count + 1, old_count) != old_count);
 }
 
-// NOTE(fakhri): main function for the thread that will serve as the host,
-//it will be only active in case we are hosting the game
-DWORD WINAPI HostMain(LPVOID param)
+
+void
+GameHostWork(void *data)
 {
-    host_context.players_storage.players_mutex = W32_CreateMutex();
+    host_context.players_storage.players_mutex = os->CreateMutex();
     host_context.host_running = true;
     
     for (u32 player_index = 0;
@@ -162,7 +162,7 @@ DWORD WINAPI HostMain(LPVOID param)
         // TODO(fakhri): wait for the main thread to tell us to start the server
         // TODO(fakhri): use thw thread workers to launch this routine when 
         // we want to host a game 
-        Socket_Handle host_socket = OpenListenSocket(HOST_PORT);
+        Socket_Handle host_socket = os->OpenListenSocket(HOST_PORT);
         if(host_socket == InvalidSocket)
         {
             LogError("Couldn't open server listen socket");
@@ -183,16 +183,16 @@ DWORD WINAPI HostMain(LPVOID param)
                 player->socket = InvalidSocket;
                 while(player->socket == InvalidSocket)
                 {
-                    player->socket = Accept(host_socket, 0, 0);
+                    player->socket = os->AcceptSocket(host_socket, 0, 0);
                 }
-                W32_PushWorkQueueEntry(GetPlayerUsernameWork, (void*)tmp_player_index);
+                os->PushWorkQueueEntry(GameHost_GetPlayerUsernameWork, (void*)tmp_player_index);
             }
             // NOTE(fakhri): make sure that all the players entered a valid username
             while(host_context.completed_username_work < players_needed)
             {
                 // NOTE(fakhri): make this thread help the worker thread
                 // instead of just waiting
-                W32_ProcessOneWorkQueueEntry();
+                os->ProcessOneWorkQueueEntry();
             }
         }
         
@@ -212,7 +212,7 @@ DWORD WINAPI HostMain(LPVOID param)
                  number < Card_Number_Count;
                  ++number, ++index)
             {
-                AddCardToResidency(CardResidencyKind_Deck, MakeCardType(category, number));
+                GameHost_AddCardToResidency(CardResidencyKind_Deck, MakeCardType(category, number));
             }
         }
         
@@ -253,9 +253,9 @@ DWORD WINAPI HostMain(LPVOID param)
                             card_offset < CARDS_PER_PLAYER;
                             ++card_offset, ++card_index)
                         {
-                            AddCardToResidency(player_residency, deck_residency->cards[card_index]);
+                            GameHost_AddCardToResidency(player_residency, deck_residency->cards[card_index]);
                         }
-                        BurnExtraCards(player_residency);
+                        GameHost_BurnExtraCards(player_residency);
                     }
                     
 #if 0
@@ -323,7 +323,7 @@ DWORD WINAPI HostMain(LPVOID param)
                                 
                                 if (found)
                                 {
-                                    AddCardToResidency(CardResidencyKind_Table, card_type);
+                                    GameHost_AddCardToResidency(CardResidencyKind_Table, card_type);
                                     curr_player_residency->cards[residency_index].number = InvalidCardNumber;
                                     ++found_cnt;
                                 }
@@ -331,7 +331,7 @@ DWORD WINAPI HostMain(LPVOID param)
                             
                             Assert(found_cnt == played_cards_count);
                             
-                            RemoveGaps(curr_player_residency);
+                            GameHost_RemoveGaps(curr_player_residency);
                             host_context.prev_played_card_count = played_cards_count;
                             
                             // NOTE(fakhri): broadcast the move to other players
@@ -381,10 +381,10 @@ DWORD WINAPI HostMain(LPVOID param)
                                  card_index < table_res->count;
                                  ++card_index)
                             {
-                                AddCardToResidency(punished_residency, table_res->cards[card_index]);
+                                GameHost_AddCardToResidency(punished_residency, table_res->cards[card_index]);
                             }
                             table_res->count = 0;
-                            BurnExtraCards(punished_residency);
+                            GameHost_BurnExtraCards(punished_residency);
                             // NOTE(fakhri): broadcast the move to other players
                             {
                                 MessageType host_msg_type = HostMessage_QuestionCredibility;
@@ -422,13 +422,11 @@ DWORD WINAPI HostMain(LPVOID param)
             Connected_Player *player = host_context.players_storage.players + player_index;
             if (player->socket != InvalidSocket)
             {
-                CloseSocket(player->socket);
+                os->CloseSocket(player->socket);
                 player->socket = InvalidSocket;
             }
         }
         host_context.players_storage.count = 0;
-        CloseSocket(host_socket);
+        os->CloseSocket(host_socket);
     }
-    
-    return 0;
 }

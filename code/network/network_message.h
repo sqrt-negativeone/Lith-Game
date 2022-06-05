@@ -8,6 +8,12 @@
 #define DECK_CARDS_COUNT (MAX_PLAYER_COUNT * CARDS_PER_PLAYER)
 #define InvalidePlayerID MAX_PLAYER_COUNT
 
+#define NetworkSendValue(s, v) do {os->SendBuffer(s, &(v), sizeof(v));} while(0)
+#define NetworkReceiveValue(s, v) do {os->ReceiveBuffer(s, &(v), sizeof(v));} while(0)
+
+#define NetworkSendArray(s, arr, cnt, T) do {NetworkSendValue(s, cnt); os->SendBuffer(s, arr, (cnt) * sizeof(T));} while(0)
+#define NetworkReceiveArray(s, arr, cnt, T) do { NetworkReceiveValue(s, cnt); os->ReceiveBuffer(s, arr, (cnt) * sizeof(T));} while(0)
+
 typedef u8 PlayerMoveKind;
 enum
 {

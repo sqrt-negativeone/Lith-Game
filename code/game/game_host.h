@@ -1,7 +1,9 @@
 /* date = April 8th 2022 10:38 pm */
 
-#ifndef GAME_SERVER_MAIN_H
-#define GAME_SERVER_MAIN_H
+#ifndef GAME_HOST_H
+#define GAME_HOST_H
+
+#define HOST_PORT "23451"
 
 struct Compact_Card_Hand
 {
@@ -88,7 +90,7 @@ BroadcastShuffledDeckMessage()
         Connected_Player *player = host_context.players_storage.players + player_index;
         // NOTE(fakhri): send the message to player
         NetworkSendValue(player->socket, type);
-        SendBuffer(player->socket, compact_deck, sizeof(compact_deck));
+        os->SendBuffer(player->socket, compact_deck, sizeof(compact_deck));
     }
 }
 
@@ -104,7 +106,7 @@ BroadcastNewPlayerJoinedMessage(Connected_Player *new_player, u32 player_id)
         MessageType type = HostMessage_NewPlayerJoined;
         NetworkSendValue(player->socket, type);
         NetworkSendValue(player->socket, player_id);
-        SendString(player->socket, new_player->username);
+        os->SendString(player->socket, new_player->username);
     }
 }
 
@@ -150,40 +152,9 @@ SendConnectedPlayersList(Socket_Handle s)
          ++player_index)
     {
         Connected_Player *player = players_storage->players + player_index;
-        SendString(s, player->username);
+        os->SendString(s, player->username);
     }
 }
 
 
-internal void
-W32_WaitForSemaphore(Semaphore_Handle semaphore)
-{
-    WaitForSingleObject(semaphore, INFINITE);
-}
-
-internal void
-W32_ReleaseSemaphore(Semaphore_Handle semaphore)
-{
-    ReleaseSemaphore(semaphore, 1, 0);
-}
-
-internal void
-W32_WaitForMutex(Mutex_Handle mutex)
-{
-    WaitForSingleObject(mutex, INFINITE);
-}
-
-internal Mutex_Handle
-W32_CreateMutex()
-{
-    Mutex_Handle result = CreateMutexA(0, FALSE, 0);
-    return result;
-}
-
-internal void
-W32_ReleaseMutex(Mutex_Handle mutex)
-{
-    ReleaseMutex(mutex);
-}
-
-#endif //GAME_SERVER_MAIN_H
+#endif //GAME_HOST_H

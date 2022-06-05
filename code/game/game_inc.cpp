@@ -8,3 +8,4 @@
 #include "game_render.cpp"
 #include "game_ui.cpp"
 #include "game_entity.cpp"
+#include "game_host.cpp"
