@@ -497,6 +497,7 @@ GameMenu(Game_State *game_state, f32 dt)
         y += VerticalAdvanceFontHeight(ui);
         if (UI_Button(ui, x, y, Str8Lit("Host Game"), text_color, hover_colore, dt, fade_in))
         {
+            UI_OpenMenu(ui, GameMenuKind_HostGame);
         }
         
         y += VerticalAdvanceFontHeight(ui);
@@ -527,6 +528,39 @@ GameMenu(Game_State *game_state, f32 dt)
         y = 0.5f * game_state->render_context.screen.y;
         
         if (UI_Button(ui, x, y, Str8Lit("Join"), text_color, hover_colore, dt, fade_in))
+        {
+            
+        }
+        
+        y += VerticalAdvanceFontHeight(ui);
+        if (UI_Button(ui, x, y, Str8Lit("Back"), text_color, hover_colore, dt, fade_in))
+        {
+            UI_OpenMenu(ui, GameMenuKind_Main);
+        }
+        
+    }
+    
+    
+    UI_MenuSection(ui, GameMenuKind_HostGame)
+    {
+        Game_Menu *menu = ui->menus + ui->current_menu;
+        menu->presence += menu->presence_change_speed * dt;
+        menu->presence = Clamp(0.0f, menu->presence, 1.0f);
+        f32 fade_in = menu->presence;
+        
+        v4 hover_colore = Vec4(0.2f,0.5f,0.5f,1.0f);
+        v4 text_color = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        
+        f32 x = 0.5f * game_state->render_context.screen.width;
+        f32 y = 0.2f * game_state->render_context.screen.height;
+        ChangeActiveCoordinates(ui, CoordinateType_Screen);
+        ChangeActiveFont(ui, FontKind_MenuTitle);
+        UI_Label(ui, x, y, Str8Lit("Host Game"), Vec4(1.0f, 1.0f, 1.0f, 1.0f), fade_in);
+        
+        ChangeActiveFont(ui, FontKind_MenuItem);
+        y = 0.5f * game_state->render_context.screen.y;
+        
+        if (UI_Button(ui, x, y, Str8Lit("Host"), text_color, hover_colore, dt, fade_in))
         {
             
         }

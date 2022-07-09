@@ -8,6 +8,7 @@ enum GameMenuKind
     GameMenuKind_None,
     GameMenuKind_Main,
     GameMenuKind_JoinGame,
+    GameMenuKind_HostGame,
     GameMenuKind_Count,
 };
 
