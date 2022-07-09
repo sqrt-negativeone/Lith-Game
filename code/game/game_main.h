@@ -25,23 +25,6 @@ struct Controller
     
 };
 
-#if 0
-enum Game_Mode
-{
-    GameMode_GAME,
-    GameMode_TestingNetworking,
-    
-    GameMode_MENU_BEGIN,
-    // NOTE(fakhri): begin menu modes
-    GameMode_MENU_Username,
-    GameMode_MENU_MAIN,
-    GameMode_MENU_JOIN_GAME,
-    GameMode_MENU_HOST_GAME,
-    GameMode_MENU_WAITING_PLAYERS,
-    GameMode_MENU_END,
-};
-#endif
-
 typedef u32 GameStateFlags;
 enum
 {
