@@ -36,7 +36,6 @@ struct Game_UI
     f32 hot_transition_speed;
     
     u32 current_widget;
-    u32 widgets_count;
     
     Game_Menu menus[GameMenuKind_Count];
     GameMenuKind active_menu;

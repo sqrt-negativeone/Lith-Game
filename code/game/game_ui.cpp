@@ -12,7 +12,6 @@ internal void
 UI_Begin(Game_UI *ui)
 {
     ui->current_widget = 0;
-    ui->widgets_count = 0;
 }
 
 internal void

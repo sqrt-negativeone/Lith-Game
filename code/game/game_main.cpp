@@ -219,7 +219,6 @@ if ((!!(ui->current_menu = menu_kind) || true) && ((ui)->active_menu == (menu_ki
 internal void
 GameMenu(Game_State *game_state, f32 dt)
 {
-    // TODO(fakhri): implement better UIs
     Game_UI *ui = &game_state->ui;
     UI_Begin(ui);
     // NOTE(fakhri): main menu
@@ -289,7 +288,6 @@ GameMenu(Game_State *game_state, f32 dt)
         {
             UI_OpenMenu(ui, GameMenuKind_Main);
         }
-        
     }
     
     
@@ -322,7 +320,6 @@ GameMenu(Game_State *game_state, f32 dt)
         {
             UI_OpenMenu(ui, GameMenuKind_Main);
         }
-        
     }
     
     if (HasFlag(game_state->flags, StateFlag_TryingJoinGame))
