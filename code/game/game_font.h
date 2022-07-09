@@ -8,6 +8,7 @@ enum
 {
     FontKind_None,
     FontKind_Arial,
+    FontKind_GameTitle,
     FontKind_MenuTitle,
     FontKind_MenuItem,
     

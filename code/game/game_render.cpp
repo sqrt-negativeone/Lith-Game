@@ -96,7 +96,7 @@ Render_PushClear(Render_Context *render_context, v4 color)
 }
 
 internal void
-Render_PushQuad(Render_Context *render_context, v3 pos, v2 size_in_meter, v4 color, Coordinate_Type coord_type, v3 orientation = {})
+Render_PushQuad(Render_Context *render_context, v3 pos, v2 size_in_meter, v4 color, Coordinate_Type coord_type, v3 orientation = Vec3(0, 0, 0))
 {
     Assert(coord_type < CoordinateType_Count);
     if (coord_type == CoordinateType_World)
@@ -120,7 +120,7 @@ internal void
 Render_PushImage(Render_Context *render_context, Texture2D texture,
                  v3 pos, v2 size, 
                  Coordinate_Type coord_type, b32 flip_y = false,
-                 v3 orientation = {}, b32 is_size_in_meter = true, v4 color = Vec4(1, 1, 1, 1), v4 src = Vec4(0, 0, 1, 1))
+                 v3 orientation = Vec3(0, 0, 0), b32 is_size_in_meter = true, v4 color = Vec4(1, 1, 1, 1), v4 src = Vec4(0, 0, 1, 1))
 {
     Assert(coord_type < CoordinateType_Count);
     if (coord_type == CoordinateType_World)
@@ -284,8 +284,6 @@ Render_End(Render_Context *render_context)
         ++sort_entry;
     }
     
-    // TODO(fakhri): sort from front to back with depth on
-    // as optimizations
     SortRenderRequests(render_context->frame_arena, &sort_buffer);
     
     for(u32 entry_index = 0;

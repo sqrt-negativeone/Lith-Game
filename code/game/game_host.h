@@ -11,6 +11,7 @@ struct Compact_Card_Hand
     u32 cards_count;
 };
 
+#define USERNAME_BUFFER_SIZE 20
 struct Connected_Player
 {
     Socket_Handle socket;

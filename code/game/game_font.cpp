@@ -8,20 +8,37 @@ struct FontInfo
     f32 scale;
 };
 
-read_only global FontInfo fonts_info[FontKind_Count] = {
-    /*[FontKind_None]      =*/ {},
-    /*[FontKind_Arial]     =*/ {Str8LitComp("data/fonts/arial.ttf"), 50.f},
-    /*[FontKind_MenuTitle] =*/ {Str8LitComp("data/fonts/arial.ttf"), 50.f},
-    /*[FontKind_MenuItem]  =*/ {Str8LitComp("data/fonts/arial.ttf"), 50.f},
-};
-
 internal void
 LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
 {
     if (font_kind == FontKind_None) return;
     Assert(font_kind < FontKind_Count);
     Font *font = render_context->fonts + font_kind;
-    FontInfo font_info = fonts_info[font_kind];
+    FontInfo font_info = {};
+    switch(font_kind)
+    {
+        case FontKind_Arial:
+        {
+            font_info.path = Str8LitComp("data/fonts/arial.ttf");
+            font_info.scale = 50.f;
+        } break;
+        case FontKind_GameTitle:
+        {
+            font_info.path = Str8LitComp("data/fonts/PilotCommand.otf");
+            font_info.scale = 100.f;
+        } break;
+        case FontKind_MenuTitle:
+        {
+            font_info.path = Str8LitComp("data/fonts/PilotCommand.otf");
+            font_info.scale = 60.f;
+        } break;
+        case FontKind_MenuItem:
+        {
+            font_info.path = Str8LitComp("data/fonts/BubbleboddyNeue.ttf");
+            font_info.scale = 50.f;
+        } break;
+        default: NotImplemented; break;
+    }
     
     M_Temp scratch = GetScratch(&arena, 1);
     

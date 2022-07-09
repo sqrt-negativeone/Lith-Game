@@ -209,7 +209,6 @@ HandleAvailableMessages(Game_State *game_state)
 internal void
 StartGame(Game_State *game_state)
 {
-    game_state->game_mode = GameMode_GAME;
     SetFlag(game_state->flags, StateFlag_WaitingForCards);
     glDepthFunc(GL_LESS);
 }
@@ -460,6 +459,123 @@ void UpdateAndRenderJoinSessionMenu(Game_State *game_state, UI_Context *ui_conte
 
 #endif
 
+#if 1
+
+#define UI_MenuSection(ui, menu_kind)                                            \
+if ((!!(ui->current_menu = menu_kind) || true) && ((ui)->active_menu == (menu_kind) || (ui)->menus[(menu_kind)].presence > 0))
+
+internal void
+GameMenu(Game_State *game_state, f32 dt)
+{
+    // TODO(fakhri): implement better UIs
+    Game_UI *ui = &game_state->ui;
+    UI_Begin(ui);
+    // NOTE(fakhri): main menu
+    
+    UI_MenuSection(ui, GameMenuKind_Main)
+    {
+        Game_Menu *menu = ui->menus + ui->current_menu;
+        menu->presence += menu->presence_change_speed * dt;
+        menu->presence = Clamp(0.0f, menu->presence, 1.0f);
+        
+        f32 fade_in = menu->presence;
+        v4 hover_colore = Vec4(0.2f,0.5f,0.5f,1.0f);
+        v4 text_color = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        f32 x = 0.5f * game_state->render_context.screen.width;
+        f32 y = 0.2f * game_state->render_context.screen.height;
+        ChangeActiveCoordinates(ui, CoordinateType_Screen);
+        ChangeActiveFont(ui, FontKind_GameTitle);
+        UI_Label(ui, x, y, Str8Lit("Lith"), Vec4(1.0f, 1.0f, 1.0f, 1.0f), fade_in);
+        
+        ChangeActiveFont(ui, FontKind_MenuItem);
+        y = 0.5f * game_state->render_context.screen.y;
+        if (UI_Button(ui, x, y, Str8Lit("Join Game"), text_color, hover_colore, dt, fade_in))
+        {
+            UI_OpenMenu(ui, GameMenuKind_JoinGame);
+        }
+        
+        y += VerticalAdvanceFontHeight(ui);
+        if (UI_Button(ui, x, y, Str8Lit("Host Game"), text_color, hover_colore, dt, fade_in))
+        {
+        }
+        
+        y += VerticalAdvanceFontHeight(ui);
+        if (UI_Button(ui, x, y, Str8Lit("Exit"), text_color, hover_colore, dt, fade_in))
+        {
+            os->quit = 1;
+        }
+    }
+    
+    
+    UI_MenuSection(ui, GameMenuKind_JoinGame)
+    {
+        Game_Menu *menu = ui->menus + ui->current_menu;
+        menu->presence += menu->presence_change_speed * dt;
+        menu->presence = Clamp(0.0f, menu->presence, 1.0f);
+        f32 fade_in = menu->presence;
+        
+        v4 hover_colore = Vec4(0.2f,0.5f,0.5f,1.0f);
+        v4 text_color = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        
+        f32 x = 0.5f * game_state->render_context.screen.width;
+        f32 y = 0.2f * game_state->render_context.screen.height;
+        ChangeActiveCoordinates(ui, CoordinateType_Screen);
+        ChangeActiveFont(ui, FontKind_MenuTitle);
+        UI_Label(ui, x, y, Str8Lit("Join Game"), Vec4(1.0f, 1.0f, 1.0f, 1.0f), fade_in);
+        
+        ChangeActiveFont(ui, FontKind_MenuItem);
+        y = 0.5f * game_state->render_context.screen.y;
+        
+        if (UI_Button(ui, x, y, Str8Lit("Join"), text_color, hover_colore, dt, fade_in))
+        {
+            
+        }
+        
+        y += VerticalAdvanceFontHeight(ui);
+        if (UI_Button(ui, x, y, Str8Lit("Back"), text_color, hover_colore, dt, fade_in))
+        {
+            UI_OpenMenu(ui, GameMenuKind_Main);
+        }
+        
+    }
+    
+    if (HasFlag(game_state->flags, StateFlag_TryingJoinGame))
+    {
+        Render_PushText(&game_state->render_context, Str8Lit("joinning the game"),  Vec3(0,CentiMeter(15), Meter(1)), Vec4(0.6f, 0.6f, 0.6f, 1.0f), CoordinateType_World, FontKind_Arial);
+        
+        if (HasFlag(game_state->flags, StateFlag_JoinedGame))
+        {
+            // NOTE(fakhri): good, we wait for all players to join and then we start the game
+            ClearFlag(game_state->flags, StateFlag_TryingJoinGame);
+        }
+        
+        if (HasFlag(game_state->flags, StateFlag_FailedJoinGame))
+        {
+            // TODO(fakhri): display an error message
+            LogError("Couldn't join game");
+            ClearFlag(game_state->flags, StateFlag_TryingJoinGame | StateFlag_FailedJoinGame);
+        }
+    }
+    
+    if (HasFlag(game_state->flags, StateFlag_JoinedGame))
+    {
+        // NOTE(fakhri): render the connected players
+        local_persist v3 positions[] = {
+            Vec3(-CentiMeter(17),  CentiMeter(17), Meter(1)), Vec3(+CentiMeter(17),  CentiMeter(17), Meter(1)),
+            Vec3(-CentiMeter(17), -CentiMeter(17), Meter(1)), Vec3(+CentiMeter(17), -CentiMeter(17), Meter(1)),
+        };
+        
+        if (game_state->players_joined_so_far == MAX_PLAYER_COUNT)
+        {
+            // NOTE(fakhri): enough players have joined
+            StartGame(game_state);
+            ClearFlag(game_state->flags, StateFlag_JoinedGame);
+        }
+    }
+    
+    UI_End(ui);
+}
+#endif
 
 exported
 APP_HotLoad(HotLoad)
@@ -488,8 +604,9 @@ APP_PermanantLoad(PermanentLoad)
     
     InitRenderer(&game_state->render_context);
     
-    UI_Init(&game_state->ui_context, &game_state->render_context);
-    
+    game_state->ui = UI_Init(&game_state->render_context, &game_state->controller);
+    UI_OpenMenu(&game_state->ui, GameMenuKind_Main);
+#define SERVER_ADDRESS_BUFFER_SIZE 20
     game_state->host_address_buffer = InitBuffer(os->permanent_arena, SERVER_ADDRESS_BUFFER_SIZE);
     game_state->username_buffer = InitBuffer(os->permanent_arena, USERNAME_BUFFER_SIZE);
     game_state->command_buffer.arena = os->permanent_arena;
@@ -504,7 +621,7 @@ APP_PermanantLoad(PermanentLoad)
     // NOTE(fakhri): host the game
     os->PushWorkQueueEntry(GameHostWork, 0);
     // @DebugOnly
-    game_state->game_mode = GameMode_TestingNetworking;
+    //game_state->game_mode = GameMode_TestingNetworking;
     PushCreateConnectToServerMessage(Str8Lit(""));
     PushUsernameNetworkMessage(Str8Lit("username"));
     SetFlag(game_state->flags, StateFlag_TryingJoinGame);
@@ -532,16 +649,16 @@ APP_HotUnload(HotUnload)
 exported
 APP_UpdateAndRender(UpdateAndRender)
 {
-    UI_Context *ui_context = &game_state->ui_context;
     game_state->controller = {};
     Controller *controller = &game_state->controller;
     
     HandleAvailableMessages(game_state);
     Render_Begin(&game_state->render_context, OS_FrameArena());
     
-    Render_PushClear(&game_state->render_context, Vec4(0.4f, 0.4f, 0.5f, 1.f));
+    Render_PushClear(&game_state->render_context, Vec4(0.2f, 0.2f, 0.2f, 1.f));
     
     // NOTE(fakhri): Debug UI
+    if (0)
     {
         M_Temp scratch = GetScratch(0, 0);
         
@@ -716,250 +833,167 @@ APP_UpdateAndRender(UpdateAndRender)
         }
     }
     
-    switch(game_state->game_mode)
+    GameMenu(game_state, dt);
+    
+    if(HasFlag(game_state->flags, StateFlag_WaitingForCards))
     {
-        case GameMode_TestingNetworking:
+        // NOTE(fakhri): we wait
+        ChangeActiveFont(&game_state->render_context, FontKind_Arial);
+        
+        Render_PushText(&game_state->render_context, Str8Lit("waiting for cards from server"), Vec3(0, 0, 60), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
+        
+        if(HasFlag(game_state->flags, StateFlag_ReceivedCards))
         {
-            if (HasFlag(game_state->flags, StateFlag_TryingJoinGame))
+            ClearFlag(game_state->flags, StateFlag_WaitingForCards);
+            
+            
+            AddButtonEntity(game_state, ButtonEntityKind_QuestionCredibility, Vec3(MiliMeter(150), MiliMeter(0), 0), Vec2(MiliMeter(50), MiliMeter(30)));
+            AddButtonEntity(game_state, ButtonEntityKind_PlaySelectedCards, Vec3(MiliMeter(150), -MiliMeter(40), 0), Vec2(MiliMeter(50), MiliMeter(30)));
+            
+            AddArrowEntity(game_state);
+            
+            for (Card_Number number = Card_Number_Ace;
+                 number < Card_Number_Count;
+                 ++number)
             {
-                Render_PushText(&game_state->render_context, Str8Lit("joinning the game"),  Vec3(0,CentiMeter(15), Meter(1)), Vec4(1.0f, 1.0f, 1.0f, 1.0f), CoordinateType_World, FontKind_Arial);
-                
-                if (HasFlag(game_state->flags, StateFlag_JoinedGame))
+                AddNumberEntity(game_state, number);
+            }
+        }
+    }
+    else
+    {
+        if (HasFlag(game_state->flags, StateFlag_QuestionCredibility))
+        {
+            PushQuestionCredibilityNetworkMessage();
+            QuestionPreviousPlayerCredibility(game_state);
+        }
+        
+        if (HasFlag(game_state->flags, StateFlag_PlaySelectedCards))
+        {
+            b32 table_empty = IsResidencyEmpty(game_state, ResidencyKind_Table);
+            
+            ResidencyKind target_residency = table_empty? 
+                ResidencyKind_SelectedCards : ResidencyKind_Table;
+            ResidencyIterator iter = MakeResidencyIterator(game_state, 
+                                                           GetResidencyOfCurrentPlayer(game_state));
+            for(EachValidResidencyEntityID(entity_id, iter))
+            {
+                Entity *entity = game_state->entities + entity_id;
+                if (HasFlag(entity->flags, EntityFlag_Selected))
                 {
-                    // NOTE(fakhri): good, we wait for all players to join and then we start the game
-                    ClearFlag(game_state->flags, StateFlag_TryingJoinGame);
-                }
-                
-                if (HasFlag(game_state->flags, StateFlag_FailedJoinGame))
-                {
-                    // TODO(fakhri): display an error message
-                    LogError("Couldn't join game");
-                    ClearFlag(game_state->flags, StateFlag_TryingJoinGame | StateFlag_FailedJoinGame);
+                    ClearFlag(entity->flags, EntityFlag_Selected);
+                    ChangeResidency(game_state, &iter, target_residency);
                 }
             }
             
-            if (HasFlag(game_state->flags, StateFlag_JoinedGame))
+            if (table_empty)
             {
-                // NOTE(fakhri): render the connected players
-                local_persist v3 positions[] = {
-                    Vec3(-CentiMeter(17),  CentiMeter(17), Meter(1)), Vec3(+CentiMeter(17),  CentiMeter(17), Meter(1)),
-                    Vec3(-CentiMeter(17), -CentiMeter(17), Meter(1)), Vec3(+CentiMeter(17), -CentiMeter(17), Meter(1)),
-                };
+                SetFlag(game_state->flags, StateFlag_ShouldOpenDeclaringMenu);
+                GameCommand_PushCommand_Delay(&game_state->command_buffer, Seconds(0.2f));
+                GameCommand_PushCommand_OpenDeclareMenu(&game_state->command_buffer);
                 
-                for (u32 index = 0;
-                     index < ArrayCount(game_state->players);
-                     ++index)
-                {
-                    Player *player = game_state->players + index;
-                    if(player->joined)
-                    {
-                        Render_PushText(&game_state->render_context, player->username, positions[index], Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
-                        
-                    }
-                    else
-                    {
-                        Render_PushText(&game_state->render_context, Str8Lit("waiting player"), positions[index], Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
-                        
-                    }
-                }
-                
-                if (game_state->players_joined_so_far == MAX_PLAYER_COUNT)
-                {
-                    // NOTE(fakhri): enough players have joined
-                    StartGame(game_state);
-                }
-            }
-            
-        } break;
-        case GameMode_GAME:
-        {
-            // TODO(fakhri): render a background
-            if(HasFlag(game_state->flags, StateFlag_WaitingForCards))
-            {
-                // NOTE(fakhri): we wait
-                ChangeActiveFont(&game_state->render_context, FontKind_Arial);
-                
-                Render_PushText(&game_state->render_context, Str8Lit("waiting for cards from server"), Vec3(0, 0, 60), Vec4(1,0,1,1), CoordinateType_World, FontKind_Arial);
-                
-                if(HasFlag(game_state->flags, StateFlag_ReceivedCards))
-                {
-                    ClearFlag(game_state->flags, StateFlag_WaitingForCards);
-                    
-                    
-                    AddButtonEntity(game_state, ButtonEntityKind_QuestionCredibility, Vec3(MiliMeter(150), MiliMeter(0), 0), Vec2(MiliMeter(50), MiliMeter(30)));
-                    AddButtonEntity(game_state, ButtonEntityKind_PlaySelectedCards, Vec3(MiliMeter(150), -MiliMeter(40), 0), Vec2(MiliMeter(50), MiliMeter(30)));
-                    
-                    AddArrowEntity(game_state);
-                    
-                    for (Card_Number number = Card_Number_Ace;
-                         number < Card_Number_Count;
-                         ++number)
-                    {
-                        AddNumberEntity(game_state, number);
-                    }
-                }
+                MoveAllFromResidency(game_state, ResidencyKind_Nonespacial, ResidencyKind_DeclarationOptions);
             }
             else
             {
-                if (HasFlag(game_state->flags, StateFlag_QuestionCredibility))
+                PlaySelectedCards(game_state);
+            }
+        }
+        
+        // NOTE(fakhri): see if any residency needs reorganization
+        {
+            b32 should_burn_cards = false;
+            for (ResidencyKind residency_kind = 0;
+                 residency_kind < ResidencyKind_Count;
+                 ++residency_kind)
+            {
+                Residency *residency = game_state->residencies + residency_kind;
+                if (HasFlag(residency->flags, ResidencyFlags_NeedsReorganizing))
                 {
-                    PushQuestionCredibilityNetworkMessage();
-                    QuestionPreviousPlayerCredibility(game_state);
-                }
-                
-                if (HasFlag(game_state->flags, StateFlag_PlaySelectedCards))
-                {
-                    b32 table_empty = IsResidencyEmpty(game_state, ResidencyKind_Table);
-                    
-                    ResidencyKind target_residency = table_empty? 
-                        ResidencyKind_SelectedCards : ResidencyKind_Table;
-                    ResidencyIterator iter = MakeResidencyIterator(game_state, 
-                                                                   GetResidencyOfCurrentPlayer(game_state));
-                    for(EachValidResidencyEntityID(entity_id, iter))
+                    ReorganizeResidencyCards(game_state, (ResidencyKind)residency_kind);
+                    if (HasFlag(residency->flags, ResidencyFlags_Burnable))
                     {
-                        Entity *entity = game_state->entities + entity_id;
-                        if (HasFlag(entity->flags, EntityFlag_Selected))
+                        // NOTE(fakhri): count the frequency of each card number in the residency
+                        u32 card_number_freq[Card_Number_Count] = {};
+                        for(u32 entity_id_in_residency = 0;
+                            entity_id_in_residency< residency->entity_count;
+                            ++entity_id_in_residency)
                         {
-                            ClearFlag(entity->flags, EntityFlag_Selected);
-                            ChangeResidency(game_state, &iter, target_residency);
+                            u32 entity_id = residency->entity_ids[entity_id_in_residency];
+                            Entity *card_entity = game_state->entities + entity_id;
+                            ++card_number_freq[card_entity->card_type.number];
                         }
-                    }
-                    
-                    if (table_empty)
-                    {
-                        SetFlag(game_state->flags, StateFlag_ShouldOpenDeclaringMenu);
-                        GameCommand_PushCommand_Delay(&game_state->command_buffer, Seconds(0.2f));
-                        GameCommand_PushCommand_OpenDeclareMenu(&game_state->command_buffer);
                         
-                        MoveAllFromResidency(game_state, ResidencyKind_Nonespacial, ResidencyKind_DeclarationOptions);
-                    }
-                    else
-                    {
-                        PlaySelectedCards(game_state);
-                    }
-                }
-                
-                // NOTE(fakhri): see if any residency needs reorganization
-                {
-                    b32 should_burn_cards = false;
-                    for (ResidencyKind residency_kind = 0;
-                         residency_kind < ResidencyKind_Count;
-                         ++residency_kind)
-                    {
-                        Residency *residency = game_state->residencies + residency_kind;
-                        if (HasFlag(residency->flags, ResidencyFlags_NeedsReorganizing))
+                        // NOTE(fakhri): mark the cards to be removed
+                        for(u32 entity_id_in_residency = 0;
+                            entity_id_in_residency< residency->entity_count;
+                            ++entity_id_in_residency)
                         {
-                            ReorganizeResidencyCards(game_state, (ResidencyKind)residency_kind);
-                            if (HasFlag(residency->flags, ResidencyFlags_Burnable))
+                            u32 entity_id = residency->entity_ids[entity_id_in_residency];
+                            Entity *card_entity = game_state->entities + entity_id;
+                            if(card_number_freq[card_entity->card_type.number] >= THRESHOLD_FOR_BURNING)
                             {
-                                // NOTE(fakhri): count the frequency of each card number in the residency
-                                u32 card_number_freq[Card_Number_Count] = {};
-                                for(u32 entity_id_in_residency = 0;
-                                    entity_id_in_residency< residency->entity_count;
-                                    ++entity_id_in_residency)
-                                {
-                                    u32 entity_id = residency->entity_ids[entity_id_in_residency];
-                                    Entity *card_entity = game_state->entities + entity_id;
-                                    ++card_number_freq[card_entity->card_type.number];
-                                }
-                                
-                                // NOTE(fakhri): mark the cards to be removed
-                                for(u32 entity_id_in_residency = 0;
-                                    entity_id_in_residency< residency->entity_count;
-                                    ++entity_id_in_residency)
-                                {
-                                    u32 entity_id = residency->entity_ids[entity_id_in_residency];
-                                    Entity *card_entity = game_state->entities + entity_id;
-                                    if(card_number_freq[card_entity->card_type.number] >= THRESHOLD_FOR_BURNING)
-                                    {
-                                        SetFlag(card_entity->flags, EntityFlag_MarkedForBurning);
-                                        should_burn_cards = true;
-                                    }
-                                }
+                                SetFlag(card_entity->flags, EntityFlag_MarkedForBurning);
+                                should_burn_cards = true;
                             }
                         }
                     }
-                    
-                    if (should_burn_cards)
-                    {
-                        GameCommand_PushCommand_Delay(&game_state->command_buffer, Seconds(0.5f));
-                        GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, Str8Lit("Burning Cards With Too Much Duplicates"),
-                                                              Vec4(1, 1, 1, 1), Vec3(0, 0, 0), CoordinateType_World,  Seconds(2.0f));
-                        GameCommand_PushCommand_BurnCards(&game_state->command_buffer);
-                        SetFlag(game_state->flags, StateFlag_ShouldBurnCards);
-                    }
                 }
-                
-                // NOTE(fakhri): declaring a card if the table was empty
-                if (HasFlag(game_state->flags, StateFlag_ShouldDeclareCard))
-                {
-                    b32 did_choose_card = false;
-                    
-                    Render_PushQuad(&game_state->render_context, Vec3(0,0, Meter(1)), Vec2(CentiMeter(80), CentiMeter(50)),Vec4(0.1f, 0.1f, 0.1f, 0.5f), CoordinateType_World);
-                    
-                    Render_PushText(&game_state->render_context, Str8Lit("Cards you are going to Play"),  Vec3(0,CentiMeter(15), Meter(1)), Vec4(1.0f, 1.0f, 1.0f, 1.0f), CoordinateType_World, FontKind_Arial);
-                    
-                    Render_PushText(&game_state->render_context, Str8Lit("Select A Card To Declare"),  Vec3(0,CentiMeter(20),Meter(1)), Vec4(1.0f, 1.0f, 1.0f, 1.0f), CoordinateType_World, FontKind_Arial);
-                    
-                    // TODO(fakhri): think about how to present this
-                }
-                
-#if 1
-                // NOTE(fakhri): display the declared number
-                if (game_state->declared_number < Card_Number_Count)
-                {
-                    // TODO(fakhri): think about how to present this
-                    M_Temp scratch = GetScratch(0 ,0);
-                    String8 msg = PushStr8F(scratch.arena, 
-                                            "Declared Rank is: ", game_state->declared_number);
-                    v3 pos = Vec3(-CentiMeter(30), CentiMeter(24), MAX_Z);
-                    pos.x = Render_PushText(&game_state->render_context, msg, pos, Vec4(0, 0, 0, 1), CoordinateType_World, FontKind_Arial);
-                    Texture2D texture = game_state->render_context.textures[TextureID_BlackNumbers_Ace + game_state->declared_number];
-                    v2 dim = 0.15f * Vec2(MiliMeter(128.f), MiliMeter(203.f));
-                    pos.x += 0.5f * dim.x;
-                    pos.y += 0.25f * dim.y;
-                    Render_PushImage(&game_state->render_context, texture, pos, dim, CoordinateType_World);
-                    ReleaseScratch(scratch);
-                    
-                }
-#endif
-                
-                // TODO(fakhri): AI stuff for debug?
             }
             
-            
-            // @DebugOnly
+            if (should_burn_cards)
             {
-                if (controller->confirm.pressed)
-                {
-                    AddDebugEntites(game_state);
-                }
+                GameCommand_PushCommand_Delay(&game_state->command_buffer, Seconds(0.5f));
+                GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, Str8Lit("Burning Cards With Too Much Duplicates"),
+                                                      Vec4(1, 1, 1, 1), Vec3(0, 0, 0), CoordinateType_World,  Seconds(2.0f));
+                GameCommand_PushCommand_BurnCards(&game_state->command_buffer);
+                SetFlag(game_state->flags, StateFlag_ShouldBurnCards);
             }
+        }
+        
+        // NOTE(fakhri): declaring a card if the table was empty
+        if (HasFlag(game_state->flags, StateFlag_ShouldDeclareCard))
+        {
+            b32 did_choose_card = false;
             
-        } break;
+            Render_PushQuad(&game_state->render_context, Vec3(0,0, Meter(1)), Vec2(CentiMeter(80), CentiMeter(50)),Vec4(0.1f, 0.1f, 0.1f, 0.5f), CoordinateType_World);
+            
+            Render_PushText(&game_state->render_context, Str8Lit("Cards you are going to Play"),  Vec3(0,CentiMeter(15), Meter(1)), Vec4(1.0f, 1.0f, 1.0f, 1.0f), CoordinateType_World, FontKind_Arial);
+            
+            Render_PushText(&game_state->render_context, Str8Lit("Select A Card To Declare"),  Vec3(0,CentiMeter(20),Meter(1)), Vec4(1.0f, 1.0f, 1.0f, 1.0f), CoordinateType_World, FontKind_Arial);
+            
+            // TODO(fakhri): think about how to present this
+        }
         
-#if 0        
-        case GameMode_MENU_MAIN:
+#if 1
+        // NOTE(fakhri): display the declared number
+        if (game_state->declared_number < Card_Number_Count)
         {
-            UpdateAndRenderMainMenu(game_state, ui_context, controller);
-        } break;
-        
-        case GameMode_MENU_Username:
-        {
-            UpdateAndRenderUserNameMenu(game_state, ui_context, controller);
-        } break;
-        
-        case GameMode_MENU_WAITING_PLAYERS: 
-        {
-            UpdateAndRenderWaitingPlayersMenu(game_state, ui_context, controller);
-        } break;
-        
-        case GameMode_MENU_JOIN_GAME:
-        {
-            UpdateAndRenderJoinSessionMenu(game_state, ui_context, controller); 
-        } break;
+            // TODO(fakhri): think about how to present this
+            M_Temp scratch = GetScratch(0 ,0);
+            String8 msg = PushStr8F(scratch.arena, 
+                                    "Declared Rank is: ", game_state->declared_number);
+            v3 pos = Vec3(-CentiMeter(30), CentiMeter(24), MAX_Z);
+            pos.x = Render_PushText(&game_state->render_context, msg, pos, Vec4(0, 0, 0, 1), CoordinateType_World, FontKind_Arial);
+            Texture2D texture = game_state->render_context.textures[TextureID_BlackNumbers_Ace + game_state->declared_number];
+            v2 dim = 0.15f * Vec2(MiliMeter(128.f), MiliMeter(203.f));
+            pos.x += 0.5f * dim.x;
+            pos.y += 0.25f * dim.y;
+            Render_PushImage(&game_state->render_context, texture, pos, dim, CoordinateType_World);
+            ReleaseScratch(scratch);
+            
+        }
 #endif
-        default: NotImplemented;
+        
+        // TODO(fakhri): AI stuff for debug?
+    }
+    
+    // @DebugOnly
+    {
+        if (controller->confirm.pressed)
+        {
+            AddDebugEntites(game_state);
+        }
     }
     
     // NOTE(fakhri): command buffer

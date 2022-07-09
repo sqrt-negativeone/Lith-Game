@@ -1,227 +1,176 @@
 
-internal void
-UI_ChangeSelectedItem(UI_Context *ui_context, i32 delta)
+internal Game_UI
+UI_Init(Render_Context *render_context, Controller *controller)
 {
-    Assert(ui_context);
-    ui_context->last_select_time = os->time.game_time;
-    ui_context->pressed_item = (ui_context->pressed_item + delta + ui_context->items_count) % ui_context->items_count;
+    Game_UI ui = {};
+    ui.render_context = render_context;
+    ui.controller = controller;
+    return ui;
 }
 
 internal void
-UI_InitColorScheme(UI_ColorScheme *color_scheme)
+UI_Begin(Game_UI *ui)
 {
-    // TODO(fakhri): choose some good colors
-    // TODO(fakhri): maybe load this from a config file?
-    
-    *color_scheme = {};
-    
-    v3 white = Vec3(1.0f, 1.0f, 1.0f);
-    v3 none_white = 0.3f * white;
-    v3 black = 0.f * white;
-    v3 red = Vec3(1.0f, 0.f, 0.f);
-    v3 blue = Vec3(78, 166, 206) / 255.f;
-    
-    color_scheme->label_color = white;
-    color_scheme->label_color1 = white;
-    color_scheme->label_color2 = 0.8f * white;
-    
-    // NOTE(fakhri): button colors
-    color_scheme->button_text_color = 0.3f * white;
-    color_scheme->button_text_active_color1 = 0.85f * blue;
-    color_scheme->button_text_active_color2 = blue;
-    color_scheme->button_text_shadow_color = black;
-    color_scheme->button_text_clicked_color = red;
-    
-    // NOTE(fakhri): input field color
-    color_scheme->input_field_background_color = 0.2f * white;
-    color_scheme->input_field_background_active_color = 0.5f * white;
-    
-    color_scheme->input_field_text_color = color_scheme->input_field_background_active_color;
-    color_scheme->input_field_text_active_color = color_scheme->input_field_background_color;
+    ui->current_widget = 0;
+    ui->widgets_count = 0;
 }
 
 internal void
-UI_Init(UI_Context *ui_context, Render_Context *render_context)
+UI_End(Game_UI *ui)
 {
-    ui_context->render_context = render_context;
-    UI_InitColorScheme(&ui_context->color_scheme);
-}
-
-internal void 
-UI_BeginFrame(UI_Context *ui_context, Controller *controller, Render_Context *render_context)
-{
-    Assert(ui_context);
-    ui_context->items_count = 0;
-    ui_context->controller = controller;
-    ui_context->render_context = render_context;
+    
 }
 
 internal void
-UI_EndFrame(UI_Context *ui_context, Controller *controller)
+ChangeActiveFont(Game_UI *ui, Font_Kind new_font)
 {
-    // NOTE(fakhri): process input
-    if (controller->move_down.pressed)
-    {
-        UI_ChangeSelectedItem(ui_context, +1);
-    }
-    if (controller->move_up.pressed)
-    {
-        UI_ChangeSelectedItem(ui_context, -1);
-    }
+    ui->active_font = new_font;
 }
 
 internal void
-UI_Label(UI_Context *ui_context, String8 text, f32 x, f32 y, Font_Kind font_to_use, b32 should_animate_color = false)
+ChangeActiveCoordinates(Game_UI *ui, Coordinate_Type new_coordinates)
 {
-    UI_ColorScheme *color_scheme = &ui_context->color_scheme;
+    ui->active_coordinates = new_coordinates;
+}
+
+internal f32
+VerticalAdvanceFontHeight(Game_UI *ui)
+{
     
-    f32 change = should_animate_color? Square(CosF(PI32 * os->time.game_time)) : 0;
-    v3 color = Lerp(color_scheme->label_color1, change, color_scheme->label_color2);
-    
-    Render_PushText(ui_context->render_context, text, Vec3(x, y, 0), Vec4(color, 1), CoordinateType_World, font_to_use);
+    f32 result = 1.4f * GetFontHeight(ui->render_context, ui->active_font);
+    return result;
+}
+
+internal void
+UI_Label(Game_UI *ui, f32 x, f32 y, String8 label_text, v4 text_color, f32 fade_in = 1.0f)
+{
+    v3 label_position = Vec3(x, y, Meter(1));
+    text_color.a *= fade_in;
+    Render_PushText(ui->render_context, label_text, label_position, text_color, ui->active_coordinates, ui->active_font);
+}
+
+internal u32
+GetCurrentWidgetID(Game_UI *ui)
+{
+    u32 result = ++ui->current_widget;
+    return result;
 }
 
 internal b32
-UI_Button(UI_Context *ui_context, String8 item_text, f32 x, f32 y, Font_Kind font_to_use)
+UI_Button(Game_UI *ui, f32 x, f32 y, String8 button_text, v4 text_color, v4 hover_color, f32 dt, f32 fade_in = 1.0f, b32 accept_input = true)
 {
-    UI_ColorScheme    *color_scheme = &ui_context->color_scheme;
+    u32 widget_id = GetCurrentWidgetID(ui);
     
-    b32 clicked = 0;
+    b32 is_pressed = 0;
+    f32 horizontal_padding = 0.1f;
+    f32 vertical_padding   = 0.1f;
+    f32 width  = (1.0f + horizontal_padding) * 
+        GetFontWidth(ui->render_context, ui->active_font, button_text);
+    f32 height = (1.0f + vertical_padding) * 
+        GetFontHeight(ui->render_context, ui->active_font);
     
-    v2 item_pos = Vec2(x, y);
+    v3 text_position = Vec3(x, y, Meter(1));
+    v3 button_position = Vec3(x, y - 0.25f * height, Meter(1));
+    v2 size = Vec2(width, height);
+    v2 size_in_meters = SizeFromScreenCoordsToWorldCoords(ui->render_context, size); 
     
-    v3 text_color;
-    
-    v2 hitbox = 1.2f * Vec2(GetFontWidth(ui_context->render_context, font_to_use, item_text), 
-                            GetFontHeight(ui_context->render_context, font_to_use));
-    
-    hitbox = SizeFromScreenCoordsToWorldCoords(ui_context->render_context, hitbox);
-    if (IsInsideRect(RectCentDim(item_pos, hitbox), WorldCoordsFromScreenCoords(ui_context->render_context, os->mouse_position).xy))
+    if (accept_input)
     {
-        ui_context->last_select_time = os->time.game_time;
-        ui_context->pressed_item = ui_context->items_count;
-    }
-    
-    b32 is_selected = (ui_context->pressed_item == ui_context->items_count);
-    
-    if (is_selected)
-    {
-        if (ui_context->controller->confirm.pressed || ui_context->controller->left_mouse.pressed)
+        if (IsInsideRect(RectCentDim(button_position.xy, size),
+                         os->mouse_position))
         {
-            clicked = 1;
+            if (ui->active_widget != widget_id)
+            {
+                ui->active_widget = widget_id;
+                ui->active_transition = 0.0f;
+                ui->active_transition_speed = 9.0f;
+            }
+            
+            ui->active_transition += ui->active_transition_speed * dt;
+            if (ui->active_transition > 1.0f)
+            {
+                ui->active_transition = 1.0f;
+            }
+            
+            v4 background_color = hover_color;
+            v2 background_size_in_meters = size_in_meters;
+            
+            background_color.a *= ui->active_transition;
+            background_size_in_meters.height *= ui->active_transition;
+            
+            if (ui->controller->left_mouse.pressed)
+            {
+                ui->hot_widget = widget_id;
+                ui->hot_transition = 0.0f;
+                ui->hot_transition_speed = 20.0f;
+            }
+            
+            if (ui->hot_widget == widget_id)
+            {
+                ui->hot_transition += ui->hot_transition_speed * dt;
+                if (ui->controller->left_mouse.released)
+                {
+                    ui->hot_transition_speed *= -3;
+                    
+                }
+                
+                if (ui->hot_transition > 1.0f)
+                {
+                    ui->hot_transition = 1.0f;
+                }
+                
+                
+                if (ui->hot_transition < 0)
+                {
+                    ui->hot_widget = 0;
+                    ui->hot_transition = 0;
+                    is_pressed = 1;
+                }
+                
+                v3 click_color = Vec3(1, 1, 1) - background_color.rgb;
+                f32 t = ui->hot_transition;
+                background_color.rgb = (1 - t) * background_color.rgb + t * click_color;
+                background_size_in_meters.height *= (1.0f - 0.1f * ui->hot_transition);
+            }
+            
+            background_color.a *= fade_in;
+            Render_PushQuad(ui->render_context, button_position, background_size_in_meters, background_color, ui->active_coordinates);
         }
-        // TODO(fakhri): maybe show some change in color when the button is clicked?
-        f32 t = os->time.game_time - ui_context->last_select_time;
-        f32 change = Square(CosF(PI32 * t));
-        text_color = Lerp(color_scheme->button_text_active_color1, change, color_scheme->button_text_active_color2);
-        v2 shadow_offset = Vec2(MiliMeter(2), -MiliMeter(1));
-        Render_PushText(ui_context->render_context, item_text, Vec3(item_pos + shadow_offset, 0), Vec4(text_color, 1), CoordinateType_World, font_to_use);
-        
-    }
-    else
-    {
-        text_color = color_scheme->button_text_color;
+        else
+        {
+            if (ui->active_widget == widget_id)
+            {
+                ui->active_widget = 0;
+            }
+            
+            if (ui->hot_widget == widget_id)
+            {
+                ui->hot_widget = 0;
+            }
+        }
     }
     
-    Render_PushText(ui_context->render_context, item_text, Vec3(item_pos, 0), Vec4(text_color, 1), CoordinateType_World, font_to_use);
+    text_color.a *= fade_in;
+    Render_PushText(ui->render_context, button_text,  text_position, text_color, ui->active_coordinates, ui->active_font);
     
-    ++ui_context->items_count;
-    return clicked;
+    return is_pressed;
 }
 
 internal void
-HandleInputFieldKeyboardInput(Buffer *input_buffer)
+UI_OpenMenu(Game_UI *ui, GameMenuKind menu_kind)
 {
-    // TODO(fakhri): support ctr+v
-    // TODO(fakhri): support moving cursor with arrow keys
-    
-    OS_Event *event = os->events.first;
-    while(event)
+    if (ui->active_menu)
     {
-        switch(event->kind)
-        {
-            case OS_EventKind_Text:
-            {
-                char c = (char)event->character;
-                if (!IsBufferFull(input_buffer))
-                {
-                    InsertCharacterToBuffer(input_buffer, c);
-                }
-            } break;
-            case OS_EventKind_Press:
-            {
-                if (event->key == OS_Key_Backspace && 
-                    !IsBufferEmpty(input_buffer))
-                {
-                    if (event->modifiers & OS_Modifier_Ctrl)
-                    {
-                        EmptyBuffer(input_buffer);
-                    }
-                    else
-                    {
-                        RemoveLastCharacterFromBuffer(input_buffer);
-                    }
-                }
-                else if (event->key == OS_Key_V && (event->modifiers & OS_Modifier_Ctrl))
-                {
-                    // TODO(fakhri): insert the content of the clipboad into the buffer
-                    Log("Pasting clipboad content to the buffer");
-                }
-            } break;
-        }
-        event = event->next;
+        Game_Menu *menu = ui->menus + ui->active_menu;
+        menu->accept_input = 0;
+        menu->presence_change_speed = -10.0f;
     }
+    
+    ui->active_menu = menu_kind;
+    {
+        Game_Menu *menu = ui->menus + ui->active_menu;
+        menu->accept_input = 1;
+        menu->presence_change_speed = 10.0f;
+    }
+    
 }
-
-internal void
-UI_InputField(UI_Context *ui_context, v2 item_size, f32 x, f32 y, Buffer *input_buffer, Font_Kind font_to_use)
-{
-    UI_ColorScheme    *color_scheme      = &ui_context->color_scheme;
-    
-    v3 background_color;
-    v3 text_color;
-    
-    v2 item_pos = Vec2(x, y);
-    
-    if (IsInsideRect(RectCentDim(item_pos, item_size), WorldCoordsFromScreenCoords(ui_context->render_context, os->mouse_position).xy))
-    {
-        ui_context->pressed_item = ui_context->items_count;
-    }
-    
-    b32 is_selected = (ui_context->pressed_item == ui_context->items_count);
-    if (is_selected)
-    {
-        HandleInputFieldKeyboardInput(input_buffer);
-        
-        // NOTE(fakhri): set colors
-        background_color = color_scheme->input_field_background_active_color;
-        text_color = color_scheme->input_field_text_active_color;
-    }
-    else
-    {
-        // NOTE(fakhri): set colors
-        background_color = color_scheme->input_field_background_color;
-        text_color = color_scheme->input_field_text_color;
-    }
-    
-    // NOTE(fakhri): render input field background
-    Render_PushQuad(ui_context->render_context, Vec3(item_pos, 0), item_size, Vec4(background_color, 1), CoordinateType_World);
-    
-    Render_PushText(ui_context->render_context, input_buffer->content, Vec3(item_pos, 0), Vec4(text_color, 1), CoordinateType_World, font_to_use);
-    
-    if (is_selected)
-    {
-        f32 t = os->time.game_time - ui_context->last_select_time;
-        f32 change = Square(CosF(PI32 * t));
-        v3 cursor_color = Lerp(background_color, change, text_color);
-        
-        f32 meter_per_pixel = 1.0f / ui_context->render_context->pixels_per_meter;
-        f32 font_half_width_in_pixels = 0.5f * GetFontWidth(ui_context->render_context, font_to_use, input_buffer->content);
-        v2 cursor_size = Vec2(MiliMeter(2), CentiMeter(4));
-        v2 cursor_pos = Vec2(item_pos.x + meter_per_pixel * font_half_width_in_pixels, item_pos.y);
-        Render_PushQuad(ui_context->render_context, Vec3(cursor_pos, 0), cursor_size, Vec4(cursor_color, 1), CoordinateType_World);
-    }
-    
-    ++ui_context->items_count;
-}
-

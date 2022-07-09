@@ -180,7 +180,7 @@ ComputeHashShaderPath(String8 shader_path)
          ++index)
     {
         u8 ch = shader_path.str[index];
-        hash += (hash * 33) ^ index;
+        hash += (hash * 33) ^ ch;
     }
     return hash;
 }

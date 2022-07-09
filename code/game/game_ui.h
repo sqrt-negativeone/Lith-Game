@@ -3,42 +3,44 @@
 #ifndef GAME_UI_H
 #define GAME_UI_H
 
-struct UI_ColorScheme
+enum GameMenuKind
 {
-    // NOTE(fakhri): text labels color
-    v3 label_color;
-    v3 label_color1;
-    v3 label_color2;
-    
-    // NOTE(fakhri): button colors
-    v3 button_text_color;
-    v3 button_text_active_color1;
-    v3 button_text_active_color2;
-    v3 button_text_clicked_color;
-    v3 button_text_shadow_color;
-    
-    // NOTE(fakhri): input field color
-    v3 input_field_background_color;
-    v3 input_field_text_color;
-    
-    v3 input_field_background_active_color;
-    v3 input_field_text_active_color;
+    GameMenuKind_None,
+    GameMenuKind_Main,
+    GameMenuKind_JoinGame,
+    GameMenuKind_Count,
 };
 
-#define SERVER_ADDRESS_BUFFER_SIZE (16 * sizeof(char))
-#define USERNAME_BUFFER_SIZE (16 * sizeof(char))
-
-struct UI_Context
+struct Game_Menu
 {
-    Render_Context    *render_context;
+    b32 accept_input;
+    f32 presence;
+    f32 presence_change_speed;
+};
+
+struct Game_UI
+{
+    Render_Context *render_context;
     struct Controller *controller;
+    Font_Kind active_font;
+    Coordinate_Type active_coordinates;
     
-    i32 pressed_item;
-    i32 items_count;
+    u32 active_widget;
+    u32 hot_widget;
     
-    f32 last_select_time;
+    f32 active_transition;
+    f32 active_transition_speed;
     
-    UI_ColorScheme color_scheme;
+    f32 hot_transition;
+    f32 hot_transition_speed;
+    
+    u32 current_widget;
+    u32 widgets_count;
+    
+    Game_Menu menus[GameMenuKind_Count];
+    GameMenuKind active_menu;
+    GameMenuKind current_menu;
+    
 };
 
 #endif //GAME_UI_H

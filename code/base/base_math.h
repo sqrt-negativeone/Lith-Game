@@ -2813,12 +2813,22 @@ Vec3MoveTowards(v3 start, v3 end, v3 amount)
 }
 
 inline v3
-LerpVec3(v3 start, v3 time, v3 end)
+Vec3MoveTowards(v3 start, v3 end, f32 amount)
 {
     v3 result;
-    result.x = Lerp(start.x, time.x, end.x);
-    result.y = Lerp(start.y, time.y, end.y);
-    result.x = Lerp(start.z, time.z, end.z);
+    result.x = MoveTowards(start.x, end.x, amount);
+    result.y = MoveTowards(start.y, end.y, amount);
+    result.z = MoveTowards(start.z, end.z, amount);
+    return result;
+}
+
+inline v3
+LerpVec3(v3 start, f32 time, v3 end)
+{
+    v3 result;
+    result.x = Lerp(start.x, time, end.x);
+    result.y = Lerp(start.y, time, end.y);
+    result.x = Lerp(start.z, time, end.z);
     return result;
 }
 

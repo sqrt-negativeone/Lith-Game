@@ -18,6 +18,7 @@ typedef b32      OS_SaveToFile_Function(String8, String8List);
 typedef b32      OS_AppendToFile_Function(String8, String8List);
 typedef void     OS_DeleteFile_Function(String8);
 typedef b32      OS_MakeDirectory_Function(String8);
+
 // NOTE(fakhri): network functions
 typedef b32      OS_IsHostMessageQueueEmpty_Function(void);
 typedef Message *OS_BeginHostMessageQueueRead_Function(void);

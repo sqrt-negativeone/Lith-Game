@@ -25,6 +25,7 @@ struct Controller
     
 };
 
+#if 0
 enum Game_Mode
 {
     GameMode_GAME,
@@ -38,8 +39,8 @@ enum Game_Mode
     GameMode_MENU_HOST_GAME,
     GameMode_MENU_WAITING_PLAYERS,
     GameMode_MENU_END,
-    
 };
+#endif
 
 typedef u32 GameStateFlags;
 enum
@@ -86,10 +87,9 @@ struct Player
 
 struct Game_State
 {
-    Game_Mode game_mode;
+    Game_UI ui;
     GameStateFlags flags;
     Render_Context render_context;
-    UI_Context ui_context;
     Player players[MAX_PLAYER_COUNT];
     u32 players_joined_so_far;
     PlayerID prev_player_id;

@@ -658,7 +658,6 @@ AddDebugEntites(Game_State *game_state)
     AddCursorEntity(game_state);
     AddArrowEntity(game_state);
     
-    game_state->game_mode = GameMode_GAME;
     SetFlag(game_state->flags, StateFlag_ReceivedCards);
     
 #if TEST_ONE_CARD

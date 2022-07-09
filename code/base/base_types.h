@@ -174,9 +174,12 @@ typedef HANDLE Semaphore_Handle;
 typedef HANDLE Mutex_Handle;
 typedef HANDLE Thread_Handle;
 typedef SOCKET Socket_Handle;
+#define AtomicCompareAndExchange _InterlockedCompareExchange
 #else
-#error Provide platform handles equivalents
+#error provide os specific equivalents
 #endif
+
+
 
 ////////////////////////////////
 //~ rjf: Limits

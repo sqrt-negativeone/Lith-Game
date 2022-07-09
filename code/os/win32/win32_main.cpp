@@ -252,6 +252,7 @@ W32_WorkerThreadMain(LPVOID param)
         }
     }
 }
+
 int
 WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_show_cmd)
 {
@@ -370,7 +371,6 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
              thread_index < work_threads_count;
              ++thread_index)
         {
-            
             Thread_Handle handle = CreateThread(0, 0, W32_WorkerThreadMain, &w32_work_queue, 0, 0);
             CloseHandle(handle);
         }

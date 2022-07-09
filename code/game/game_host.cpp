@@ -146,7 +146,7 @@ GameHost_GetPlayerUsernameWork(void *data)
     // NOTE(fakhri): try to increment the compeleted usernames count
     u64 old_count = input->host_context->completed_username_work;
     volatile u64 *destination = (volatile u64*)&input->host_context->completed_username_work;
-    while(InterlockedCompareExchange(destination, old_count + 1, old_count) != old_count);
+    while(AtomicCompareAndExchange(destination, old_count + 1, old_count) != old_count);
 }
 
 
@@ -165,9 +165,6 @@ GameHostWork(void *data)
     
     for(;;)
     {
-        // TODO(fakhri): wait for the main thread to tell us to start the server
-        // TODO(fakhri): use thw thread workers to launch this routine when 
-        // we want to host a game 
         Socket_Handle host_socket = os->OpenListenSocket(HOST_PORT);
         if(host_socket == InvalidSocket)
         {
@@ -240,6 +237,7 @@ GameHostWork(void *data)
         CardResidency *deck_residency = host_context.residencies + CardResidencyKind_Deck;
         Game_Step step = GameStep_ShuffleDeck;
         b32 stop = false;
+        
         // TODO(fakhri): handle when a player disconnect
         while(!stop)
         {
