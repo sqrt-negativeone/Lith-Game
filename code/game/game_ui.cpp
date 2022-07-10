@@ -335,3 +335,15 @@ UI_OpenMenu(Game_UI *ui, GameMenuKind menu_kind)
     }
     
 }
+
+internal b32
+UI_MenuSection(Game_UI *ui, GameMenuKind menu_kind, f32 dt)
+{
+    ui->current_menu = menu_kind;
+    Game_Menu *menu = ui->menus + menu_kind;
+    menu->presence += menu->presence_change_speed * dt;
+    menu->presence = Clamp(0.0f, menu->presence, 1.0f);
+    
+    b32 result = ((ui->active_menu == menu_kind) || (menu->presence > 0));
+    return result;
+}

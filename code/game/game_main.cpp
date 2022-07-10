@@ -213,8 +213,12 @@ StartGame(Game_State *game_state)
     glDepthFunc(GL_LESS);
 }
 
-#define UI_MenuSection(ui, menu_kind)                                            \
-if ((!!(ui->current_menu = menu_kind) || true) && ((ui)->active_menu == (menu_kind) || (ui)->menus[(menu_kind)].presence > 0))
+#define UI_MenuSectionBegin(ui, menu_kind)          \
+{                                                 \
+Game_Menu *menu = (ui)->menus + (menu_kind);    \
+if (UI_MenuSection(ui, menu_kind, dt))
+#define UI_MenuSectionEnd()                         \
+}
 
 internal void
 GameMenu(Game_State *game_state, f32 dt)
@@ -223,12 +227,8 @@ GameMenu(Game_State *game_state, f32 dt)
     UI_Begin(ui);
     // NOTE(fakhri): main menu
     
-    UI_MenuSection(ui, GameMenuKind_Main)
+    UI_MenuSectionBegin(ui, GameMenuKind_Main)
     {
-        Game_Menu *menu = ui->menus + ui->current_menu;
-        menu->presence += menu->presence_change_speed * dt;
-        menu->presence = Clamp(0.0f, menu->presence, 1.0f);
-        
         f32 fade_in = menu->presence;
         f32 x = 0.5f * game_state->render_context.screen.width;
         f32 y = 0.2f * game_state->render_context.screen.height;
@@ -255,15 +255,12 @@ GameMenu(Game_State *game_state, f32 dt)
             os->quit = 1;
         }
     }
+    UI_MenuSectionEnd();
     
     
-    UI_MenuSection(ui, GameMenuKind_JoinGame)
+    UI_MenuSectionBegin(ui, GameMenuKind_JoinGame)
     {
-        Game_Menu *menu = ui->menus + ui->current_menu;
-        menu->presence += menu->presence_change_speed * dt;
-        menu->presence = Clamp(0.0f, menu->presence, 1.0f);
         f32 fade_in = menu->presence;
-        
         f32 x = 0.5f * game_state->render_context.screen.width;
         f32 y = 0.2f * game_state->render_context.screen.height;
         ChangeActiveCoordinates(ui, CoordinateType_Screen);
@@ -293,11 +290,10 @@ GameMenu(Game_State *game_state, f32 dt)
             UI_OpenMenu(ui, GameMenuKind_Main);
         }
     }
+    UI_MenuSectionEnd();
     
-    
-    UI_MenuSection(ui, GameMenuKind_HostGame)
+    UI_MenuSectionBegin(ui, GameMenuKind_HostGame)
     {
-        Game_Menu *menu = ui->menus + ui->current_menu;
         menu->presence += menu->presence_change_speed * dt;
         menu->presence = Clamp(0.0f, menu->presence, 1.0f);
         f32 fade_in = menu->presence;
@@ -332,6 +328,7 @@ GameMenu(Game_State *game_state, f32 dt)
             UI_OpenMenu(ui, GameMenuKind_Main);
         }
     }
+    UI_MenuSectionEnd();
     
     if (HasFlag(game_state->flags, StateFlag_TryingJoinGame))
     {
