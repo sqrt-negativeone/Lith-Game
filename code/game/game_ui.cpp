@@ -214,7 +214,7 @@ internal void
 UI_InputField(Game_UI *ui, Game_UI_InputFieldKind input_field_kind, f32 x, f32 y, f32 dt, f32 fade_in = 1.0f, b32 accept_input = true)
 {
     Game_UI_InputField *input_field = ui->input_fields + input_field_kind;
-    //input_field->cursor_x_offset_speed = 300.0f;
+    b32 is_pressed = 0;
     v4 background_color = Vec4(0.3f, 0.3f, 0.3f, fade_in);
     v4 hover_color = Vec4(0.2f, 0.5f, 0.5f, fade_in);
     v4 text_color  = Vec4(1.0f, 1.0f, 1.0f, fade_in);
@@ -253,6 +253,39 @@ UI_InputField(Game_UI *ui, Game_UI_InputFieldKind input_field_kind, f32 x, f32 y
             }
             ui->active_transition = ClampTop(ui->active_transition, 1.0f);
             
+            
+            if (ui->controller->left_mouse.pressed)
+            {
+                ui->hot_widget = widget_id;
+                ui->hot_transition = 0.0f;
+                ui->hot_transition_speed = 10.0f;
+                is_pressed = 1;
+            }
+            
+            if (ui->hot_widget == widget_id)
+            {
+                ui->hot_transition += ui->hot_transition_speed * dt;
+                
+                if (ui->hot_transition > 1.0f)
+                {
+                    ui->hot_transition = 1.0f;
+                    ui->hot_transition_speed *= -1;
+                }
+                
+                if (ui->hot_transition < 0)
+                {
+                    ui->hot_widget = 0;
+                    ui->hot_transition = 0;
+                }
+            }
+        }
+        else
+        {
+            if (ui->hot_widget == widget_id)
+            {
+                ui->hot_widget = 0;
+                ui->hot_transition = 0;
+            }
         }
     }
     
@@ -261,7 +294,7 @@ UI_InputField(Game_UI *ui, Game_UI_InputFieldKind input_field_kind, f32 x, f32 y
         background_color = ((1.0f - ui->active_transition) * background_color + 
                             ui->active_transition * Vec4(0.6f, 0.6f, 0.6f, fade_in));
         
-        // NOTE(fakhri): handle input
+        // NOTE(fakhri): handle input events
         {
             OS_Event *event = os->events.first;
             while(event)
@@ -294,20 +327,57 @@ UI_InputField(Game_UI *ui, Game_UI_InputFieldKind input_field_kind, f32 x, f32 y
             }
         }
         
-        v2 cursor_size = Vec2(MiliMeter(2), PixelsToMeter(ui->render_context, 0.95f * height));
+        // NOTE(fakhri): hot effect
+        if (ui->hot_widget == widget_id)
+        {
+            size_in_meters.height *= (1.0f - 0.05f * ui->hot_transition);
+        }
         
-        f32 t = Square(SinF(4.0f * os->time.wall_time));
-        v3 cursor_color1 = background_color.xyz;
-        v3 cursor_color2 = 2 * Vec3(0.1f, 0.1f, 0.1f);
-        v3 cursor_color = (1 - t) * cursor_color1 + t * cursor_color2;
-        v3 cursor_position = input_field_position; 
+        if (is_pressed)
+        {
+            
+            Render_PushText(ui->render_context, Str8Lit("Pressed"), text_position, text_color, ui->active_coordinates, ui->active_font);
+            
+            // NOTE(fakhri): move the cursor to where it should be
+            f32 mouse_offset = os->mouse_position.x - input_field_position.x;
+            String8 text = Str8(input_field->buffer, input_field->size);
+            f32 text_width = GetFontWidth(ui->render_context, ui->active_font, text);
+            f32 offset = -0.5f * text_width;
+            u32 index = 0;
+            for (;
+                 index < text.size;
+                 ++index)
+            {
+                f32 old_offset = offset;
+                offset += GetCharacterAdvance(ui->render_context, ui->active_font, text.str[index]);
+                if (offset > mouse_offset)
+                {
+                    offset = old_offset;
+                    break;
+                }
+            }
+            
+            input_field->cursor_index = index;
+            input_field->cursor_target_x_offset = offset;
+        }
         
-        SpringMoveTowards(&input_field->cursor_x_offset, input_field->cursor_target_x_offset,
-                          &input_field->cursor_x_offset_speed, 200, 10, 0.5f, dt);
-        
-        cursor_position.x += input_field->cursor_x_offset;
-        cursor_position.z += MiliMeter(1);
-        Render_PushQuad(ui->render_context, cursor_position, cursor_size, Vec4(cursor_color, fade_in), ui->active_coordinates);
+        // NOTE(fakhri): render the cursor
+        {
+            v2 cursor_size = Vec2(MiliMeter(2), PixelsToMeter(ui->render_context, 0.95f * height));
+            
+            f32 t = Square(SinF(4.0f * os->time.wall_time));
+            v3 cursor_color1 = background_color.xyz;
+            v3 cursor_color2 = 2 * Vec3(0.1f, 0.1f, 0.1f);
+            v3 cursor_color = (1 - t) * cursor_color1 + t * cursor_color2;
+            v3 cursor_position = input_field_position; 
+            
+            SpringMoveTowards(&input_field->cursor_x_offset, input_field->cursor_target_x_offset,
+                              &input_field->cursor_x_offset_speed, 200, 10, 0.5f, dt);
+            
+            cursor_position.x += input_field->cursor_x_offset;
+            cursor_position.z += MiliMeter(1);
+            Render_PushQuad(ui->render_context, cursor_position, cursor_size, Vec4(cursor_color, fade_in), ui->active_coordinates);
+        }
         
     }
     
