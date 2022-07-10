@@ -19,6 +19,26 @@ struct Game_Menu
     f32 presence_change_speed;
 };
 
+enum Game_UI_InputFieldKind
+{
+    InputFieldKind_HostSessionName,
+    InputFieldKind_JoinSessionName,
+    InputFieldKind_Count,
+};
+
+
+struct Game_UI_InputField
+{
+    u8 buffer[20];
+    u32 size;
+    
+    f32 cursor_x_offset;
+    f32 cursor_target_x_offset;
+    f32 cursor_x_offset_speed;
+    
+    u32 cursor_index;
+};
+
 struct Game_UI
 {
     Render_Context *render_context;
@@ -41,6 +61,7 @@ struct Game_UI
     GameMenuKind active_menu;
     GameMenuKind current_menu;
     
+    Game_UI_InputField input_fields[InputFieldKind_Count];
 };
 
 #endif //GAME_UI_H

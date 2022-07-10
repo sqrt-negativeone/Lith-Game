@@ -2832,4 +2832,14 @@ LerpVec3(v3 start, f32 time, v3 end)
     return result;
 }
 
+
+internal inline void
+SpringMoveTowards(f32 *pos, f32 target_pos, f32 *speed, f32 spring_constant, f32 friction, f32 mass, f32 dt)
+{
+    f32 acceleration = -spring_constant * (*pos - target_pos) - friction * (*speed);
+    acceleration *= 1.0f / mass;
+    *speed += dt * acceleration;
+    *pos += dt * (*speed) + 0.5f * Square(dt) * acceleration;
+}
+
 #endif //BASE_MATH_H

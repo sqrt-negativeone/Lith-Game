@@ -35,8 +35,14 @@ ChangeActiveCoordinates(Game_UI *ui, Coordinate_Type new_coordinates)
 internal f32
 VerticalAdvanceFontHeight(Game_UI *ui)
 {
-    
     f32 result = 1.4f * GetFontHeight(ui->render_context, ui->active_font);
+    return result;
+}
+
+internal u32
+GetCurrentWidgetID(Game_UI *ui)
+{
+    u32 result = ++ui->current_widget;
     return result;
 }
 
@@ -48,17 +54,12 @@ UI_Label(Game_UI *ui, f32 x, f32 y, String8 label_text, v4 text_color, f32 fade_
     Render_PushText(ui->render_context, label_text, label_position, text_color, ui->active_coordinates, ui->active_font);
 }
 
-internal u32
-GetCurrentWidgetID(Game_UI *ui)
-{
-    u32 result = ++ui->current_widget;
-    return result;
-}
-
 internal b32
-UI_Button(Game_UI *ui, f32 x, f32 y, String8 button_text, v4 text_color, v4 hover_color, f32 dt, f32 fade_in = 1.0f, b32 accept_input = true)
+UI_Button(Game_UI *ui, f32 x, f32 y, String8 button_text, f32 dt, f32 fade_in = 1.0f, b32 accept_input = true)
 {
-    u32 widget_id = GetCurrentWidgetID(ui);
+    v4 hover_color = Vec4(0.2f,0.5f,0.5f,1.0f);
+    v4 text_color  = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    u32 widget_id  = GetCurrentWidgetID(ui);
     
     b32 is_pressed = 0;
     f32 horizontal_padding = 0.1f;
@@ -86,11 +87,7 @@ UI_Button(Game_UI *ui, f32 x, f32 y, String8 button_text, v4 text_color, v4 hove
             }
             
             ui->active_transition += ui->active_transition_speed * dt;
-            if (ui->active_transition > 1.0f)
-            {
-                ui->active_transition = 1.0f;
-            }
-            
+            ui->active_transition = ClampTop(ui->active_transition, 1.0f);
             v4 background_color = hover_color;
             v2 background_size_in_meters = size_in_meters;
             
@@ -110,7 +107,6 @@ UI_Button(Game_UI *ui, f32 x, f32 y, String8 button_text, v4 text_color, v4 hove
                 if (ui->controller->left_mouse.released)
                 {
                     ui->hot_transition_speed *= -3;
-                    
                 }
                 
                 if (ui->hot_transition > 1.0f)
@@ -153,6 +149,172 @@ UI_Button(Game_UI *ui, f32 x, f32 y, String8 button_text, v4 text_color, v4 hove
     Render_PushText(ui->render_context, button_text,  text_position, text_color, ui->active_coordinates, ui->active_font);
     
     return is_pressed;
+}
+
+
+internal void
+InputField_AddCharacter(Game_UI *ui, Game_UI_InputField *input_field, u8 character)
+{
+    if (input_field->size < ArrayCount(input_field->buffer))
+    {
+        for (u32 index = input_field->size;
+             index > input_field->cursor_index;
+             --index)
+        {
+            input_field->buffer[index] = input_field->buffer[index - 1];
+        }
+        input_field->buffer[input_field->cursor_index] = character;
+        ++input_field->size;
+        ++input_field->cursor_index;
+        input_field->cursor_target_x_offset += 0.5f * GetCharacterAdvance(ui->render_context, ui->active_font, character);
+    }
+}
+
+internal void
+InputField_DeleteCharacterAtCursor(Game_UI *ui, Game_UI_InputField *input_field)
+{
+    if (input_field->size > 0 && input_field->cursor_index > 0)
+    {
+        u8 character = input_field->buffer[input_field->cursor_index - 1];
+        for (u32 index = input_field->cursor_index - 1;
+             index < input_field->size - 1;
+             ++index)
+        {
+            input_field->buffer[index] = input_field->buffer[index + 1];
+        }
+        --input_field->size;
+        --input_field->cursor_index;
+        input_field->cursor_target_x_offset -= 0.5f * GetCharacterAdvance(ui->render_context, ui->active_font, character);
+    }
+}
+
+internal void
+InputField_MoveLeft(Game_UI *ui, Game_UI_InputField *input_field)
+{
+    if (input_field->cursor_index > 0)
+    {
+        u8 character = input_field->buffer[input_field->cursor_index - 1];
+        --input_field->cursor_index;
+        input_field->cursor_target_x_offset -= GetCharacterAdvance(ui->render_context, ui->active_font, character);
+    }
+}
+
+internal void
+InputField_MoveRight(Game_UI *ui, Game_UI_InputField *input_field)
+{
+    if (input_field->cursor_index < input_field->size)
+    {
+        u8 character = input_field->buffer[input_field->cursor_index];
+        ++input_field->cursor_index;
+        input_field->cursor_target_x_offset += GetCharacterAdvance(ui->render_context, ui->active_font, character);
+    }
+}
+
+internal void
+UI_InputField(Game_UI *ui, Game_UI_InputFieldKind input_field_kind, f32 x, f32 y, f32 dt, f32 fade_in = 1.0f, b32 accept_input = true)
+{
+    Game_UI_InputField *input_field = ui->input_fields + input_field_kind;
+    //input_field->cursor_x_offset_speed = 300.0f;
+    v4 background_color = Vec4(0.3f, 0.3f, 0.3f, fade_in);
+    v4 hover_color = Vec4(0.2f, 0.5f, 0.5f, fade_in);
+    v4 text_color  = Vec4(1.0f, 1.0f, 1.0f, fade_in);
+    
+    u32 widget_id  = GetCurrentWidgetID(ui);
+    
+    f32 horizontal_padding = 0.1f;
+    f32 vertical_padding   = 0.1f;
+    
+    f32 width  = (1.0f + horizontal_padding) * 
+        GetFontMaxWidth(ui->render_context, ui->active_font, ArrayCount(input_field->buffer));
+    f32 height = (1.0f + vertical_padding) * 
+        GetFontHeight(ui->render_context, ui->active_font);
+    
+    v3 text_position = Vec3(x, y, Meter(1));
+    v3 input_field_position = Vec3(x, y - 0.25f * height, Meter(1));
+    v2 size = Vec2(width, height);
+    v2 size_in_meters = SizeFromScreenCoordsToWorldCoords(ui->render_context, size); 
+    
+    if (accept_input)
+    {
+        if (IsInsideRect(RectCentDim(input_field_position.xy, size),
+                         os->mouse_position))
+        {
+            if (ui->active_widget != widget_id)
+            {
+                ui->active_widget = widget_id;
+                ui->active_transition = 0.0f;
+                ui->active_transition_speed = 5.0f;
+            }
+            
+            ui->active_transition += ui->active_transition_speed * dt;
+            if (ui->active_transition > 1.0f)
+            {
+                ui->active_transition = 1.0f;
+            }
+            ui->active_transition = ClampTop(ui->active_transition, 1.0f);
+            
+        }
+    }
+    
+    if (ui->active_widget == widget_id)
+    {
+        background_color = ((1.0f - ui->active_transition) * background_color + 
+                            ui->active_transition * Vec4(0.6f, 0.6f, 0.6f, fade_in));
+        
+        // NOTE(fakhri): handle input
+        {
+            OS_Event *event = os->events.first;
+            while(event)
+            {
+                switch(event->kind)
+                {
+                    case OS_EventKind_Text:
+                    {
+                        InputField_AddCharacter(ui, input_field, (u8)event->character);
+                    } break;
+                    case OS_EventKind_Press:
+                    {
+                        if (event->key == OS_Key_Backspace)
+                        {
+                            InputField_DeleteCharacterAtCursor(ui, input_field);
+                        }
+                        else if (event->key == OS_Key_Left)
+                        {
+                            InputField_MoveLeft(ui, input_field);
+                        }
+                        else if (event->key == OS_Key_Right)
+                        {
+                            InputField_MoveRight(ui, input_field);
+                        }
+                    } break;
+                    
+                    default: break;
+                }
+                event = event->next;
+            }
+        }
+        
+        v2 cursor_size = Vec2(MiliMeter(2), PixelsToMeter(ui->render_context, 0.95f * height));
+        
+        f32 t = Square(SinF(4.0f * os->time.wall_time));
+        v3 cursor_color1 = background_color.xyz;
+        v3 cursor_color2 = 2 * Vec3(0.1f, 0.1f, 0.1f);
+        v3 cursor_color = (1 - t) * cursor_color1 + t * cursor_color2;
+        v3 cursor_position = input_field_position; 
+        
+        SpringMoveTowards(&input_field->cursor_x_offset, input_field->cursor_target_x_offset,
+                          &input_field->cursor_x_offset_speed, 200, 10, 0.5f, dt);
+        
+        cursor_position.x += input_field->cursor_x_offset;
+        cursor_position.z += MiliMeter(1);
+        Render_PushQuad(ui->render_context, cursor_position, cursor_size, Vec4(cursor_color, fade_in), ui->active_coordinates);
+        
+    }
+    
+    Render_PushQuad(ui->render_context, input_field_position, size_in_meters, background_color, ui->active_coordinates);
+    
+    Render_PushText(ui->render_context, Str8(input_field->buffer, input_field->size), text_position, text_color, ui->active_coordinates, ui->active_font);
+    
 }
 
 internal void

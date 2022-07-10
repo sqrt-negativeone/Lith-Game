@@ -52,11 +52,20 @@ WorldCoordsFromScreenCoords(Render_Context *render_context, v2 screen_coords)
     return result;
 }
 
+internal f32
+PixelsToMeter(Render_Context *render_context, f32 pixels)
+{
+    f32 meter_per_pixel = 1.0f / render_context->pixels_per_meter;
+    f32 result = meter_per_pixel * pixels;
+    return result;
+}
+
 internal v2
 SizeFromScreenCoordsToWorldCoords(Render_Context *render_context, v2 size)
 {
-    f32 meter_per_pixel = 1.0f / render_context->pixels_per_meter;
-    v2 result = meter_per_pixel * size;
+    v2 result;
+    result.x = PixelsToMeter(render_context, size.x);
+    result.y = PixelsToMeter(render_context, size.y);
     return result;
 }
 

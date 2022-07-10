@@ -230,8 +230,6 @@ GameMenu(Game_State *game_state, f32 dt)
         menu->presence = Clamp(0.0f, menu->presence, 1.0f);
         
         f32 fade_in = menu->presence;
-        v4 hover_colore = Vec4(0.2f,0.5f,0.5f,1.0f);
-        v4 text_color = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
         f32 x = 0.5f * game_state->render_context.screen.width;
         f32 y = 0.2f * game_state->render_context.screen.height;
         ChangeActiveCoordinates(ui, CoordinateType_Screen);
@@ -240,19 +238,19 @@ GameMenu(Game_State *game_state, f32 dt)
         
         ChangeActiveFont(ui, FontKind_MenuItem);
         y = 0.5f * game_state->render_context.screen.y;
-        if (UI_Button(ui, x, y, Str8Lit("Join Game"), text_color, hover_colore, dt, fade_in))
+        if (UI_Button(ui, x, y, Str8Lit("Join Game"), dt, fade_in))
         {
             UI_OpenMenu(ui, GameMenuKind_JoinGame);
         }
         
         y += VerticalAdvanceFontHeight(ui);
-        if (UI_Button(ui, x, y, Str8Lit("Host Game"), text_color, hover_colore, dt, fade_in))
+        if (UI_Button(ui, x, y, Str8Lit("Host Game"), dt, fade_in))
         {
             UI_OpenMenu(ui, GameMenuKind_HostGame);
         }
         
         y += VerticalAdvanceFontHeight(ui);
-        if (UI_Button(ui, x, y, Str8Lit("Exit"), text_color, hover_colore, dt, fade_in))
+        if (UI_Button(ui, x, y, Str8Lit("Exit"), dt, fade_in))
         {
             os->quit = 1;
         }
@@ -266,9 +264,6 @@ GameMenu(Game_State *game_state, f32 dt)
         menu->presence = Clamp(0.0f, menu->presence, 1.0f);
         f32 fade_in = menu->presence;
         
-        v4 hover_colore = Vec4(0.2f,0.5f,0.5f,1.0f);
-        v4 text_color = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        
         f32 x = 0.5f * game_state->render_context.screen.width;
         f32 y = 0.2f * game_state->render_context.screen.height;
         ChangeActiveCoordinates(ui, CoordinateType_Screen);
@@ -276,15 +271,24 @@ GameMenu(Game_State *game_state, f32 dt)
         UI_Label(ui, x, y, Str8Lit("Join Game"), Vec4(1.0f, 1.0f, 1.0f, 1.0f), fade_in);
         
         ChangeActiveFont(ui, FontKind_MenuItem);
-        y = 0.5f * game_state->render_context.screen.y;
+        y = 0.4f * game_state->render_context.screen.y;
+        UI_Label(ui, x, y, Str8Lit("Session Name:"), Vec4(0.8f, 0.8f, 0.8f, 1.0f), fade_in);
+        y += VerticalAdvanceFontHeight(ui);
         
-        if (UI_Button(ui, x, y, Str8Lit("Join"), text_color, hover_colore, dt, fade_in))
+        ChangeActiveFont(ui, FontKind_InputField);
+        UI_InputField(ui, InputFieldKind_JoinSessionName, x, y, dt, fade_in);
+        
+        y += 1.5f * VerticalAdvanceFontHeight(ui);
+        
+        ChangeActiveFont(ui, FontKind_MenuItem);
+        
+        if (UI_Button(ui, x, y, Str8Lit("Join"), dt, fade_in))
         {
-            
+            // TODO(fakhri): handle join button click
         }
         
         y += VerticalAdvanceFontHeight(ui);
-        if (UI_Button(ui, x, y, Str8Lit("Back"), text_color, hover_colore, dt, fade_in))
+        if (UI_Button(ui, x, y, Str8Lit("Back"), dt, fade_in))
         {
             UI_OpenMenu(ui, GameMenuKind_Main);
         }
@@ -298,25 +302,32 @@ GameMenu(Game_State *game_state, f32 dt)
         menu->presence = Clamp(0.0f, menu->presence, 1.0f);
         f32 fade_in = menu->presence;
         
-        v4 hover_colore = Vec4(0.2f,0.5f,0.5f,1.0f);
-        v4 text_color = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        
         f32 x = 0.5f * game_state->render_context.screen.width;
         f32 y = 0.2f * game_state->render_context.screen.height;
         ChangeActiveCoordinates(ui, CoordinateType_Screen);
         ChangeActiveFont(ui, FontKind_MenuTitle);
         UI_Label(ui, x, y, Str8Lit("Host Game"), Vec4(1.0f, 1.0f, 1.0f, 1.0f), fade_in);
         
+        
         ChangeActiveFont(ui, FontKind_MenuItem);
-        y = 0.5f * game_state->render_context.screen.y;
-        
-        if (UI_Button(ui, x, y, Str8Lit("Host"), text_color, hover_colore, dt, fade_in))
-        {
-            
-        }
-        
+        y = 0.4f * game_state->render_context.screen.y;
+        UI_Label(ui, x, y, Str8Lit("Give a Session Name:"), Vec4(0.8f, 0.8f, 0.8f, 1.0f), fade_in);
         y += VerticalAdvanceFontHeight(ui);
-        if (UI_Button(ui, x, y, Str8Lit("Back"), text_color, hover_colore, dt, fade_in))
+        
+        ChangeActiveFont(ui, FontKind_InputField);
+        UI_InputField(ui, InputFieldKind_HostSessionName, x, y, dt, fade_in);
+        
+        y += 1.5f * VerticalAdvanceFontHeight(ui);
+        
+        ChangeActiveFont(ui, FontKind_MenuItem);
+        
+        if (UI_Button(ui, x, y, Str8Lit("Host"), dt, fade_in))
+        {
+            // TODO(fakhri): handle host button click
+        }
+        y += VerticalAdvanceFontHeight(ui);
+        
+        if (UI_Button(ui, x, y, Str8Lit("Back"), dt, fade_in))
         {
             UI_OpenMenu(ui, GameMenuKind_Main);
         }

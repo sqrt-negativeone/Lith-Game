@@ -11,6 +11,7 @@ enum
     FontKind_GameTitle,
     FontKind_MenuTitle,
     FontKind_MenuItem,
+    FontKind_InputField,
     
     FontKind_Count,
 };
@@ -35,6 +36,7 @@ struct Font
     F32 ascent;
     F32 descent;
     Texture2D texture;
+    f32 max_advance;
 };
 
 #endif //GAME_FONTS_H

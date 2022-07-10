@@ -14,6 +14,7 @@ LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
     if (font_kind == FontKind_None) return;
     Assert(font_kind < FontKind_Count);
     Font *font = render_context->fonts + font_kind;
+    MemoryZeroStruct(font);
     FontInfo font_info = {};
     switch(font_kind)
     {
@@ -35,6 +36,11 @@ LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
         case FontKind_MenuItem:
         {
             font_info.path = Str8LitComp("data/fonts/BubbleboddyNeue.ttf");
+            font_info.scale = 50.f;
+        } break;
+        case FontKind_InputField:
+        {
+            font_info.path = Str8LitComp("data/fonts/ariblk.ttf");
             font_info.scale = 50.f;
         } break;
         default: NotImplemented; break;
@@ -96,6 +102,10 @@ LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
         glyph->size = HadamardMultiplyVec2(RectDim(src_px),
                                            Vec2(1.f / oversample.x, 1.f / oversample.y));
         glyph->advance = x_offset;
+        if (font->max_advance < glyph->advance)
+        {
+            font->max_advance = glyph->advance;
+        }
     }
     
     
@@ -121,6 +131,16 @@ GetFontOrActiveIfNone(Render_Context *render_context, Font_Kind font_kind)
     Assert(font_kind > FontKind_None && font_kind < FontKind_Count);
     Font *font = render_context->fonts + font_kind;
     return font;
+}
+
+internal f32
+GetFontMaxWidth(Render_Context *render_context, Font_Kind font_kind, u32 characters_count)
+{
+    f32 text_width = 0;
+    
+    Font *font = GetFontOrActiveIfNone(render_context, font_kind);
+    text_width = font->max_advance * characters_count;
+    return text_width;
 }
 
 internal f32
@@ -155,4 +175,12 @@ ChangeActiveFont(Render_Context *render_context, Font_Kind font_kind)
 {
     Assert(font_kind < FontKind_Count);
     render_context->active_font = font_kind;
+}
+
+internal f32
+GetCharacterAdvance(Render_Context *render_context, Font_Kind font_kind, u8 character)
+{
+    Font *font = GetFontOrActiveIfNone(render_context, font_kind);
+    f32 result = font->map[character - font->map_first].advance;
+    return result;
 }
