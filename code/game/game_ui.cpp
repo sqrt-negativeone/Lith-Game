@@ -348,11 +348,19 @@ UI_InputField(Game_UI *ui, Game_UI_InputFieldKind input_field_kind, f32 x, f32 y
                  index < text.size;
                  ++index)
             {
-                f32 old_offset = offset;
+                f32 prev_offset = offset;
                 offset += GetCharacterAdvance(ui->render_context, ui->active_font, text.str[index]);
                 if (offset > mouse_offset)
                 {
-                    offset = old_offset;
+                    f32 half_offset = 0.5f * (offset + prev_offset);
+                    if (mouse_offset > half_offset)
+                    {
+                        index = index + 1;
+                    }
+                    else
+                    {
+                        offset = prev_offset;
+                    }
                     break;
                 }
             }
