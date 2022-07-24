@@ -8,7 +8,11 @@ enum GameMenuKind
     GameMenuKind_None,
     GameMenuKind_Main,
     GameMenuKind_JoinGame,
+    GameMenuKind_JoinGameConfirmation,
     GameMenuKind_HostGame,
+    GameMenuKind_EnterUsername,
+    GameMenuKind_UsernameConfirmation,
+    GameMenuKind_JoinedPlayers,
     GameMenuKind_Count,
 };
 
@@ -22,7 +26,8 @@ struct Game_Menu
 enum Game_UI_InputFieldKind
 {
     InputFieldKind_HostSessionName,
-    InputFieldKind_JoinSessionName,
+    InputFieldKind_GameID,
+    InputFieldKind_PlayerUsername,
     InputFieldKind_Count,
 };
 

@@ -28,11 +28,9 @@ typedef u8 MessageType;
 enum
 {
     // NOTE(fakhri): player messages here
-    PlayerMessage_ConnectToHost,
+    PlayerMessage_JoinGameSession,
+    PlayerMessage_HostGameSession,
     PlayerMessage_Username,
-    PlayerMessage_FetchHosts,
-    PlayerMessage_StartHostServer,
-    PlayerMessage_StopHostServer,
     PlayerMessage_PlayCard,
     PlayerMessage_QuestionCredibility,
     
@@ -46,6 +44,12 @@ enum
     HostMessage_PlayerWon,
     HostMessage_PlayCard,
     HostMessage_QuestionCredibility,
+    
+    // NOTE(fakhri): other network messages
+    NetworkMessage_GameID,
+    NetworkMessage_FailedToHost,
+    NetworkMessage_JoinedGame,
+    NetworkMessage_FailtToJoin,
 };
 
 struct Hosts_Storage;
@@ -95,7 +99,15 @@ struct Message
         };
         PlayCardMove player_move;
         PlayerID next_player_id;
+        String8 game_id;
     };
 };
+
+
+internal void PushCreateConnectToServerMessage(String8 server_address);
+internal void PushUsernameNetworkMessage(String8 username);
+internal void PushPlayedCardNetworkMessage(struct Game_State *game_state);
+internal void PushQuestionCredibilityNetworkMessage();
+internal void PushHostGameSessionNetworkMessage(String8 session_name);
 
 #endif //NETWORK_MESSAGE_H

@@ -150,7 +150,7 @@ GameHost_GetPlayerUsernameWork(void *data)
 }
 
 
-void
+internal void
 GameHostWork(void *data)
 {
     Host_Context host_context = {};

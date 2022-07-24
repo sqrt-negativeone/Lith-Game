@@ -352,6 +352,7 @@ UI_InputField(Game_UI *ui, Game_UI_InputFieldKind input_field_kind, f32 x, f32 y
                 offset += GetCharacterAdvance(ui->render_context, ui->active_font, text.str[index]);
                 if (offset > mouse_offset)
                 {
+                    // NOTE(fakhri): we go to the nearest offset from where we clicked
                     f32 half_offset = 0.5f * (offset + prev_offset);
                     if (mouse_offset > half_offset)
                     {
@@ -402,16 +403,22 @@ UI_OpenMenu(Game_UI *ui, GameMenuKind menu_kind)
     {
         Game_Menu *menu = ui->menus + ui->active_menu;
         menu->accept_input = 0;
-        menu->presence_change_speed = -10.0f;
+        menu->presence_change_speed = -5.0f;
     }
     
     ui->active_menu = menu_kind;
     {
         Game_Menu *menu = ui->menus + ui->active_menu;
         menu->accept_input = 1;
-        menu->presence_change_speed = 10.0f;
+        menu->presence_change_speed = 5.0f;
     }
     
+}
+
+internal void
+UI_CloseMenu(Game_UI *ui)
+{
+    UI_OpenMenu(ui, GameMenuKind_None);
 }
 
 internal b32

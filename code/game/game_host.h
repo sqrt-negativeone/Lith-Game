@@ -3,6 +3,9 @@
 #ifndef GAME_HOST_H
 #define GAME_HOST_H
 
+#define LOBBY_HOST_PORT "1234"
+#define LOBBY_PLAYER_PORT "1235"
+
 #define HOST_PORT "23451"
 
 struct Compact_Card_Hand
@@ -67,6 +70,7 @@ struct Host_Context
     Card_Number declared_number;
 };
 
+internal void GameHostWork(void *data);
 internal void
 BroadcastShuffledDeckMessage(Host_Context *host_context)
 {

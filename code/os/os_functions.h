@@ -49,4 +49,7 @@ typedef b32               OS_PushWorkQueueEntrySP_Function(OS_WorkThreadWork *wo
 typedef b32               OS_PushWorkQueueEntry_Function(OS_WorkThreadWork *work, void *data);
 typedef b32               OS_IsWorkQueueEmpty_Function();
 
+//- NOTE(fakhri): clipboard functions
+typedef void              OS_CopyStringToClipboard_Function(String text);
+
 #endif //OS_FUNCTOINS_H

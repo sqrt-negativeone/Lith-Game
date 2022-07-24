@@ -1,16 +1,5 @@
 
 internal void
-PushCreateConnectToServerMessage(String8 server_address)
-{
-    Message *message = os->BeginPlayerMessageQueueWrite();
-    message->type = PlayerMessage_ConnectToHost;
-    Assert(server_address.size < ArrayCount(message->buffer));
-    MemoryCopy(message->buffer, server_address.str, server_address.size);
-    message->server_address = Str8(message->buffer, server_address.size);
-    os->EndPlayerMessageQueueWrite();
-}
-
-internal void
 PushUsernameNetworkMessage(String8 username)
 {
     Message *message = os->BeginPlayerMessageQueueWrite();
@@ -54,14 +43,21 @@ PushQuestionCredibilityNetworkMessage()
     os->EndPlayerMessageQueueWrite();
 }
 
-#if 0
-internal Message
-CreateFetchAvailableHostsMessage(Hosts_Storage *hosts_storage)
+internal void
+PushHostGameSessionNetworkMessage()
 {
-    Message result = {};
-    result.type = PlayerMessage_FetchHosts;
-    result.hosts_storage = hosts_storage;
-    return result;
+    Message *message = os->BeginPlayerMessageQueueWrite();
+    message->type = PlayerMessage_HostGameSession;
+    os->EndPlayerMessageQueueWrite();
 }
 
-#endif
+internal void
+PushJoinGameSessionNetworkMessage(String game_id)
+{
+    Message *message = os->BeginPlayerMessageQueueWrite();
+    message->type = PlayerMessage_JoinGameSession;
+    Assert(game_id.size < ArrayCount(message->buffer));
+    MemoryCopy(message->buffer, game_id.str, game_id.size);
+    message->game_id = Str8(message->buffer, game_id.size);
+    os->EndPlayerMessageQueueWrite();
+}

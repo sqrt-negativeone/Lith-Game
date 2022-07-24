@@ -1,37 +1,5 @@
 //#include "network_message.cpp"
 
-internal void
-FetchHostsFromLobby(Socket_Handle lobby_socket, Hosts_Storage *hosts_storage)
-{
-    if (!W32_ReceiveBuffer(lobby_socket, &hosts_storage->hosts_count, sizeof(hosts_storage->hosts_count)))
-    {
-        LogError("couldn't read stuff from lobby");
-        closesocket(lobby_socket);
-        return;
-    }
-    
-    hosts_storage->hosts_count = ntohl(hosts_storage->hosts_count);
-    if (hosts_storage->hosts_count > ArrayCount(hosts_storage->hosts))
-    {
-        hosts_storage->hosts_count = ArrayCount(hosts_storage->hosts);
-    }
-    
-    u32 host_index = 0;
-    while(host_index < hosts_storage->hosts_count)
-    {
-        Host_Info *host_info = hosts_storage->hosts + host_index;
-        if (ReceiveHostInfo(lobby_socket, host_info))
-        {
-            ++host_index;
-        }
-        else
-        {
-            --hosts_storage->hosts_count;
-        }
-    }
-    
-}
-
 struct Host_IO_Context
 {
     Socket_Handle host_socket;
@@ -65,40 +33,74 @@ ReceiveNextMessageType()
 }
 
 internal void
+ConnectToHost(char *host_address)
+{
+    host_io_context.host_socket = W32_ConnectToServer(host_address, HOST_PORT);
+    if(host_io_context.host_socket != InvalidSocket)
+    {
+        CreateIoCompletionPort((HANDLE)host_io_context.host_socket, network_thread_iocp_handle, NetworkMessageSource_Host, 1);
+        ReceiveNextMessageType();
+    }
+    else
+    {
+        // NOTE(fakhri): probably the host is full?
+    }
+}
+
+internal void
 HandlePlayerMessage(Message *message)
 {
+    char *lobby_address = "127.0.0.1";
     switch(message->type)
     {
-        case PlayerMessage_FetchHosts:
+        case PlayerMessage_HostGameSession:
         {
-            
-#if 0            
-            Log("fetching hosts from lobby");
-            Socket_Handle lobby_socket = ConnectToServer(LOBBY_ADDRESS, LOBBY_PLAYER_PORT);
-            if (lobby_socket == InvalidSocket)
+            // NOTE(fakhri): start the host
+            Socket_Handle LobbySocket = W32_ConnectToServer(lobby_address, LOBBY_HOST_PORT);
+            String8 GameID;
+            b32 good = false;
+            if (W32_ReceiveBuffer(LobbySocket, &GameID.size, sizeof(GameID.size)))
             {
-                int last_error = WSAGetLastError();
-                Assert(!"NetworkThread::COULDN'T REACH LOBBY");
+                M_Temp Scratch = GetScratch(0, 0);
+                GameID.str = PushArray(Scratch.arena, u8, GameID.size);
+                good = W32_ReceiveBuffer(LobbySocket, GameID.str, (i32)GameID.size);
+                if (good)
+                {
+                    Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
+                    message->type = NetworkMessage_GameID;
+                    Assert(GameID.size <= ArrayCount(message->buffer));
+                    MemoryCopy(message->buffer, GameID.str, GameID.size);
+                    message->game_id = Str8(message->buffer, GameID.size);
+                    W32_EndMessageQueueWrite(&network_message_queue);
+                    ConnectToHost("127.0.0.1");
+                    // TODO(fakhri): how to close connectoin with the lobby?
+                }
+                ReleaseScratch(Scratch);
             }
-            FetchHostsFromLobby(lobby_socket, message->hosts_storage);
-            MemoryBarrier();
-            message->hosts_storage->is_fetching = false;
-            CloseSocket(lobby_socket);
-#endif
+            if (!good)
+            {
+                Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
+                message->type = NetworkMessage_FailedToHost;
+                W32_EndMessageQueueWrite(&network_message_queue);
+            }
         } break;
-        case PlayerMessage_ConnectToHost:
+        case PlayerMessage_JoinGameSession:
         {
-            char *host_address = "127.0.0.1";
-            host_io_context.host_socket = W32_ConnectToServer(host_address, HOST_PORT);
-            if(host_io_context.host_socket != InvalidSocket)
-            {
-                CreateIoCompletionPort((HANDLE)host_io_context.host_socket, network_thread_iocp_handle, NetworkMessageSource_Host, 1);
-                ReceiveNextMessageType();
-            }
-            else
-            {
-                // NOTE(fakhri): probably the server is full?
-            }
+            Socket_Handle LobbySocket = W32_ConnectToServer(lobby_address, LOBBY_PLAYER_PORT);
+            W32_SendBuffer(LobbySocket, &message->game_id.size, sizeof(message->game_id.size));
+            W32_SendBuffer(LobbySocket, message->game_id.str, (i32)message->game_id.size);
+            u32 host_address;
+            W32_ReceiveBuffer(LobbySocket, &host_address, sizeof(host_address));
+            Log("Received address is %d", host_address);
+            struct in_addr ip_addr;
+            ip_addr.S_un.S_addr = host_address;
+            char *str_address = inet_ntoa(ip_addr);
+            Log("address as string is %s", str_address);
+            ConnectToHost(str_address);
+            
+            Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
+            message->type = NetworkMessage_JoinedGame;
+            W32_EndMessageQueueWrite(&network_message_queue);
         } break;
         case PlayerMessage_Username:
         {
@@ -133,6 +135,9 @@ HandlePlayerMessage(Message *message)
 // NOTE(fakhri): this thread is responsible for network communication with the server
 DWORD WINAPI NetworkMain(LPVOID lpParameter)
 {
+    Thread_Ctx WorkerThreadContext = MakeTCTX();
+    SetTCTX(&WorkerThreadContext);
+    
     host_io_context.wsa_buf.buf = (char *)&host_io_context.message_type;
     host_io_context.wsa_buf.len = sizeof(host_io_context.message_type);
     for(;;)
@@ -164,7 +169,7 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                 case NetworkMessageSource_Host:
                 {
                     Log("From host");
-                    Message *message = W32_BeginMessageQueueWrite(&host_message_queue);
+                    Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
                     message->type = host_io_context.message_type;
                     // NOTE(fakhri): receive the actual message from the host
                     switch(host_io_context.message_type)
@@ -231,7 +236,7 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                         }
                     }
                     // NOTE(fakhri): make the changes visible to consumer threads
-                    W32_EndMessageQueueWrite(&host_message_queue);
+                    W32_EndMessageQueueWrite(&network_message_queue);
                     ReceiveNextMessageType();
                 } break;
             }

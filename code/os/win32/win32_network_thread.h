@@ -5,8 +5,6 @@
 
 
 #define LOBBY_ADDRESS "127.0.0.1"
-#define LOBBY_PLAYER_PORT "42069"
-#define LOBBY_SERVER_PORT "12345"
 #define SERVER_PORT "42069"
 
 // IMPORTANT(fakhri): THIS IMPLEMENTATION OF CIRCULAR BUFFER ASSUMES 
@@ -21,7 +19,7 @@ struct MessageQueue
 // NOTE(fakhri): messages coming from the player
 global MessageQueue player_message_queue;
 // NOTE(fakhri): messages coming from the host
-global MessageQueue host_message_queue;
+global MessageQueue network_message_queue;
 global HANDLE network_thread_iocp_handle;
 
 typedef u8 NetworkMessageSource;

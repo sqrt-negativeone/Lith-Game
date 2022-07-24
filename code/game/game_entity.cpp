@@ -338,7 +338,7 @@ AddCardEntity(Game_State *game_state, Card_Type card_type, ResidencyKind card_re
     *card = {};
     card->type = EntityType_Card;
     card->card_type = card_type;
-    game_state->card_type_to_entity_id_map[card_type.category][card_type.number] = card_entity_id;
+    game_state->entity_id_from_card_type[card_type.category][card_type.number] = card_entity_id;
     card->target_dimension   = Vec2(CARD_WIDTH, CARD_HEIGHT);
     card->curr_dimension  = Vec2(CARD_WIDTH, CARD_HEIGHT);
     AddToResidency(game_state, card_entity_id, card_residency);

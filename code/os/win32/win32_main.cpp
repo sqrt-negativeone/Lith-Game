@@ -27,6 +27,7 @@ global char w32_working_directory[256];
 global char w32_app_dll_path[256];
 global char w32_temp_app_dll_path[256];
 global OS_WorkQueue w32_work_queue;
+
 ////////////////////////////////
 //~ NOTE(fakhri): implementations
 #include "base/base_inc.cpp"
@@ -240,6 +241,9 @@ W32_WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param)
 internal DWORD WINAPI 
 W32_WorkerThreadMain(LPVOID param)
 {
+    Thread_Ctx WorkerThreadContext = MakeTCTX();
+    SetTCTX(&WorkerThreadContext);
+    
     OS_WorkQueue *work_queue = (OS_WorkQueue *)param;
     
     for(;;)
@@ -346,6 +350,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         w32_os.PushWorkQueueEntrySP         = W32_PushWorkQueueEntrySP;
         w32_os.PushWorkQueueEntry           = W32_PushWorkQueueEntry;
         w32_os.IsWorkQueueEmpty             = W32_IsWorkQueueEmpty;
+        w32_os.CopyStringToClipboard        = W32_CopyStringToClipboard;
         
         w32_os.permanent_arena = M_ArenaAllocDefault();
         for (u32 arena_index = 0;
@@ -471,6 +476,8 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     
     ShowWindow(w32_window_handle, n_show_cmd);
     UpdateWindow(w32_window_handle);
+    
+    W32_CopyStringToClipboard(Str8Lit("Hello clipboard"));
     
     while(!w32_os.quit)
     {

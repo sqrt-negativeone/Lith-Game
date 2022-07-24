@@ -54,6 +54,7 @@ W32_PageSize(void)
 
 ////////////////////////////////
 //- NOTE(fakhri): output error internal
+
 internal void
 W32_OutputError(char *title, char *format, ...)
 {
@@ -230,21 +231,21 @@ W32_MakeDirectory(String8 path)
 internal b32
 W32_IsHostMessageQueueEmpty()
 {
-    b32 result = W32_IsMessageQueueEmpty(&host_message_queue);
+    b32 result = W32_IsMessageQueueEmpty(&network_message_queue);
     return result;
 }
 
 internal Message *
 W32_BeginHostMessageQueueRead()
 {
-    Message *result = W32_BeginMessageQueueRead(&host_message_queue);
+    Message *result = W32_BeginMessageQueueRead(&network_message_queue);
     return result;
 }
 
 internal void
 W32_EndHostMessageQueueRead()
 {
-    W32_EndMessageQueueRead(&host_message_queue);
+    W32_EndMessageQueueRead(&network_message_queue);
 }
 
 internal Message *
@@ -520,4 +521,18 @@ W32_IsWorkQueueEmpty()
 {
     b32 result = (w32_work_queue.tail == w32_work_queue.head);
     return result;
+}
+
+internal void
+W32_CopyStringToClipboard(String8 text)
+{
+    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, text.size + 1);
+    char *cstr = (char *)GlobalLock(hMem);
+    memcpy(cstr, text.cstr, text.size);
+    cstr[text.size] = 0;
+    GlobalUnlock(hMem);
+    OpenClipboard(w32_window_handle);
+    EmptyClipboard();
+    SetClipboardData(CF_TEXT, hMem);
+    CloseClipboard();
 }

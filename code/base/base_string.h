@@ -11,12 +11,12 @@ struct String8
     union
     {
         void *data;
-        U8 *str;
+        u8 *str;
         char *cstr;
     };
     union
     {
-        U64 size;
+        u64 size;
         u64 len;
     };
     

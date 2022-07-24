@@ -73,7 +73,7 @@ PlayPlayedCards(Game_State *game_state, PlayCardMove player_move)
          ++index)
     {
         Card_Type card_type = UnpackCompactCardType(player_move.actual_cards[index]);
-        EntityID entity_id = game_state->card_type_to_entity_id_map[card_type.category][card_type.number];
+        EntityID entity_id = game_state->entity_id_from_card_type[card_type.category][card_type.number];
         Entity *entity = game_state->entities + entity_id;
         if (curr_player_residency == entity->residency)
         {
@@ -132,6 +132,15 @@ HandleAvailableMessages(Game_State *game_state)
         Message *message = os->BeginHostMessageQueueRead();
         switch(message->type)
         {
+            case NetworkMessage_JoinedGame:
+            {
+                SetFlag(game_state->flags, StateFlag_JoinedGame);
+            } break;
+            case NetworkMessage_GameID:
+            {
+                game_state->game_id = PushStr8Copy(os->permanent_arena, message->game_id);
+                SetFlag(game_state->flags, StateFlag_HostingGame);
+            } break;
             case HostMessage_NewPlayerJoined:
             {
                 PlayerID player_id = message->new_player_id;
@@ -152,11 +161,11 @@ HandleAvailableMessages(Game_State *game_state)
                     String8 player_username = message->players_usernames[player_id];
                     AddPlayer(game_state, player_username, player_id);
                 }
-                SetFlag(game_state->flags, StateFlag_JoinedGame);
+                SetFlag(game_state->flags, StateFlag_UsernameValid);
             } break;
             case HostMessage_InvalidUsername:
             {
-                SetFlag(game_state->flags, StateFlag_FailedJoinGame);
+                SetFlag(game_state->flags, StateFlag_UsernameInvalid);
             } break;
             case HostMessage_ShuffledDeck:
             {
@@ -221,12 +230,43 @@ if (UI_MenuSection(ui, menu_kind, dt))
 }
 
 internal void
+UI_HostingGameMessage(Game_State *game_state, Game_UI *ui, f32 &x, f32 &y, f32 dt, f32 fade_in)
+{
+    if (HasFlag(game_state->flags, StateFlag_HostingGame))
+    {
+        y = 0.3f * game_state->render_context.screen.y;
+        UI_Label(ui, x, y, Str8Lit("You are hosting the game"), Vec4(0.8f, 0.8f, 0.8f, 1.0f), fade_in);
+        y += .85f * VerticalAdvanceFontHeight(ui);
+        
+        UI_Label(ui, x, y, Str8Lit("Game ID is"), Vec4(0.8f, 0.8f, 0.8f, 1.0f), fade_in);
+        y += 0.85f * VerticalAdvanceFontHeight(ui);
+        
+        String8 button_text = game_state->game_id;
+        b32 accept_input = 1;
+        if (game_state->game_id_copie_message_time > 0)
+        {
+            game_state->game_id_copie_message_time -= dt;
+            accept_input = 0;
+            button_text = Str8Lit("Game ID Copied to clipboard");
+        }
+        
+        if (UI_Button(ui, x, y, button_text, dt, fade_in, accept_input))
+        {
+            game_state->game_id_copie_message_time = Seconds(1);
+            // TODO(fakhri): copy game id to clipboard
+            os->CopyStringToClipboard(game_state->game_id);
+        }
+        y += VerticalAdvanceFontHeight(ui);
+    }
+}
+
+internal void
 GameMenu(Game_State *game_state, f32 dt)
 {
     Game_UI *ui = &game_state->ui;
     UI_Begin(ui);
     
-    // NOTE(fakhri): main menu
+    //~ NOTE(fakhri): main menu
     UI_MenuSectionBegin(ui, GameMenuKind_Main)
     {
         f32 fade_in = menu->presence;
@@ -248,6 +288,8 @@ GameMenu(Game_State *game_state, f32 dt)
         
         if (UI_Button(ui, x, y, Str8Lit("Host Game"), dt, fade_in))
         {
+            os->PushWorkQueueEntry(GameHostWork, 0);
+            PushHostGameSessionNetworkMessage();
             UI_OpenMenu(ui, GameMenuKind_HostGame);
         }
         y += VerticalAdvanceFontHeight(ui);
@@ -259,6 +301,7 @@ GameMenu(Game_State *game_state, f32 dt)
     }
     UI_MenuSectionEnd();
     
+    //~
     UI_MenuSectionBegin(ui, GameMenuKind_JoinGame)
     {
         f32 fade_in = menu->presence;
@@ -272,19 +315,25 @@ GameMenu(Game_State *game_state, f32 dt)
         
         ChangeActiveFont(ui, FontKind_MenuItem);
         y = 0.4f * game_state->render_context.screen.y;
-        UI_Label(ui, x, y, Str8Lit("Session Name:"), Vec4(0.8f, 0.8f, 0.8f, 1.0f), fade_in);
+        UI_Label(ui, x, y, Str8Lit("Game ID:"), Vec4(0.8f, 0.8f, 0.8f, 1.0f), fade_in);
         y += VerticalAdvanceFontHeight(ui);
         
         ChangeActiveFont(ui, FontKind_InputField);
         
-        UI_InputField(ui, InputFieldKind_JoinSessionName, x, y, dt, fade_in);
+        UI_InputField(ui, InputFieldKind_GameID, x, y, dt, fade_in);
         y += 1.5f * VerticalAdvanceFontHeight(ui);
         
         ChangeActiveFont(ui, FontKind_MenuItem);
         
         if (UI_Button(ui, x, y, Str8Lit("Join"), dt, fade_in))
         {
-            // TODO(fakhri): handle join button click
+            Game_UI_InputField *input_field = ui->input_fields + InputFieldKind_GameID;
+            if (input_field->size)
+            {
+                String8 game_id = Str8(input_field->buffer, input_field->size);
+                PushJoinGameSessionNetworkMessage(game_id);
+                UI_OpenMenu(ui, GameMenuKind_JoinGameConfirmation);
+            }
         }
         y += VerticalAdvanceFontHeight(ui);
         
@@ -295,10 +344,37 @@ GameMenu(Game_State *game_state, f32 dt)
     }
     UI_MenuSectionEnd();
     
+    //~
+    UI_MenuSectionBegin(ui, GameMenuKind_JoinGameConfirmation)
+    {
+        f32 fade_in = menu->presence;
+        
+        f32 x = 0.5f * game_state->render_context.screen.width;
+        f32 y = 0.2f * game_state->render_context.screen.height;
+        ChangeActiveCoordinates(ui, CoordinateType_Screen);
+        ChangeActiveFont(ui, FontKind_MenuTitle);
+        UI_Label(ui, x, y, Str8Lit("Join Game"), Vec4(1.0f, 1.0f, 1.0f, 1.0f), fade_in);
+        
+        ChangeActiveFont(ui, FontKind_MenuItem);
+        y = 0.4f * game_state->render_context.screen.y;
+        
+        f32 color_change = Square(SinF(os->time.game_time));
+        v4 color1 = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        v4 color2 = Vec4(0.8f, 0.8f, 0.8f, 1.0f);
+        v4 color = color_change * color1 + (1 - color_change) * color2;
+        UI_Label(ui, x, y, Str8Lit("Joining Game"), color, fade_in);
+        y += VerticalAdvanceFontHeight(ui);
+        
+        if (HasFlag(game_state->flags, StateFlag_JoinedGame))
+        {
+            UI_OpenMenu(ui, GameMenuKind_EnterUsername);
+        }
+    }
+    UI_MenuSectionEnd();
+    
+    //~
     UI_MenuSectionBegin(ui, GameMenuKind_HostGame)
     {
-        menu->presence += menu->presence_change_speed * dt;
-        menu->presence = Clamp(0.0f, menu->presence, 1.0f);
         f32 fade_in = menu->presence;
         
         f32 x = 0.5f * game_state->render_context.screen.width;
@@ -307,65 +383,154 @@ GameMenu(Game_State *game_state, f32 dt)
         ChangeActiveFont(ui, FontKind_MenuTitle);
         UI_Label(ui, x, y, Str8Lit("Host Game"), Vec4(1.0f, 1.0f, 1.0f, 1.0f), fade_in);
         
+        ChangeActiveFont(ui, FontKind_MenuItem);
+        y = 0.4f * game_state->render_context.screen.y;
+        
+        f32 color_change = Square(SinF(os->time.game_time));
+        v4 color1 = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        v4 color2 = Vec4(0.8f, 0.8f, 0.8f, 1.0f);
+        v4 color = color_change * color1 + (1 - color_change) * color2;
+        UI_Label(ui, x, y, Str8Lit("Waiting Server Confirmation"), color, fade_in);
+        y += VerticalAdvanceFontHeight(ui);
+        
+        
+        if (HasFlag(game_state->flags, StateFlag_HostingGame))
+        {
+            UI_OpenMenu(ui, GameMenuKind_EnterUsername);
+        }
+    }
+    UI_MenuSectionEnd();
+    
+    //~
+    UI_MenuSectionBegin(ui, GameMenuKind_EnterUsername)
+    {
+        f32 fade_in = menu->presence;
+        
+        f32 x = 0.5f * game_state->render_context.screen.width;
+        f32 y = 0.2f * game_state->render_context.screen.height;
+        ChangeActiveCoordinates(ui, CoordinateType_Screen);
+        ChangeActiveFont(ui, FontKind_MenuTitle);
+        UI_Label(ui, x, y, Str8Lit("Joining Game"), Vec4(1.0f, 1.0f, 1.0f, 1.0f), fade_in);
         
         ChangeActiveFont(ui, FontKind_MenuItem);
         y = 0.4f * game_state->render_context.screen.y;
-        UI_Label(ui, x, y, Str8Lit("Give a Session Name:"), Vec4(0.8f, 0.8f, 0.8f, 1.0f), fade_in);
+        
+        UI_HostingGameMessage(game_state, ui, x, y, dt, fade_in);
+        
+        UI_Label(ui, x, y, Str8Lit("type a username:"), Vec4(0.8f, 0.8f, 0.8f, 1.0f), fade_in);
         y += VerticalAdvanceFontHeight(ui);
         
         ChangeActiveFont(ui, FontKind_InputField);
-        UI_InputField(ui, InputFieldKind_HostSessionName, x, y, dt, fade_in);
+        UI_InputField(ui, InputFieldKind_PlayerUsername, x, y, dt, fade_in);
         
         y += 1.5f * VerticalAdvanceFontHeight(ui);
         
         ChangeActiveFont(ui, FontKind_MenuItem);
         
-        if (UI_Button(ui, x, y, Str8Lit("Host"), dt, fade_in))
+        if (UI_Button(ui, x, y, Str8Lit("Continue"), dt, fade_in))
         {
-            // TODO(fakhri): handle host button click
+            Game_UI_InputField *input_field = ui->input_fields + InputFieldKind_PlayerUsername;
+            if (input_field->size)
+            {
+                PushUsernameNetworkMessage(Str8(input_field->buffer, input_field->size));
+                UI_OpenMenu(ui, GameMenuKind_UsernameConfirmation);
+            }
         }
+        
+    }
+    UI_MenuSectionEnd();
+    
+    //~
+    UI_MenuSectionBegin(ui, GameMenuKind_UsernameConfirmation)
+    {
+        f32 fade_in = menu->presence;
+        
+        f32 x = 0.5f * game_state->render_context.screen.width;
+        f32 y = 0.2f * game_state->render_context.screen.height;
+        ChangeActiveCoordinates(ui, CoordinateType_Screen);
+        ChangeActiveFont(ui, FontKind_MenuTitle);
+        UI_Label(ui, x, y, Str8Lit("Joining Game"), Vec4(1.0f, 1.0f, 1.0f, 1.0f), fade_in);
+        
+        ChangeActiveFont(ui, FontKind_MenuItem);
+        y = 0.4f * game_state->render_context.screen.y;
+        
+        UI_HostingGameMessage(game_state, ui, x, y, dt, fade_in);
+        
+        f32 color_change = Square(SinF(os->time.game_time));
+        v4 color1 = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        v4 color2 = Vec4(0.8f, 0.8f, 0.8f, 1.0f);
+        v4 color = color_change * color1 + (1 - color_change) * color2;
+        UI_Label(ui, x, y, Str8Lit("Waiting Username Confirmation"), color, fade_in);
         y += VerticalAdvanceFontHeight(ui);
         
-        if (UI_Button(ui, x, y, Str8Lit("Back"), dt, fade_in))
+        
+        if (HasFlag(game_state->flags, StateFlag_UsernameValid))
         {
-            UI_OpenMenu(ui, GameMenuKind_Main);
+            UI_OpenMenu(ui, GameMenuKind_JoinedPlayers);
+        }
+        else if (HasFlag(game_state->flags, StateFlag_UsernameInvalid))
+        {
+            // TODO(fakhri): display an error 
+            NotImplemented;
         }
     }
     UI_MenuSectionEnd();
     
-    if (HasFlag(game_state->flags, StateFlag_TryingJoinGame))
+    //~
+    UI_MenuSectionBegin(ui, GameMenuKind_JoinedPlayers)
     {
-        Render_PushText(&game_state->render_context, Str8Lit("joinning the game"),  Vec3(0,CentiMeter(15), Meter(1)), Vec4(0.6f, 0.6f, 0.6f, 1.0f), CoordinateType_World, FontKind_Arial);
+        f32 fade_in = menu->presence;
         
-        if (HasFlag(game_state->flags, StateFlag_JoinedGame))
-        {
-            // NOTE(fakhri): good, we wait for all players to join and then we start the game
-            ClearFlag(game_state->flags, StateFlag_TryingJoinGame);
-        }
+        f32 x = 0.5f * game_state->render_context.screen.width;
+        f32 y = 0.2f * game_state->render_context.screen.height;
+        ChangeActiveCoordinates(ui, CoordinateType_Screen);
+        ChangeActiveFont(ui, FontKind_MenuTitle);
+        UI_Label(ui, x, y, Str8Lit("Joining Game"), Vec4(1.0f, 1.0f, 1.0f, 1.0f), fade_in);
         
-        if (HasFlag(game_state->flags, StateFlag_FailedJoinGame))
-        {
-            // TODO(fakhri): display an error message
-            LogError("Couldn't join game");
-            ClearFlag(game_state->flags, StateFlag_TryingJoinGame | StateFlag_FailedJoinGame);
-        }
-    }
-    
-    if (HasFlag(game_state->flags, StateFlag_JoinedGame))
-    {
+        ChangeActiveFont(ui, FontKind_MenuItem);
+        
+        UI_HostingGameMessage(game_state, ui, x, y, dt, fade_in);
+        
         // NOTE(fakhri): render the connected players
-        local_persist v3 positions[] = {
-            Vec3(-CentiMeter(17),  CentiMeter(17), Meter(1)), Vec3(+CentiMeter(17),  CentiMeter(17), Meter(1)),
-            Vec3(-CentiMeter(17), -CentiMeter(17), Meter(1)), Vec3(+CentiMeter(17), -CentiMeter(17), Meter(1)),
+        
+        f32 x_displacement = 0.3f;
+        f32 y_displacement = 0.4f;
+        local_persist v2 position_coefficients[] = {
+            Vec2(x_displacement,         y_displacement), Vec2(1.0f - x_displacement,        y_displacement),
+            Vec2(x_displacement,  1.0f - y_displacement), Vec2(1.0f - x_displacement, 1.0f - y_displacement),
         };
         
-        if (game_state->players_joined_so_far == MAX_PLAYER_COUNT)
+        for (u32 index = 0;
+             index < ArrayCount(game_state->players);
+             ++index)
+        {
+            Player *player = game_state->players + index;
+            x = position_coefficients[index].x * game_state->render_context.screen.width;
+            y = position_coefficients[index].y * game_state->render_context.screen.height;
+            y += 0.2f * game_state->render_context.screen.height;
+            if(player->joined)
+            {
+                UI_Label(ui, x, y, player->username, Vec4(0.95f, 0.95f, 0.95f, 1.0f), fade_in);
+            }
+            else
+            {
+                f32 color_change = Square(SinF(2 * os->time.game_time));
+                v4 color1 = Vec4(0.6f, 0.6f, 0.6f, 1.0f);
+                v4 color2 = Vec4(0.4f, 0.4f, 0.4f, 1.0f);
+                v4 color = color_change * color1 + (1 - color_change) * color2;
+                UI_Label(ui, x, y, Str8Lit("waiting player"), color, fade_in);
+            }
+        }
+        
+        if (menu->accept_input && game_state->players_joined_so_far == MAX_PLAYER_COUNT)
         {
             // NOTE(fakhri): enough players have joined
             StartGame(game_state);
             ClearFlag(game_state->flags, StateFlag_JoinedGame);
+            UI_CloseMenu(ui);
         }
     }
+    UI_MenuSectionEnd();
     
     UI_End(ui);
 }
@@ -399,22 +564,21 @@ APP_PermanantLoad(PermanentLoad)
     
     game_state->ui = UI_Init(&game_state->render_context, &game_state->controller);
     UI_OpenMenu(&game_state->ui, GameMenuKind_Main);
-#define SERVER_ADDRESS_BUFFER_SIZE 20
-    game_state->host_address_buffer = InitBuffer(os->permanent_arena, SERVER_ADDRESS_BUFFER_SIZE);
-    game_state->username_buffer = InitBuffer(os->permanent_arena, USERNAME_BUFFER_SIZE);
     game_state->command_buffer.arena = os->permanent_arena;
     
     InitResidencies(game_state);
     game_state->time_scale_factor = 1.f;
     game_state->selection_limit = 13;
     
-#if TEST_NETWORKING
     AddNullEntity(game_state);
     AddCursorEntity(game_state);
+    
+#if 0    
+#if TEST_NETWORKING
+    
     // NOTE(fakhri): host the game
     os->PushWorkQueueEntry(GameHostWork, 0);
     // @DebugOnly
-    //game_state->game_mode = GameMode_TestingNetworking;
     PushCreateConnectToServerMessage(Str8Lit(""));
     PushUsernameNetworkMessage(Str8Lit("username"));
     SetFlag(game_state->flags, StateFlag_TryingJoinGame);
@@ -427,6 +591,8 @@ APP_PermanantLoad(PermanentLoad)
     game_state->my_player_id      = ResidencyKind_Down - ResidencyKind_Left;
     AddDebugEntites(game_state);
 #endif
+#endif
+    
     game_state->declared_number = InvalidCardNumber;
 }
 
