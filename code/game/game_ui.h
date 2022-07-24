@@ -14,6 +14,7 @@ enum GameMenuKind
     GameMenuKind_UsernameConfirmation,
     GameMenuKind_JoinedPlayers,
     GameMenuKind_NetworkError,
+    GameMenuKind_InvalidUsername,
     GameMenuKind_Count,
 };
 

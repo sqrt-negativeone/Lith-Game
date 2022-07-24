@@ -104,8 +104,6 @@ GameHost_GetPlayerUsernameWork(void *data)
                 }
             }
             
-            is_username_unique = true;
-            
             if (is_username_unique)
             {
                 // NOTE(fakhri): good, check if we still have place for him
@@ -141,6 +139,11 @@ GameHost_GetPlayerUsernameWork(void *data)
                 }
             }
         }
+        else
+        {
+            os->CloseSocket(player->socket);
+            break;
+        }
     }
     
     // NOTE(fakhri): try to increment the compeleted usernames count
@@ -172,11 +175,8 @@ GameHostWork(void *data)
             break;
         }
         
-        // TODO(fakhri): tell the lobby that we exist
-        
         // NOTE(fakhri): wait for enough players to join
         {
-            
             PlayerUsernameWorkInput username_work_inputs[MAX_PLAYER_COUNT];
             for (u32 index = 0;
                  index < MAX_PLAYER_COUNT;

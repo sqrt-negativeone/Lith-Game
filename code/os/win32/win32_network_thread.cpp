@@ -182,6 +182,10 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                     // NOTE(fakhri): receive the actual message from the host
                     switch(host_io_context.message_type)
                     {
+                        case HostMessage_InvalidUsername:
+                        {
+                            // NOTE(fakhri): nothing to do
+                        } break;
                         case HostMessage_PlayCard:
                         {
                             message->player_move.actual_cards = (Compact_Card_Type *)message->buffer;

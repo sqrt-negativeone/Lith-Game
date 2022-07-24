@@ -9,3 +9,4 @@
 #include "game_ui.cpp"
 #include "game_entity.cpp"
 #include "game_host.cpp"
+#include "game_menu.cpp"

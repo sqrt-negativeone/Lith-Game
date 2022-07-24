@@ -44,6 +44,7 @@ enum
     StateFlag_UsernameValid           = (1 << 12),
     StateFlag_UsernameInvalid         = (1 << 13),
     StateFlag_GameStarted             = (1 << 13),
+    StateFlag_CantHost                = (1 << 13),
 };
 
 enum GameStateFlagsGroup
