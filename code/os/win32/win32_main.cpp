@@ -351,6 +351,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         w32_os.PushWorkQueueEntry           = W32_PushWorkQueueEntry;
         w32_os.IsWorkQueueEmpty             = W32_IsWorkQueueEmpty;
         w32_os.CopyStringToClipboard        = W32_CopyStringToClipboard;
+        w32_os.GetStringFromClipboard       = W32_GetStringFromClipboard;
         
         w32_os.permanent_arena = M_ArenaAllocDefault();
         for (u32 arena_index = 0;
@@ -387,6 +388,8 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         w32_main_tctx = MakeTCTX();
         SetTCTX(&w32_main_tctx);
     }
+    
+    String clip = W32_GetStringFromClipboard(OS_FrameArena());
     
     // NOTE(fakhri): Calculate executable name and path to DLL
     {
@@ -476,8 +479,6 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     
     ShowWindow(w32_window_handle, n_show_cmd);
     UpdateWindow(w32_window_handle);
-    
-    W32_CopyStringToClipboard(Str8Lit("Hello clipboard"));
     
     while(!w32_os.quit)
     {

@@ -72,6 +72,7 @@ struct OS_State
     OS_PushWorkQueueEntry_Function           *PushWorkQueueEntry;
     OS_IsWorkQueueEmpty_Function             *IsWorkQueueEmpty;
     OS_CopyStringToClipboard_Function        *CopyStringToClipboard;
+    OS_GetStringFromClipboard_Function       *GetStringFromClipboard;
 };
 
 global OS_State *os;

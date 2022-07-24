@@ -51,5 +51,6 @@ typedef b32               OS_IsWorkQueueEmpty_Function();
 
 //- NOTE(fakhri): clipboard functions
 typedef void              OS_CopyStringToClipboard_Function(String text);
+typedef String            OS_GetStringFromClipboard_Function(M_Arena *arena);
 
 #endif //OS_FUNCTOINS_H

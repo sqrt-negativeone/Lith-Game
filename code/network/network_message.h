@@ -49,7 +49,7 @@ enum
     NetworkMessage_GameID,
     NetworkMessage_FailedToHost,
     NetworkMessage_JoinedGame,
-    NetworkMessage_FailtToJoin,
+    NetworkMessage_FailedToJoin,
 };
 
 struct Hosts_Storage;

@@ -132,6 +132,10 @@ HandleAvailableMessages(Game_State *game_state)
         Message *message = os->BeginHostMessageQueueRead();
         switch(message->type)
         {
+            case NetworkMessage_FailedToJoin:
+            {
+                SetFlag(game_state->flags, StateFlag_FailedJoinGame);
+            } break;
             case NetworkMessage_JoinedGame:
             {
                 SetFlag(game_state->flags, StateFlag_JoinedGame);
@@ -250,13 +254,14 @@ UI_HostingGameMessage(Game_State *game_state, Game_UI *ui, f32 &x, f32 &y, f32 d
             button_text = Str8Lit("Game ID Copied to clipboard");
         }
         
+        ChangeActiveFont(ui, FontKind_InputField);
         if (UI_Button(ui, x, y, button_text, dt, fade_in, accept_input))
         {
             game_state->game_id_copie_message_time = Seconds(1);
-            // TODO(fakhri): copy game id to clipboard
             os->CopyStringToClipboard(game_state->game_id);
         }
         y += VerticalAdvanceFontHeight(ui);
+        ChangeActiveFont(ui, FontKind_MenuItem);
     }
 }
 
@@ -368,6 +373,34 @@ GameMenu(Game_State *game_state, f32 dt)
         if (HasFlag(game_state->flags, StateFlag_JoinedGame))
         {
             UI_OpenMenu(ui, GameMenuKind_EnterUsername);
+        }
+        else if (HasFlag(game_state->flags, StateFlag_FailedJoinGame))
+        {
+            UI_OpenMenu(ui, GameMenuKind_NetworkError);
+        }
+    }
+    UI_MenuSectionEnd();
+    
+    //~
+    UI_MenuSectionBegin(ui, GameMenuKind_NetworkError)
+    {
+        f32 fade_in = menu->presence;
+        
+        f32 x = 0.5f * game_state->render_context.screen.width;
+        f32 y = 0.2f * game_state->render_context.screen.height;
+        ChangeActiveCoordinates(ui, CoordinateType_Screen);
+        ChangeActiveFont(ui, FontKind_MenuTitle);
+        UI_Label(ui, x, y, Str8Lit("Lith Game"), Vec4(1.0f, 1.0f, 1.0f, 1.0f), fade_in);
+        
+        ChangeActiveFont(ui, FontKind_MenuItem);
+        y = 0.4f * game_state->render_context.screen.y;
+        
+        UI_Label(ui, x, y, Str8Lit("Encountered a Network Error"), Vec4(0.8f, 0.8f, 0.8f, 1.0f), fade_in);
+        y += 2 * VerticalAdvanceFontHeight(ui);
+        
+        if (UI_Button(ui, x, y, Str8Lit("Return to Main Menu"), dt, fade_in))
+        {
+            UI_OpenMenu(ui, GameMenuKind_Main);
         }
     }
     UI_MenuSectionEnd();

@@ -536,3 +536,15 @@ W32_CopyStringToClipboard(String8 text)
     SetClipboardData(CF_TEXT, hMem);
     CloseClipboard();
 }
+
+internal String
+W32_GetStringFromClipboard(M_Arena *arena)
+{
+    OpenClipboard(w32_window_handle);
+    HANDLE clipboard_data = GetClipboardData(CF_TEXT);
+    char *cstr = (char *)GlobalLock(clipboard_data);
+    String Result = PushStr8Copy(arena, Str8C(cstr));
+    GlobalUnlock(clipboard_data);
+    CloseClipboard();
+    return Result;
+}

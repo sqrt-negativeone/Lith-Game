@@ -152,11 +152,13 @@ UI_Button(Game_UI *ui, f32 x, f32 y, String8 button_text, f32 dt, f32 fade_in = 
 }
 
 
-internal void
+internal b32
 InputField_AddCharacter(Game_UI *ui, Game_UI_InputField *input_field, u8 character)
 {
+    b32 result = false;
     if (input_field->size < ArrayCount(input_field->buffer))
     {
+        result = true;
         for (u32 index = input_field->size;
              index > input_field->cursor_index;
              --index)
@@ -168,6 +170,7 @@ InputField_AddCharacter(Game_UI *ui, Game_UI_InputField *input_field, u8 charact
         ++input_field->cursor_index;
         input_field->cursor_target_x_offset += 0.5f * GetCharacterAdvance(ui->render_context, ui->active_font, character);
     }
+    return result;
 }
 
 internal void
@@ -319,6 +322,21 @@ UI_InputField(Game_UI *ui, Game_UI_InputFieldKind input_field_kind, f32 x, f32 y
                         {
                             InputField_MoveRight(ui, input_field);
                         }
+                        else if (event->key == OS_Key_V && (event->modifiers & OS_Modifier_Ctrl))
+                        {
+                            M_Temp scratch = GetScratch(0 ,0);
+                            String clipboard_data = os->GetStringFromClipboard(scratch.arena);
+                            for (u32 index = 0;
+                                 index < clipboard_data.size;
+                                 ++index)
+                            {
+                                if (!InputField_AddCharacter(ui, input_field, clipboard_data.str[index]))
+                                {
+                                    break;
+                                }
+                            }
+                            ReleaseScratch(scratch);
+                        }
                     } break;
                     
                     default: break;
@@ -403,14 +421,14 @@ UI_OpenMenu(Game_UI *ui, GameMenuKind menu_kind)
     {
         Game_Menu *menu = ui->menus + ui->active_menu;
         menu->accept_input = 0;
-        menu->presence_change_speed = -5.0f;
+        menu->presence_change_speed = -10.0f;
     }
     
     ui->active_menu = menu_kind;
     {
         Game_Menu *menu = ui->menus + ui->active_menu;
         menu->accept_input = 1;
-        menu->presence_change_speed = 5.0f;
+        menu->presence_change_speed = 10.0f;
     }
     
 }

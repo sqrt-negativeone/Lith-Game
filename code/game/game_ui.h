@@ -13,6 +13,7 @@ enum GameMenuKind
     GameMenuKind_EnterUsername,
     GameMenuKind_UsernameConfirmation,
     GameMenuKind_JoinedPlayers,
+    GameMenuKind_NetworkError,
     GameMenuKind_Count,
 };
 

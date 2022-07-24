@@ -90,17 +90,25 @@ HandlePlayerMessage(Message *message)
             W32_SendBuffer(LobbySocket, &message->game_id.size, sizeof(message->game_id.size));
             W32_SendBuffer(LobbySocket, message->game_id.str, (i32)message->game_id.size);
             u32 host_address;
-            W32_ReceiveBuffer(LobbySocket, &host_address, sizeof(host_address));
-            Log("Received address is %d", host_address);
-            struct in_addr ip_addr;
-            ip_addr.S_un.S_addr = host_address;
-            char *str_address = inet_ntoa(ip_addr);
-            Log("address as string is %s", str_address);
-            ConnectToHost(str_address);
-            
-            Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
-            message->type = NetworkMessage_JoinedGame;
-            W32_EndMessageQueueWrite(&network_message_queue);
+            if (W32_ReceiveBuffer(LobbySocket, &host_address, sizeof(host_address)))
+            {
+                Log("Received address is %d", host_address);
+                struct in_addr ip_addr;
+                ip_addr.S_un.S_addr = host_address;
+                char *str_address = inet_ntoa(ip_addr);
+                Log("address as string is %s", str_address);
+                ConnectToHost(str_address);
+                
+                Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
+                message->type = NetworkMessage_JoinedGame;
+                W32_EndMessageQueueWrite(&network_message_queue);
+            }
+            else
+            {
+                Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
+                message->type = NetworkMessage_FailedToJoin;
+                W32_EndMessageQueueWrite(&network_message_queue);
+            }
         } break;
         case PlayerMessage_Username:
         {
