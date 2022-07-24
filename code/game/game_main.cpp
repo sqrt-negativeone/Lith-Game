@@ -132,6 +132,36 @@ HandleAvailableMessages(Game_State *game_state)
         Message *message = os->BeginHostMessageQueueRead();
         switch(message->type)
         {
+            case NetworkMessage_HostDown:
+            {
+                if (os->IsGameHostRunning())
+                {
+                    os->StopGameHost();
+                }
+                
+                if (HasFlag(game_state->flags, StateFlag_GameStarted))
+                {
+                    ClearFlag(game_state->flags, StateFlag_GameStarted);
+                    SetFlag(game_state->flags, StateFlag_HostDown);
+                }
+            } break;
+            case HostMessage_HostShuttingDown:
+            {
+                if (os->IsGameHostRunning())
+                {
+                    os->StopGameHost();
+                }
+                
+                if (HasFlag(game_state->flags, StateFlag_GameStarted))
+                {
+                    ClearFlag(game_state->flags, StateFlag_GameStarted);
+                    SetFlag(game_state->flags, StateFlag_HostDown);
+                    if (message->host_closing_reason == ClosingReason_PlayerDisconnected)
+                    {
+                        SetFlag(game_state->flags, StateFlag_PlayerDisconnected);
+                    }
+                }
+            } break;
             case NetworkMessage_FailedToHost:
             {
                 SetFlag(game_state->flags, StateFlag_CantHost);
@@ -223,6 +253,23 @@ HandleAvailableMessages(Game_State *game_state)
     }
 }
 
+internal void
+ResetGameState(Game_State *game_state)
+{
+    game_state->flags = 0;
+    game_state->highest_entity_under_cursor = InvalidEntityID;
+    game_state->prev_played_cards_count = 0;
+    game_state->selection_count = 0;
+    game_state->entity_count = 0;
+    game_state->time_scale_factor = 1.f;
+    game_state->selection_limit = 13;
+    game_state->declared_number = InvalidCardNumber;
+    UI_OpenMenu(&game_state->ui, GameMenuKind_Main);
+    InitResidencies(game_state);
+    AddNullEntity(game_state);
+    AddCursorEntity(game_state);
+    GameCommand_ClearBuffer(&game_state->command_buffer);
+}
 
 exported
 APP_HotLoad(HotLoad)
@@ -234,7 +281,7 @@ APP_HotLoad(HotLoad)
         SetTCTX(&game_tctx);
     }
     
-    gladLoadGL();
+    gladLoadGL ();
 }
 
 exported
@@ -252,17 +299,9 @@ APP_PermanantLoad(PermanentLoad)
     InitRenderer(&game_state->render_context);
     
     game_state->ui = UI_Init(&game_state->render_context, &game_state->controller);
-    UI_OpenMenu(&game_state->ui, GameMenuKind_Main);
     game_state->command_buffer.arena = os->permanent_arena;
     
-    InitResidencies(game_state);
-    game_state->time_scale_factor = 1.f;
-    game_state->selection_limit = 13;
-    
-    AddNullEntity(game_state);
-    AddCursorEntity(game_state);
-    
-    game_state->declared_number = InvalidCardNumber;
+    ResetGameState(game_state);
 }
 
 
@@ -368,6 +407,11 @@ APP_UpdateAndRender(UpdateAndRender)
     
     GameMenu(game_state, dt);
     
+    if (game_state->controller.right_mouse.pressed)
+    {
+        ResetGameState(game_state);
+    }
+    
     if(HasFlag(game_state->flags, StateFlag_WaitingForCards))
     {
         // NOTE(fakhri): we wait
@@ -393,103 +437,113 @@ APP_UpdateAndRender(UpdateAndRender)
         }
     }
     
+    // NOTE(fakhri): loop over all the entities and update them
+    for (u32 entity_id = 1;
+         entity_id < game_state->entity_count;
+         ++entity_id)
+    {
+        Entity *entity = game_state->entities + entity_id;
+        switch(entity->type)
+        {
+            case EntityType_Cursor:
+            {
+                UpdateCursorEntity(game_state, entity);
+                
+                // NOTE(fakhri): render the mouse cursor
+                Render_PushQuad(&game_state->render_context, 
+                                entity->center_pos,
+                                Vec2(MiliMeter(5.f), MiliMeter(5.f)), Vec4(1, .3f, .5f, 1.f), CoordinateType_World);
+                
+            } break;
+            case EntityType_Card:
+            {
+                UpdateCardEntity(game_state, entity_id, dt);
+                if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
+                {
+                    if (HasFlag(entity->flags, EntityFlag_Selected))
+                    {
+                        Render_PushQuad(&game_state->render_context, 
+                                        Vec3(entity->center_pos.xy, entity->center_pos.z - MiliMeter(.1f)),
+                                        1.05f * entity->curr_dimension, red, CoordinateType_World, entity->orientation);
+                    }
+                    
+                    Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World, entity->flip_y,
+                                     entity->orientation);
+                    
+                    v3 card_back_pos = entity->center_pos;
+                    
+                    v3 card_back_orientation = entity->orientation;
+                    card_back_orientation.y = PI32 - card_back_orientation.y;
+                    Render_PushImage(&game_state->render_context, game_state->render_context.textures[TextureID_CardBack],  entity->center_pos, entity->curr_dimension, CoordinateType_World, false, card_back_orientation);
+                }
+                else
+                {
+                    ClearFlag(entity->flags, EntityFlag_DontDrawThisFrame);
+                }
+            } break;
+            case EntityType_Companion:
+            {
+                UpdateCompanionEntity(game_state, entity, dt);
+                if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
+                {
+                    Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World,
+                                     entity->flip_y, entity->orientation);
+                }
+                else
+                {
+                    ClearFlag(entity->flags, EntityFlag_DontDrawThisFrame);
+                }
+            } break;
+            case EntityType_Button:
+            {
+                UpdateButtonEntity(game_state, entity, dt);
+                if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
+                {
+                    // TODO(fakhri): draw the button entity
+                    v4 button_color = Vec4(251, 73, 197, 255) / 255;
+                    if (entity->button_kind == ButtonEntityKind_PlaySelectedCards)
+                    {
+                        button_color.r = 0;
+                    }
+                    Render_PushQuad(&game_state->render_context, entity->center_pos, entity->curr_dimension, button_color, CoordinateType_World);
+                }
+                else
+                {
+                    ClearFlag(entity->flags, EntityFlag_DontDrawThisFrame);
+                }
+            } break;
+            case EntityType_Numbers:
+            {
+                UpdateNumberEntity(game_state, entity_id, dt);
+                Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World,
+                                 false, entity->orientation);
+            } break;
+            case EntityType_Arrow:
+            {
+                UpdateArrowEntity(game_state, entity, dt);
+                Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World,
+                                 false, entity->orientation);
+            } break;
+            default:
+            {
+                StopExecution;
+            } break;
+        }
+    }
+    
+    if (HasFlag(game_state->flags, StateFlag_HostDown))
+    {
+        ClearFlag(game_state->flags, StateFlag_HostDown);
+        UI_OpenMenu(&game_state->ui, GameMenuKind_HostInGameError);
+    }
+    
+    if (HasFlag(game_state->flags, StateFlag_EndGame))
+    {
+        ResetGameState(game_state);
+    }
+    
     if (HasFlag(game_state->flags, StateFlag_GameStarted))
     {
-        // NOTE(fakhri): loop over all the entities and update them
-        for (u32 entity_id = 1;
-             entity_id < game_state->entity_count;
-             ++entity_id)
-        {
-            Entity *entity = game_state->entities + entity_id;
-            switch(entity->type)
-            {
-                case EntityType_Cursor:
-                {
-                    UpdateCursorEntity(game_state, entity);
-                    
-                    // NOTE(fakhri): render the mouse cursor
-                    Render_PushQuad(&game_state->render_context, 
-                                    entity->center_pos,
-                                    Vec2(MiliMeter(5.f), MiliMeter(5.f)), Vec4(1, .3f, .5f, 1.f), CoordinateType_World);
-                    
-                } break;
-                case EntityType_Card:
-                {
-                    UpdateCardEntity(game_state, entity_id, dt);
-                    if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
-                    {
-                        if (HasFlag(entity->flags, EntityFlag_Selected))
-                        {
-                            Render_PushQuad(&game_state->render_context, 
-                                            Vec3(entity->center_pos.xy, entity->center_pos.z - MiliMeter(.1f)),
-                                            1.05f * entity->curr_dimension, red, CoordinateType_World, entity->orientation);
-                        }
-                        
-                        Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World, entity->flip_y,
-                                         entity->orientation);
-                        
-                        v3 card_back_pos = entity->center_pos;
-                        
-                        v3 card_back_orientation = entity->orientation;
-                        card_back_orientation.y = PI32 - card_back_orientation.y;
-                        Render_PushImage(&game_state->render_context, game_state->render_context.textures[TextureID_CardBack],  entity->center_pos, entity->curr_dimension, CoordinateType_World, false, card_back_orientation);
-                        
-                    }
-                    else
-                    {
-                        ClearFlag(entity->flags, EntityFlag_DontDrawThisFrame);
-                    }
-                } break;
-                case EntityType_Companion:
-                {
-                    UpdateCompanionEntity(game_state, entity, dt);
-                    if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
-                    {
-                        Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World,
-                                         entity->flip_y, entity->orientation);
-                    }
-                    else
-                    {
-                        ClearFlag(entity->flags, EntityFlag_DontDrawThisFrame);
-                    }
-                } break;
-                case EntityType_Button:
-                {
-                    UpdateButtonEntity(game_state, entity, dt);
-                    if (!HasFlag(entity->flags, EntityFlag_DontDrawThisFrame))
-                    {
-                        // TODO(fakhri): draw the button entity
-                        v4 button_color = Vec4(251, 73, 197, 255) / 255;
-                        if (entity->button_kind == ButtonEntityKind_PlaySelectedCards)
-                        {
-                            button_color.r = 0;
-                        }
-                        Render_PushQuad(&game_state->render_context, entity->center_pos, entity->curr_dimension, button_color, CoordinateType_World);
-                    }
-                    else
-                    {
-                        ClearFlag(entity->flags, EntityFlag_DontDrawThisFrame);
-                    }
-                } break;
-                case EntityType_Numbers:
-                {
-                    UpdateNumberEntity(game_state, entity_id, dt);
-                    Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World,
-                                     false, entity->orientation);
-                } break;
-                case EntityType_Arrow:
-                {
-                    UpdateArrowEntity(game_state, entity, dt);
-                    Render_PushImage(&game_state->render_context, game_state->render_context.textures[entity->texture], entity->center_pos, entity->curr_dimension, CoordinateType_World,
-                                     false, entity->orientation);
-                } break;
-                default:
-                {
-                    StopExecution;
-                } break;
-            }
-        }
-        
         if (HasFlag(game_state->flags, StateFlag_QuestionCredibility))
         {
             PushQuestionCredibilityNetworkMessage();

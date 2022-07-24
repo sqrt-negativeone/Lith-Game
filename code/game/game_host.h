@@ -68,14 +68,57 @@ struct Host_Context
     u64 completed_username_work;
     u32 prev_played_card_count;
     Card_Number declared_number;
+    PlayerID winner;
 };
 
-internal void GameHostWork(void *data);
-internal void
+
+enum ClosingReason
+{
+    ClosingReason_Unkown,
+    ClosingReason_PlayerDisconnected,
+};
+
+internal b32
+BroadcastHostShuttingDown(Host_Context *host_context, ClosingReason reason)
+{
+    b32 result = true;
+    MessageType type = HostMessage_HostShuttingDown;
+    for (u32 player_index = 0;
+         player_index < host_context->players_storage.count;
+         ++player_index)
+    {
+        Connected_Player *player = host_context->players_storage.players + player_index;
+        // NOTE(fakhri): send the message to player
+        NetworkSendValue(player->socket, type, result);
+        NetworkSendValue(player->socket, reason, result);
+    }
+    return result;
+}
+
+internal b32
+BroadcastPlayerWon(Host_Context *host_context, PlayerID winner)
+{
+    b32 result = true;
+    MessageType type = HostMessage_PlayerWon;
+    for (u32 player_index = 0;
+         player_index < host_context->players_storage.count;
+         ++player_index)
+    {
+        Connected_Player *player = host_context->players_storage.players + player_index;
+        // NOTE(fakhri): send the message to player
+        NetworkSendValue(player->socket, type, result);
+        NetworkSendValue(player->socket, winner, result);
+    }
+    return result;
+}
+
+internal b32
 BroadcastShuffledDeckMessage(Host_Context *host_context)
 {
+    b32 result = true;
     CardResidency *deck_residency = host_context->residencies + CardResidencyKind_Deck;
     Compact_Card_Type compact_deck[DECK_CARDS_COUNT];
+    
     for(u32 index = 0;
         index < deck_residency->count;
         ++index)
@@ -91,14 +134,16 @@ BroadcastShuffledDeckMessage(Host_Context *host_context)
     {
         Connected_Player *player = host_context->players_storage.players + player_index;
         // NOTE(fakhri): send the message to player
-        NetworkSendValue(player->socket, type);
-        os->SendBuffer(player->socket, compact_deck, sizeof(compact_deck));
+        NetworkSendValue(player->socket, type, result);
+        NetworkSendConstArray(player->socket, compact_deck, result);
     }
+    return result;
 }
 
 internal void
 BroadcastNewPlayerJoinedMessage(Host_Context *host_context, Connected_Player *new_player, u32 player_id)
 {
+    b32 result = true;
     for (u32 player_index = 0;
          player_index < host_context->players_storage.count;
          ++player_index)
@@ -106,15 +151,16 @@ BroadcastNewPlayerJoinedMessage(Host_Context *host_context, Connected_Player *ne
         Connected_Player *player = host_context->players_storage.players + player_index;
         // NOTE(fakhri): send the message to player
         MessageType type = HostMessage_NewPlayerJoined;
-        NetworkSendValue(player->socket, type);
-        NetworkSendValue(player->socket, player_id);
+        NetworkSendValue(player->socket, type, result);
+        NetworkSendValue(player->socket, player_id, result);
         os->SendString(player->socket, new_player->username);
     }
 }
 
-internal void
+internal b32
 BroadcastChangeTurnMessage(Host_Context *host_context, PlayerID player_id)
 {
+    b32 result = true;
     for (u32 player_index = 0;
          player_index < host_context->players_storage.count;
          ++player_index)
@@ -122,40 +168,29 @@ BroadcastChangeTurnMessage(Host_Context *host_context, PlayerID player_id)
         Connected_Player *player = host_context->players_storage.players + player_index;
         // NOTE(fakhri): send the message to player
         MessageType type = HostMessage_ChangePlayerTurn;
-        NetworkSendValue(player->socket, type);
-        NetworkSendValue(player->socket, player_id);
+        NetworkSendValue(player->socket, type, result);
+        NetworkSendValue(player->socket, player_id, result);
+        
     }
+    return result;
 }
 
-internal void
-BroadcastPlayerWon(Host_Context *host_context, u32 winner_id)
-{
-    for (u32 player_index = 0;
-         player_index < host_context->players_storage.count;
-         ++player_index)
-    {
-        Connected_Player *player = host_context->players_storage.players + player_index;
-        // NOTE(fakhri): send the message to player
-        MessageType type = HostMessage_PlayerWon;
-        NetworkSendValue(player->socket, type);
-        NetworkSendValue(player->socket, winner_id);
-    }
-}
-
-internal void
+internal b32
 SendConnectedPlayersList(Host_Context *host_context, Socket_Handle s)
 {
+    b32 result = true;
     MessageType type = HostMessage_ConnectedPlayersList;
-    NetworkSendValue(s, type);
+    NetworkSendValue(s, type, result);
     Players_Storage *players_storage = &host_context->players_storage;
-    NetworkSendValue(s, players_storage->count);
+    NetworkSendValue(s, players_storage->count, result);
     for (u32 player_index = 0;
          player_index < players_storage->count;
          ++player_index)
     {
         Connected_Player *player = players_storage->players + player_index;
-        os->SendString(s, player->username);
+        result &= os->SendString(s, player->username);
     }
+    return result;
 }
 
 

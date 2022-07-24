@@ -96,3 +96,13 @@ GameCommand_EatFirstCommand(Game_Command_Buffer *command_buffer)
         command_buffer->free_list = first;
     }
 }
+
+internal void
+GameCommand_ClearBuffer(Game_Command_Buffer *command_buffer)
+{
+    if (command_buffer->first)
+    {
+        command_buffer->free_list = command_buffer->first;
+        command_buffer->first = command_buffer->last = 0;
+    }
+}

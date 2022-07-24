@@ -220,7 +220,7 @@ LoadShader(Render_Context *render_context, Shader_Kind shader_kind)
     }
     else
     {
-        InvalidPath;
+        InvalidCodePath;
     }
     
 }

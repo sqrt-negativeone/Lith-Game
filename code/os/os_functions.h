@@ -53,4 +53,9 @@ typedef b32               OS_IsWorkQueueEmpty_Function();
 typedef void              OS_CopyStringToClipboard_Function(String text);
 typedef String            OS_GetStringFromClipboard_Function(M_Arena *arena);
 
+
+typedef void OS_StartGameHost_Function();
+typedef b32  OS_IsGameHostRunning_Function();
+typedef void OS_StopGameHost_Function();
+
 #endif //OS_FUNCTOINS_H

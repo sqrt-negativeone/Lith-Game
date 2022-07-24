@@ -21,7 +21,8 @@ SetTCTX(Thread_Ctx *tctx)
 internal Thread_Ctx *
 GetTCTX(void)
 {
-    return tl_tctx;
+    Thread_Ctx *result = tl_tctx;
+    return result;
 }
 
 internal void

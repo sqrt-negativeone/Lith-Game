@@ -17,6 +17,7 @@
 
 ////////////////////////////////
 //~ NOTE(fakhri): Globals
+
 global OS_State   w32_os;
 global W32_Timer  w32_timer;
 global Thread_Ctx w32_main_tctx;
@@ -27,6 +28,7 @@ global char w32_working_directory[256];
 global char w32_app_dll_path[256];
 global char w32_temp_app_dll_path[256];
 global OS_WorkQueue w32_work_queue;
+global volatile b32 w32_host_running = 0;
 
 ////////////////////////////////
 //~ NOTE(fakhri): implementations
@@ -353,6 +355,10 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         w32_os.CopyStringToClipboard        = W32_CopyStringToClipboard;
         w32_os.GetStringFromClipboard       = W32_GetStringFromClipboard;
         
+        w32_os.StartGameHost                = W32_StartGameHost;
+        w32_os.IsGameHostRunning            = W32_IsGameHostRunning;
+        w32_os.StopGameHost                 = W32_StopGameHost;
+        
         w32_os.permanent_arena = M_ArenaAllocDefault();
         for (u32 arena_index = 0;
              arena_index < ArrayCount(w32_os.frame_arenas);
@@ -360,13 +366,12 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         {
             w32_os.frame_arenas[arena_index] = M_ArenaAlloc(Gigabytes(16));
         }
-        
     }
     
     // NOTE(fakhri): worker threads
     {
         u32 initial_count = 0;
-        u32 work_threads_count = 4;
+        u32 work_threads_count = 8;
         
         w32_work_queue.waiting_worker_threads_semaphore = CreateSemaphoreA(0, initial_count, work_threads_count, 0);
         w32_work_queue.producer_mutex                   = CreateMutexA(0, FALSE, 0);
@@ -474,7 +479,7 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     Directory_Watcher shaders_watcher = {};
     if (!W32_BeginWatchDirectory(w32_os.permanent_arena, &shaders_watcher, Str8Lit("data/shaders/")))
     {
-        InvalidPath;
+        InvalidCodePath;
     }
     
     ShowWindow(w32_window_handle, n_show_cmd);

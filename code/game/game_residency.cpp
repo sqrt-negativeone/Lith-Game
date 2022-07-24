@@ -38,78 +38,96 @@ InitResidencies(Game_State *game_state)
     // NOTE(fakhri): none spacial residency
     {
         Residency *residency = game_state->residencies + ResidencyKind_Nonespacial;
+        residency->flags = 0;
         SetFlag(residency->flags, ResidencyFlags_OutsideScreen | ResidencyFlags_RandomizedPlacement);
         residency->controlling_player_id = InvalidePlayerID;
+        residency->entity_count = 0;
     }
     
     // NOTE(fakhri): left residency
     {
         Residency *residency = game_state->residencies + ResidencyKind_Left;
+        residency->flags = 0;
         SetFlag(residency->flags, ResidencyFlags_Burnable | ResidencyFlags_HostsCards | ResidencyFlags_Hidden);
         residency->controlling_player_id = InvalidePlayerID;
         residency->base_position = Vec3(-CentiMeter(40), 0, 0);
         residency->advance_direction = 1.0f;
+        residency->entity_count = 0;
     }
     
     // NOTE(fakhri): up residency
     {
         Residency *residency = game_state->residencies + ResidencyKind_Up;
+        residency->flags = 0;
         SetFlag(residency->flags, ResidencyFlags_Horizontal | ResidencyFlags_Burnable | ResidencyFlags_HostsCards | ResidencyFlags_Hidden);
         residency->controlling_player_id = InvalidePlayerID;
         residency->base_position = Vec3(0, CentiMeter(20), 0);
         residency->advance_direction = -1.0f;
+        residency->entity_count = 0;
     }
     
     // NOTE(fakhri): right residency
     {
         Residency *residency = game_state->residencies + ResidencyKind_Right;
+        residency->flags = 0;
         SetFlag(residency->flags, ResidencyFlags_Burnable | ResidencyFlags_HostsCards | ResidencyFlags_Hidden);
         residency->controlling_player_id = InvalidePlayerID;
         residency->base_position = Vec3(CentiMeter(40), 0, 0);
         residency->advance_direction = -1.0f;
+        residency->entity_count = 0;
     }
     
     // NOTE(fakhri): down residency
     {
         Residency *residency = game_state->residencies + ResidencyKind_Down;
+        residency->flags = 0;
         SetFlag(residency->flags, ResidencyFlags_Horizontal | ResidencyFlags_Burnable | ResidencyFlags_HostsCards);
         residency->controlling_player_id = InvalidePlayerID;
         residency->base_position = Vec3(0, -CentiMeter(20), 0);
         residency->advance_direction = 1.0f;
+        residency->entity_count = 0;
     }
     
     // NOTE(fakhri): table residency
     {
         Residency *residency = game_state->residencies + ResidencyKind_Table;
+        residency->flags = 0;
         SetFlag(residency->flags, ResidencyFlags_Stacked | ResidencyFlags_Hidden | ResidencyFlags_HostsCards);
         residency->controlling_player_id = InvalidePlayerID;
         residency->base_position = Vec3(-CentiMeter(5), 0, 0);
         residency->advance_direction = 1.0f;
+        residency->entity_count = 0;
     }
     
     // NOTE(fakhri): burnt residency
     {
         Residency *residency = game_state->residencies + ResidencyKind_Burnt;
+        residency->flags = 0;
         SetFlag(residency->flags, ResidencyFlags_Stacked | ResidencyFlags_HostsCards);
         residency->controlling_player_id = InvalidePlayerID;
         residency->base_position = Vec3(CentiMeter(5), 0, 0);
         residency->advance_direction = -1.0f;
+        residency->entity_count = 0;
     }
     
     // NOTE(fakhri): card declaring residency
     {
         Residency *residency = game_state->residencies + ResidencyKind_DeclarationOptions;
+        residency->flags = 0;
         SetFlag(residency->flags, ResidencyFlags_Horizontal);
         residency->controlling_player_id = InvalidePlayerID;
         residency->base_position = Vec3(0, CentiMeter(0), Meter(1));
+        residency->entity_count = 0;
     }
     
     // NOTE(fakhri): selected cards for play residency
     {
         Residency *residency = game_state->residencies + ResidencyKind_SelectedCards;
+        residency->flags = 0;
         SetFlag(residency->flags, ResidencyFlags_Horizontal | ResidencyFlags_HostsCards);
         residency->controlling_player_id = InvalidePlayerID;
         residency->base_position = Vec3(0, CentiMeter(10), Meter(1));
+        residency->entity_count = 0;
     }
     
 }

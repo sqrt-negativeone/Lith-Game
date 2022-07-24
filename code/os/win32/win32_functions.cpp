@@ -548,3 +548,22 @@ W32_GetStringFromClipboard(M_Arena *arena)
     CloseClipboard();
     return Result;
 }
+
+internal void
+W32_StartGameHost()
+{
+    w32_host_running = true;
+}
+
+internal b32
+W32_IsGameHostRunning()
+{
+    b32 result = (w32_host_running == 1);
+    return result;
+}
+
+internal void
+W32_StopGameHost()
+{
+    w32_host_running = false;
+}

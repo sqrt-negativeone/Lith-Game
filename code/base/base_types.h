@@ -333,7 +333,7 @@ read_only global f32 F32Pi = 3.14159265359f;
 #define StaticAssert(c,label) U8 static_assert_##label[(c)?(1):(-1)]
 #define NotImplemented Assert(!"Not Implemented")
 #define StopExecution Assert(!"Stopping Execution")
-#define InvalidPath Assert(!"Invalid Path")
+#define InvalidCodePath Assert(!"Invalid Path")
 
 ////////////////////////////////
 //~ NOTE(fakhri): Logging

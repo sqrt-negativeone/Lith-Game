@@ -49,7 +49,7 @@ GetCurrentWidgetID(Game_UI *ui)
 internal void
 UI_Label(Game_UI *ui, f32 x, f32 y, String8 label_text, v4 text_color, f32 fade_in = 1.0f)
 {
-    v3 label_position = Vec3(x, y, Meter(1));
+    v3 label_position = Vec3(x, y, Meter(5));
     text_color.a *= fade_in;
     Render_PushText(ui->render_context, label_text, label_position, text_color, ui->active_coordinates, ui->active_font);
 }
@@ -69,8 +69,8 @@ UI_Button(Game_UI *ui, f32 x, f32 y, String8 button_text, f32 dt, f32 fade_in = 
     f32 height = (1.0f + vertical_padding) * 
         GetFontHeight(ui->render_context, ui->active_font);
     
-    v3 text_position = Vec3(x, y, Meter(1));
-    v3 button_position = Vec3(x, y - 0.25f * height, Meter(1));
+    v3 text_position = Vec3(x, y, Meter(5));
+    v3 button_position = Vec3(x, y - 0.25f * height, Meter(4.9f));
     v2 size = Vec2(width, height);
     v2 size_in_meters = SizeFromScreenCoordsToWorldCoords(ui->render_context, size); 
     
@@ -232,8 +232,8 @@ UI_InputField(Game_UI *ui, Game_UI_InputFieldKind input_field_kind, f32 x, f32 y
     f32 height = (1.0f + vertical_padding) * 
         GetFontHeight(ui->render_context, ui->active_font);
     
-    v3 text_position = Vec3(x, y, Meter(1));
-    v3 input_field_position = Vec3(x, y - 0.25f * height, Meter(1));
+    v3 text_position = Vec3(x, y, Meter(5));
+    v3 input_field_position = Vec3(x, y - 0.25f * height, Meter(5));
     v2 size = Vec2(width, height);
     v2 size_in_meters = SizeFromScreenCoordsToWorldCoords(ui->render_context, size); 
     

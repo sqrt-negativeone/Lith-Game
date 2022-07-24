@@ -73,6 +73,8 @@ GameMenu(Game_State *game_state, f32 dt)
         
         if (UI_Button(ui, x, y, Str8Lit("Host Game"), dt, fade_in))
         {
+            
+            os->StartGameHost();
             os->PushWorkQueueEntry(GameHostWork, 0);
             PushHostGameSessionNetworkMessage();
             UI_OpenMenu(ui, GameMenuKind_HostGame);
@@ -386,6 +388,39 @@ GameMenu(Game_State *game_state, f32 dt)
                 UI_CloseMenu(ui);
             }
         }
+    }
+    UI_MenuSectionEnd();
+    
+    //~
+    UI_MenuSectionBegin(ui, GameMenuKind_HostInGameError)
+    {
+        Render_PushQuad(&game_state->render_context, Vec3(0,0, Meter(2)), Vec2(Meter(2), Meter(2)),Vec4(0.05f, 0.05f, 0.05f, 0.7f), CoordinateType_World);
+        f32 fade_in = menu->presence;
+        
+        f32 x = 0.5f * game_state->render_context.screen.width;
+        f32 y = 0.2f * game_state->render_context.screen.height;
+        ChangeActiveCoordinates(ui, CoordinateType_Screen);
+        ChangeActiveFont(ui, FontKind_MenuTitle);
+        UI_Label(ui, x, y, Str8Lit("Lith Game"), Vec4(1.0f, 1.0f, 1.0f, 1.0f), fade_in);
+        
+        ChangeActiveFont(ui, FontKind_MenuItem);
+        y = 0.4f * game_state->render_context.screen.y;
+        
+        UI_Label(ui, x, y, Str8Lit("Encountered a Network Error"), Vec4(0.8f, 0.8f, 0.8f, 1.0f), fade_in);
+        y += 2 * VerticalAdvanceFontHeight(ui);
+        
+        if (HasFlag(game_state->flags, StateFlag_PlayerDisconnected))
+        {
+            UI_Label(ui, x, y, Str8Lit("A Player Disconnected"), Vec4(0.8f, 0.8f, 0.8f, 1.0f), fade_in);
+            
+            y += 2 * VerticalAdvanceFontHeight(ui);
+        }
+        
+        if (UI_Button(ui, x, y, Str8Lit("Return to Main Menu"), dt, fade_in))
+        {
+            SetFlag(game_state->flags, StateFlag_EndGame);
+        }
+        
     }
     UI_MenuSectionEnd();
     

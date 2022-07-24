@@ -43,13 +43,20 @@ enum
     StateFlag_HostingGame             = (1 << 11),
     StateFlag_UsernameValid           = (1 << 12),
     StateFlag_UsernameInvalid         = (1 << 13),
-    StateFlag_GameStarted             = (1 << 13),
-    StateFlag_CantHost                = (1 << 13),
+    StateFlag_GameStarted             = (1 << 14),
+    StateFlag_CantHost                = (1 << 15),
+    StateFlag_HostDown                = (1 << 16),
+    StateFlag_PlayerDisconnected      = (1 << 17),
+    StateFlag_NoInput                 = (1 << 18),
+    StateFlag_EndGame                 = (1 << 19),
 };
 
 enum GameStateFlagsGroup
 {
-    GameStateFlagsGroup_NoSelect = StateFlag_ShouldDeclareCard | StateFlag_ShouldBurnCards | StateFlag_ShouldOpenDeclaringMenu,
+    GameStateFlagsGroup_NoInput = (StateFlag_NoInput           | 
+                                   StateFlag_ShouldDeclareCard | 
+                                   StateFlag_ShouldBurnCards   | 
+                                   StateFlag_ShouldOpenDeclaringMenu),
     GameStateFlagsGroup_ValidOnlyForOneFrame = StateFlag_PlaySelectedCards | StateFlag_QuestionCredibility,
 };
 

@@ -160,6 +160,7 @@ Render_PushText(Render_Context *render_context, String text, v3 pos, v4 color, C
         Assert(render_context->active_font > FontKind_None && render_context->active_font < FontKind_Count);
         font_to_use = render_context->active_font;
     }
+    
     if (coord_type == CoordinateType_World)
     {
         pos = ScreenCoordsFromWorldCoords(render_context, pos);
@@ -189,6 +190,7 @@ Render_PushText(Render_Context *render_context, String text, v3 pos, v4 color, C
             curr_point.x += glyph.advance;
         }
     }
+    
     if (coord_type == CoordinateType_World)
     {
         curr_point = WorldCoordsFromScreenCoords(render_context, curr_point).xy;

@@ -1,25 +1,33 @@
 //#include "network_message.cpp"
 
-struct Host_IO_Context
+struct NetworkIOContext
 {
     Socket_Handle host_socket;
     MessageType message_type;
-    WSABUF wsa_buf;
-    WSAOVERLAPPED Overlapped;
+    
+    Socket_Handle lobby_socket;
+    u8 lobby_heartbeat;
+    
+    WSABUF message_type_wsa_buf;
+    WSAOVERLAPPED message_type_overlapped;
+    
+    WSABUF lobby_heartbeat_wsa_buf;
+    WSAOVERLAPPED lobby_heartbeat_overlapped;
+    
 };
 
-global Host_IO_Context host_io_context;
+global NetworkIOContext network_io_context;
 
 internal void
 ReceiveNextMessageType()
 {
     DWORD flags = 0;
-    if (WSARecv(host_io_context.host_socket,
-                &host_io_context.wsa_buf,
+    if (WSARecv(network_io_context.host_socket,
+                &network_io_context.message_type_wsa_buf,
                 1,
                 0,
                 &flags,
-                &host_io_context.Overlapped,
+                &network_io_context.message_type_overlapped,
                 0
                 ) == SOCKET_ERROR)
     {
@@ -27,7 +35,29 @@ ReceiveNextMessageType()
         if(error != WSA_IO_PENDING)
         {
             Log("Receive failed with error %d", error);
-            Assert(!"See what is the problem");
+            InvalidCodePath;
+        }
+    }
+}
+
+internal void
+ReceiveNextLobbyHeartbeat()
+{
+    DWORD flags = 0;
+    if (WSARecv(network_io_context.lobby_socket,
+                &network_io_context.lobby_heartbeat_wsa_buf,
+                1,
+                0,
+                &flags,
+                &network_io_context.lobby_heartbeat_overlapped,
+                0
+                ) == SOCKET_ERROR)
+    {
+        int error = WSAGetLastError();
+        if(error != WSA_IO_PENDING)
+        {
+            Log("Receive failed with error %d", error);
+            InvalidCodePath;
         }
     }
 }
@@ -35,10 +65,10 @@ ReceiveNextMessageType()
 internal void
 ConnectToHost(char *host_address)
 {
-    host_io_context.host_socket = W32_ConnectToServer(host_address, HOST_PORT);
-    if(host_io_context.host_socket != InvalidSocket)
+    network_io_context.host_socket = W32_ConnectToServer(host_address, HOST_PORT);
+    if(network_io_context.host_socket != InvalidSocket)
     {
-        CreateIoCompletionPort((HANDLE)host_io_context.host_socket, network_thread_iocp_handle, NetworkMessageSource_Host, 1);
+        CreateIoCompletionPort((HANDLE)network_io_context.host_socket, network_thread_iocp_handle, NetworkMessageSource_Host, 1);
         ReceiveNextMessageType();
     }
     else
@@ -56,27 +86,39 @@ HandlePlayerMessage(Message *message)
         case PlayerMessage_HostGameSession:
         {
             // NOTE(fakhri): start the host
-            Socket_Handle LobbySocket = W32_ConnectToServer(lobby_address, LOBBY_HOST_PORT);
-            String8 GameID;
             b32 good = false;
-            if (W32_ReceiveBuffer(LobbySocket, &GameID.size, sizeof(GameID.size)))
+            Socket_Handle LobbySocket = W32_ConnectToServer(lobby_address, LOBBY_HOST_PORT);
+            if (LobbySocket)
             {
-                M_Temp Scratch = GetScratch(0, 0);
-                GameID.str = PushArray(Scratch.arena, u8, GameID.size);
-                good = W32_ReceiveBuffer(LobbySocket, GameID.str, (i32)GameID.size);
-                if (good)
+                String8 GameID;
+                b32 io_successed = true;
+                NetworkReceiveValue(LobbySocket, GameID.size, io_successed);
+                if (io_successed)
                 {
-                    Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
-                    message->type = NetworkMessage_GameID;
-                    Assert(GameID.size <= ArrayCount(message->buffer));
-                    MemoryCopy(message->buffer, GameID.str, GameID.size);
-                    message->game_id = Str8(message->buffer, GameID.size);
-                    W32_EndMessageQueueWrite(&network_message_queue);
-                    ConnectToHost("127.0.0.1");
-                    // TODO(fakhri): how to close connectoin with the lobby?
+                    M_Temp Scratch = GetScratch(0, 0);
+                    GameID.str = PushArray(Scratch.arena, u8, GameID.size);
+                    io_successed &= os->ReceiveBuffer(LobbySocket, GameID.str, (i32)GameID.size);
+                    if (io_successed)
+                    {
+                        Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
+                        message->type = NetworkMessage_GameID;
+                        Assert(GameID.size <= ArrayCount(message->buffer));
+                        MemoryCopy(message->buffer, GameID.str, GameID.size);
+                        message->game_id = Str8(message->buffer, GameID.size);
+                        W32_EndMessageQueueWrite(&network_message_queue);
+                        ConnectToHost("127.0.0.1");
+                    }
+                    ReleaseScratch(Scratch);
                 }
-                ReleaseScratch(Scratch);
+                
+                if (io_successed)
+                {
+                    network_io_context.lobby_socket = LobbySocket;
+                    CreateIoCompletionPort((HANDLE)LobbySocket, network_thread_iocp_handle, NetworkMessageSource_LobbyHeartbeat, 1);
+                    ReceiveNextLobbyHeartbeat();
+                }
             }
+            
             if (!good)
             {
                 Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
@@ -86,11 +128,13 @@ HandlePlayerMessage(Message *message)
         } break;
         case PlayerMessage_JoinGameSession:
         {
+            b32 io_successed = true;
             Socket_Handle LobbySocket = W32_ConnectToServer(lobby_address, LOBBY_PLAYER_PORT);
-            W32_SendBuffer(LobbySocket, &message->game_id.size, sizeof(message->game_id.size));
-            W32_SendBuffer(LobbySocket, message->game_id.str, (i32)message->game_id.size);
+            NetworkSendString(LobbySocket, message->game_id, io_successed);
+            
             u32 host_address;
-            if (W32_ReceiveBuffer(LobbySocket, &host_address, sizeof(host_address)))
+            NetworkReceiveValue(LobbySocket, host_address, io_successed);
+            if (io_successed)
             {
                 Log("Received address is %d", host_address);
                 struct in_addr ip_addr;
@@ -109,28 +153,52 @@ HandlePlayerMessage(Message *message)
                 message->type = NetworkMessage_FailedToJoin;
                 W32_EndMessageQueueWrite(&network_message_queue);
             }
+            
+            if (LobbySocket != InvalidSocket)
+            {
+                os->CloseSocket(LobbySocket);
+            }
         } break;
         case PlayerMessage_Username:
         {
-            Log("Username request");
-            Log("username is %s", message->username.cstr);
-            Assert(host_io_context.host_socket != InvalidSocket);
-            W32_SendString(host_io_context.host_socket, message->username);
+            b32 io_successed = true;
+            Assert(network_io_context.host_socket != InvalidSocket);
+            NetworkSendString(network_io_context.host_socket, message->username, io_successed);
+            if (!io_successed)
+            {
+                Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
+                message->type = NetworkMessage_HostDown;
+                W32_EndMessageQueueWrite(&network_message_queue);
+            }
         } break;
         case PlayerMessage_PlayCard:
         {
+            b32 io_successed = true;
             PlayerMoveKind move_kind = PlayerMove_PlayCard;
-            NetworkSendValue(host_io_context.host_socket, move_kind);
-            NetworkSendArray(host_io_context.host_socket,
+            NetworkSendValue(network_io_context.host_socket, move_kind, io_successed);
+            NetworkSendArray(network_io_context.host_socket,
                              message->player_move.actual_cards, 
                              message->player_move.played_cards_count, 
-                             Compact_Card_Type);
-            NetworkSendValue(host_io_context.host_socket, message->player_move.declared_number);
+                             Compact_Card_Type, io_successed);
+            NetworkSendValue(network_io_context.host_socket, message->player_move.declared_number, io_successed);
+            if (!io_successed)
+            {
+                Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
+                message->type = NetworkMessage_HostDown;
+                W32_EndMessageQueueWrite(&network_message_queue);}
         } break;
         case PlayerMessage_QuestionCredibility:
         {
+            b32 io_successed = true;
             PlayerMoveKind move_kind = PlayerMove_QuestionCredibility;
-            NetworkSendValue(host_io_context.host_socket, move_kind);
+            NetworkSendValue(network_io_context.host_socket, move_kind, io_successed);
+            if (!io_successed)
+            {
+                Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
+                message->type = NetworkMessage_HostDown;
+                W32_EndMessageQueueWrite(&network_message_queue);
+            }
+            
         } break;
         default:
         {
@@ -146,8 +214,12 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
     Thread_Ctx WorkerThreadContext = MakeTCTX();
     SetTCTX(&WorkerThreadContext);
     
-    host_io_context.wsa_buf.buf = (char *)&host_io_context.message_type;
-    host_io_context.wsa_buf.len = sizeof(host_io_context.message_type);
+    network_io_context.message_type_wsa_buf.buf = (char *)&network_io_context.message_type;
+    network_io_context.message_type_wsa_buf.len = sizeof(network_io_context.message_type);
+    
+    network_io_context.lobby_heartbeat_wsa_buf.buf = (char *)&network_io_context.lobby_heartbeat;
+    network_io_context.lobby_heartbeat_wsa_buf.len = sizeof(network_io_context.lobby_heartbeat);
+    
     for(;;)
     {
         DWORD bytes_transferred;
@@ -162,6 +234,22 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
             Log("Received network message");
             switch(completion_key)
             {
+                case NetworkMessageSource_LobbyHeartbeat:
+                {
+                    if (network_io_context.lobby_socket != InvalidSocket)
+                    {
+                        if (os->IsGameHostRunning())
+                        {
+                            // NOTE(fakhri): echo back whatever the lobby sent
+                            os->SendBuffer(network_io_context.lobby_socket, &network_io_context.lobby_heartbeat, sizeof(network_io_context.lobby_heartbeat));
+                        }
+                        else
+                        {
+                            os->CloseSocket(network_io_context.lobby_socket);
+                            network_io_context.lobby_socket = InvalidSocket;
+                        }
+                    }
+                } break;
                 case NetworkMessageSource_Player:
                 {
                     Log("From Player");
@@ -178,22 +266,39 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                 {
                     Log("From host");
                     Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
-                    message->type = host_io_context.message_type;
+                    message->type = network_io_context.message_type;
                     // NOTE(fakhri): receive the actual message from the host
-                    switch(host_io_context.message_type)
+                    switch(network_io_context.message_type)
                     {
+                        case HostMessage_HostShuttingDown:
+                        {
+                            b32 io_successed = true;
+                            NetworkReceiveValue(network_io_context.host_socket, message->host_closing_reason, io_successed);
+                            if (!io_successed)
+                            {
+                                message->host_closing_reason = ClosingReason_Unkown;
+                            }
+                            os->CloseSocket(network_io_context.host_socket);
+                            network_io_context.host_socket = InvalidSocket;
+                        } break;
                         case HostMessage_InvalidUsername:
                         {
                             // NOTE(fakhri): nothing to do
                         } break;
                         case HostMessage_PlayCard:
                         {
+                            b32 io_successed = true;
                             message->player_move.actual_cards = (Compact_Card_Type *)message->buffer;
-                            NetworkReceiveArray(host_io_context.host_socket, 
-                                                message->player_move.actual_cards, 
-                                                message->player_move.played_cards_count, 
-                                                Compact_Card_Type);
-                            NetworkReceiveValue(host_io_context.host_socket, message->player_move.declared_number);
+                            NetworkReceiveArrayNoAlloc(network_io_context.host_socket, 
+                                                       message->player_move.actual_cards, 
+                                                       message->player_move.played_cards_count, 
+                                                       Compact_Card_Type, io_successed);
+                            NetworkReceiveValue(network_io_context.host_socket, message->player_move.declared_number, io_successed);
+                            
+                            if (!io_successed)
+                            {
+                                message->type = NetworkMessage_HostDown;
+                            }
                         } break;
                         case HostMessage_QuestionCredibility:
                         {
@@ -201,8 +306,9 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                         } break;
                         case HostMessage_ConnectedPlayersList:
                         {
+                            b32 io_successed = true;
                             Log("HostMessage_ConnectedPlayersList");
-                            NetworkReceiveValue(host_io_context.host_socket, message->players_count);
+                            NetworkReceiveValue(network_io_context.host_socket, message->players_count, io_successed);
                             
                             u32 offset = 0;
                             for (u32 player_index = 0;
@@ -210,22 +316,26 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                                  ++player_index)
                             {
                                 String8 *player_username = message->players_usernames + player_index;
-                                NetworkReceiveValue(host_io_context.host_socket, player_username->len);
+                                NetworkReceiveValue(network_io_context.host_socket, player_username->len, io_successed);
                                 Assert(offset + player_username->len < sizeof(message->buffer));
                                 Assert(player_username->len < USERNAME_BUFFER_SIZE);
-                                W32_ReceiveBuffer(host_io_context.host_socket, message->buffer + offset, (i32)player_username->len);
+                                os->ReceiveBuffer(network_io_context.host_socket, message->buffer + offset, (i32)player_username->len);
                                 player_username->str = message->buffer + offset;
                                 offset += (i32)player_username->len;
+                            }
+                            if (!io_successed)
+                            {
+                                message->type = NetworkMessage_HostDown;
                             }
                         } break;
                         case HostMessage_NewPlayerJoined:
                         {
                             Log("HostMessage_NewPlayerJoined");
-                            W32_ReceiveBuffer(host_io_context.host_socket, &message->new_player_id, sizeof(message->new_player_id));
-                            W32_ReceiveBuffer(host_io_context.host_socket, &message->new_username.len, sizeof(message->new_username.len));
+                            os->ReceiveBuffer(network_io_context.host_socket, &message->new_player_id, sizeof(message->new_player_id));
+                            os->ReceiveBuffer(network_io_context.host_socket, &message->new_username.len, sizeof(message->new_username.len));
                             Assert(message->new_username.len < USERNAME_BUFFER_SIZE);
                             Assert(message->new_username.len < sizeof(message->buffer));
-                            W32_ReceiveBuffer(host_io_context.host_socket, message->buffer, (i32)message->new_username.len);
+                            os->ReceiveBuffer(network_io_context.host_socket, message->buffer, (i32)message->new_username.len);
                             message->new_username.str = message->buffer;
                             
                         } break;
@@ -235,12 +345,20 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                             message->compact_deck = (Compact_Card_Type *)message->buffer;
                             u32 compact_deck_size = DECK_CARDS_COUNT * sizeof(Compact_Card_Type);
                             Assert(compact_deck_size < sizeof(message->buffer));
-                            W32_ReceiveBuffer(host_io_context.host_socket, message->compact_deck, compact_deck_size);
+                            if (!os->ReceiveBuffer(network_io_context.host_socket, message->compact_deck, compact_deck_size))
+                            {
+                                message->type = NetworkMessage_HostDown;
+                            }
                         } break;
                         case HostMessage_ChangePlayerTurn:
                         {
+                            b32 io_successed = true;
                             Log("HostMessage_ChangePlayerTurn");
-                            NetworkReceiveValue(host_io_context.host_socket, message->next_player_id);
+                            NetworkReceiveValue(network_io_context.host_socket, message->next_player_id, io_successed);
+                            if (!io_successed)
+                            {
+                                message->type = NetworkMessage_HostDown;
+                            }
                         } break;
                         default :
                         {
@@ -249,7 +367,10 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                     }
                     // NOTE(fakhri): make the changes visible to consumer threads
                     W32_EndMessageQueueWrite(&network_message_queue);
-                    ReceiveNextMessageType();
+                    if (network_io_context.host_socket != InvalidSocket)
+                    {
+                        ReceiveNextMessageType();
+                    }
                 } break;
             }
         }

@@ -73,6 +73,11 @@ struct OS_State
     OS_IsWorkQueueEmpty_Function             *IsWorkQueueEmpty;
     OS_CopyStringToClipboard_Function        *CopyStringToClipboard;
     OS_GetStringFromClipboard_Function       *GetStringFromClipboard;
+    
+    OS_StartGameHost_Function                *StartGameHost;
+    OS_IsGameHostRunning_Function            *IsGameHostRunning;
+    OS_StopGameHost_Function                 *StopGameHost;
+    
 };
 
 global OS_State *os;

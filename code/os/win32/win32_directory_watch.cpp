@@ -78,7 +78,7 @@ W32_CheckDirectoryChanges(M_Arena *arena, Directory_Watcher *dir_watch)
         }
         else
         {
-            InvalidPath;
+            InvalidCodePath;
         }
     }
     return result;

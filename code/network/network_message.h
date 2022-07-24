@@ -8,11 +8,28 @@
 #define DECK_CARDS_COUNT (MAX_PLAYER_COUNT * CARDS_PER_PLAYER)
 #define InvalidePlayerID MAX_PLAYER_COUNT
 
-#define NetworkSendValue(s, v) do {os->SendBuffer(s, &(v), sizeof(v));} while(0)
-#define NetworkReceiveValue(s, v) do {os->ReceiveBuffer(s, &(v), sizeof(v));} while(0)
+#define NetworkSendValue(s, v, r) do { r &= os->SendBuffer(s, &(v), sizeof(v));} while(0)
+#define NetworkReceiveValue(s, v, r) do {r &= os->ReceiveBuffer(s, &(v), sizeof(v));} while(0)
 
-#define NetworkSendArray(s, arr, cnt, T) do {NetworkSendValue(s, cnt); os->SendBuffer(s, arr, (cnt) * sizeof(T));} while(0)
-#define NetworkReceiveArray(s, arr, cnt, T) do { NetworkReceiveValue(s, cnt); os->ReceiveBuffer(s, arr, (cnt) * sizeof(T));} while(0)
+#define NetworkSendArray(s, arr, cnt, T, r) do {NetworkSendValue(s, cnt, r); r &= os->SendBuffer(s, arr, (i32)(cnt) * sizeof(T));} while(0)
+#define NetworkReceiveArray(a, s, arr, cnt, T, r) do { \
+NetworkReceiveValue(s, cnt, r); \
+u32 array_size = (cnt) * sizeof(T); \
+arr = PushArray(a, T, array_size); \
+r &= os->ReceiveBuffer(s, arr, array_size);\
+} while(0)
+
+#define NetworkReceiveArrayNoAlloc(s, arr, cnt, T, r) do { \
+NetworkReceiveValue(s, cnt, r); \
+u32 array_size = (cnt) * sizeof(T); \
+r &= os->ReceiveBuffer(s, arr, array_size);\
+} while(0)
+
+#define NetworkSendConstArray(s, arr, r) do {r &= os->SendBuffer(s, arr, sizeof(arr));} while(0)
+#define NetworkReceiveConstArray(s, arr, r) do { r &= os->ReceiveBuffer(s, arr, sizeof(arr));} while(0)
+
+#define NetworkSendString(s, string, r) NetworkSendArray(s, string.str, string.size, u8, r)
+#define NetworkReceiveString(a, s, string, r) NetworkReceiveArray(a, s, string.str, string.size, u8, r)
 
 typedef u8 PlayerMoveKind;
 enum
@@ -44,12 +61,14 @@ enum
     HostMessage_PlayerWon,
     HostMessage_PlayCard,
     HostMessage_QuestionCredibility,
+    HostMessage_HostShuttingDown,
     
     // NOTE(fakhri): other network messages
     NetworkMessage_GameID,
     NetworkMessage_FailedToHost,
     NetworkMessage_JoinedGame,
     NetworkMessage_FailedToJoin,
+    NetworkMessage_HostDown,
 };
 
 struct Hosts_Storage;
@@ -100,6 +119,7 @@ struct Message
         PlayCardMove player_move;
         PlayerID next_player_id;
         String8 game_id;
+        enum ClosingReason host_closing_reason;
     };
 };
 

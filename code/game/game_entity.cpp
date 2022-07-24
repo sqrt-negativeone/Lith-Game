@@ -383,18 +383,21 @@ UpdateCursorEntity(Game_State *game_state, Entity *cursor_entity)
     
     f32 max_z = -1;
     game_state->highest_entity_under_cursor = 0;
-    for (EachValidResidencyKind(residency_kind))
+    if (!HasFlag(game_state->flags, GameStateFlagsGroup_NoInput))
     {
-        // NOTE(fakhri): find the card entity with the highest z value in residency
-        ResidencyIterator iter = MakeResidencyIterator(game_state, residency_kind);
-        for(EachValidResidencyEntityID(entity_id, iter))
+        for (EachValidResidencyKind(residency_kind))
         {
-            Entity *entity = game_state->entities + entity_id;
-            if (IsInsideRect(RectCentDim(entity->center_pos.xy, entity->curr_dimension), cursor_entity->center_pos.xy) && 
-                max_z < entity->center_pos.z)
+            // NOTE(fakhri): find the card entity with the highest z value in residency
+            ResidencyIterator iter = MakeResidencyIterator(game_state, residency_kind);
+            for(EachValidResidencyEntityID(entity_id, iter))
             {
-                game_state->highest_entity_under_cursor = entity_id;
-                max_z = entity->center_pos.z;
+                Entity *entity = game_state->entities + entity_id;
+                if (IsInsideRect(RectCentDim(entity->center_pos.xy, entity->curr_dimension), cursor_entity->center_pos.xy) && 
+                    max_z < entity->center_pos.z)
+                {
+                    game_state->highest_entity_under_cursor = entity_id;
+                    max_z = entity->center_pos.z;
+                }
             }
         }
     }
@@ -423,37 +426,40 @@ UpdateCardEntity(Game_State *game_state, EntityID entity_id, f32 dt)
             entity->target_dimension = 1.1f * Vec2(CARD_WIDTH, CARD_HEIGHT);
         }
         
-        if (game_state->controller.left_mouse.pressed)
+        if (!HasFlag(game_state->flags, GameStateFlagsGroup_NoInput))
         {
-            Player *curr_player = game_state->players + game_state->curr_player_id;
-            if ((game_state->curr_player_id == game_state->my_player_id) && (entity->residency == curr_player->assigned_residency_kind))
+            if (game_state->controller.left_mouse.pressed)
             {
-                if (HasFlag(entity->flags, EntityFlag_Selected))
+                Player *curr_player = game_state->players + game_state->curr_player_id;
+                if ((game_state->curr_player_id == game_state->my_player_id) && (entity->residency == curr_player->assigned_residency_kind))
                 {
-                    ClearFlag(entity->flags, EntityFlag_Selected);
-                    game_state->selection_count -= 1;
-                    entity->target_pos.y -= MiliMeter(10);
-                }
-                else
-                {
-                    if (game_state->selection_count < game_state->selection_limit)
+                    if (HasFlag(entity->flags, EntityFlag_Selected))
                     {
-                        ++game_state->selection_count;
-                        SetFlag(entity->flags, EntityFlag_Selected);
-                        entity->target_pos.y += MiliMeter(10);
+                        ClearFlag(entity->flags, EntityFlag_Selected);
+                        game_state->selection_count -= 1;
+                        entity->target_pos.y -= MiliMeter(10);
                     }
                     else
                     {
-                        M_Temp scratch = GetScratch(0, 0);
-                        String8 msg = PushStr8F(scratch.arena, "you can't select more than %d cards", game_state->selection_limit);
-                        GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, msg, Vec4(1, 1, 1, 1), Vec3(0, 0, 50), CoordinateType_World, Seconds(1.0f));
-                        ReleaseScratch(scratch);
+                        if (game_state->selection_count < game_state->selection_limit)
+                        {
+                            ++game_state->selection_count;
+                            SetFlag(entity->flags, EntityFlag_Selected);
+                            entity->target_pos.y += MiliMeter(10);
+                        }
+                        else
+                        {
+                            M_Temp scratch = GetScratch(0, 0);
+                            String8 msg = PushStr8F(scratch.arena, "you can't select more than %d cards", game_state->selection_limit);
+                            GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, msg, Vec4(1, 1, 1, 1), Vec3(0, 0, 50), CoordinateType_World, Seconds(1.0f));
+                            ReleaseScratch(scratch);
+                        }
                     }
                 }
-            }
-            else
-            {
-                GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, Str8Lit("you can't select other players cards!"), Vec4(1, 1, 1, 1), Vec3(0, 0, 50), CoordinateType_World, Seconds(2.0f));
+                else
+                {
+                    GameCommand_PushCommand_DisplayMessag(&game_state->command_buffer, Str8Lit("you can't select other players cards!"), Vec4(1, 1, 1, 1), Vec3(0, 0, 50), CoordinateType_World, Seconds(2.0f));
+                }
             }
         }
     }
@@ -492,13 +498,16 @@ UpdateNumberEntity(Game_State *game_state, EntityID entity_id, f32 dt)
             entity->target_dimension = 1.1f * 3 * Vec2(MiliMeter(6.5f), MiliMeter(10));
         }
         
-        if (HasFlag(game_state->flags, StateFlag_ShouldDeclareCard))
+        if (!HasFlag(game_state->flags, GameStateFlagsGroup_NoInput))
         {
-            if (game_state->controller.left_mouse.pressed)
+            if (HasFlag(game_state->flags, StateFlag_ShouldDeclareCard))
             {
-                game_state->declared_number = entity->card_type.number;
-                PlaySelectedCards(game_state);
-                MoveAllFromResidency(game_state, ResidencyKind_DeclarationOptions, ResidencyKind_Nonespacial);
+                if (game_state->controller.left_mouse.pressed)
+                {
+                    game_state->declared_number = entity->card_type.number;
+                    PlaySelectedCards(game_state);
+                    MoveAllFromResidency(game_state, ResidencyKind_DeclarationOptions, ResidencyKind_Nonespacial);
+                }
             }
         }
     }
@@ -536,22 +545,26 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
     b32 clicked = 0;
     b32 mouse_inside = IsInsideRect(RectCentDim(entity->center_pos.xy, entity->curr_dimension),
                                     cursor_entity->center_pos.xy);
-    if (mouse_inside)
-    {
-        if (game_state->controller.left_mouse.pressed)
-        {
-            SetFlag(entity->flags, EntityFlag_Pressed);
-            entity->target_dimension = 1.2f * Vec2(MiliMeter(50), MiliMeter(30));
-            clicked = true;
-        }
-    }
     
-    if (HasFlag(entity->flags, EntityFlag_Pressed))
+    if (!HasFlag(game_state->flags, GameStateFlagsGroup_NoInput))
     {
-        if (game_state->controller.left_mouse.released)
+        if (mouse_inside)
         {
-            entity->target_dimension = Vec2(MiliMeter(50), MiliMeter(30));
-            ClearFlag(entity->flags, EntityFlag_Pressed);
+            if (game_state->controller.left_mouse.pressed)
+            {
+                SetFlag(entity->flags, EntityFlag_Pressed);
+                entity->target_dimension = 1.2f * Vec2(MiliMeter(50), MiliMeter(30));
+                clicked = true;
+            }
+        }
+        
+        if (HasFlag(entity->flags, EntityFlag_Pressed))
+        {
+            if (game_state->controller.left_mouse.released)
+            {
+                entity->target_dimension = Vec2(MiliMeter(50), MiliMeter(30));
+                ClearFlag(entity->flags, EntityFlag_Pressed);
+            }
         }
     }
     
