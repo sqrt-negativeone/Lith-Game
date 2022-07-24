@@ -343,27 +343,6 @@ AssignResidencyToPlayers(Game_State *game_state)
     game_state->players[player_id].assigned_residency_kind = ResidencyKind_Right;
     game_state->residencies[ResidencyKind_Right].controlling_player_id = player_id;
     
-#if 0    
-    for(u32 player_index = 0;
-        player_index < ArrayCount(game_state->players);
-        ++player_index)
-    {
-        Player *player = game_state->players + player_index;
-        if (player_index == game_state->my_player_id)
-        {
-            player->assigned_residency_kind = ResidencyKind_Down;
-            game_state->residencies[ResidencyKind_Down].controlling_player_id = player_index;
-        }
-        else
-        {
-            Assert(residency != ResidencyKind_Down);
-            player->assigned_residency_kind = (ResidencyKind)residency;
-            game_state->residencies[residency].controlling_player_id = player_index;
-            ++residency;
-        }
-    }
-#endif
-    
 }
 
 internal b32

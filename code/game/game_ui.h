@@ -19,7 +19,7 @@ enum GameMenuKind
 
 struct Game_Menu
 {
-    b32 accept_input;
+    b32 is_active;
     f32 presence;
     f32 presence_change_speed;
 };

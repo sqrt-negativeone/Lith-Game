@@ -420,14 +420,14 @@ UI_OpenMenu(Game_UI *ui, GameMenuKind menu_kind)
     if (ui->active_menu)
     {
         Game_Menu *menu = ui->menus + ui->active_menu;
-        menu->accept_input = 0;
+        menu->is_active = 0;
         menu->presence_change_speed = -10.0f;
     }
     
     ui->active_menu = menu_kind;
     {
         Game_Menu *menu = ui->menus + ui->active_menu;
-        menu->accept_input = 1;
+        menu->is_active = 1;
         menu->presence_change_speed = 10.0f;
     }
     

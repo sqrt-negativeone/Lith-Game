@@ -276,10 +276,10 @@ GameHostWork(void *data)
                         GameHost_BurnExtraCards(&host_context, player_residency);
                     }
                     
-#if 0
+#if 1
                     curr_player_id = NextRandomNumber(&rand_ctx);
 #else
-                    curr_player_id = MAX_PLAYER_COUNT - 2;
+                    curr_player_id = MAX_PLAYER_COUNT - 1;
 #endif
                     
                     step = GameStep_ChangePlayerTurn;

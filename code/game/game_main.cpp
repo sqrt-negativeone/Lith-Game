@@ -370,13 +370,16 @@ GameMenu(Game_State *game_state, f32 dt)
         UI_Label(ui, x, y, Str8Lit("Joining Game"), color, fade_in);
         y += VerticalAdvanceFontHeight(ui);
         
-        if (HasFlag(game_state->flags, StateFlag_JoinedGame))
+        if (menu->is_active)
         {
-            UI_OpenMenu(ui, GameMenuKind_EnterUsername);
-        }
-        else if (HasFlag(game_state->flags, StateFlag_FailedJoinGame))
-        {
-            UI_OpenMenu(ui, GameMenuKind_NetworkError);
+            if (HasFlag(game_state->flags, StateFlag_JoinedGame))
+            {
+                UI_OpenMenu(ui, GameMenuKind_EnterUsername);
+            }
+            else if (HasFlag(game_state->flags, StateFlag_FailedJoinGame))
+            {
+                UI_OpenMenu(ui, GameMenuKind_NetworkError);
+            }
         }
     }
     UI_MenuSectionEnd();
@@ -426,10 +429,12 @@ GameMenu(Game_State *game_state, f32 dt)
         UI_Label(ui, x, y, Str8Lit("Waiting Server Confirmation"), color, fade_in);
         y += VerticalAdvanceFontHeight(ui);
         
-        
-        if (HasFlag(game_state->flags, StateFlag_HostingGame))
+        if (menu->is_active)
         {
-            UI_OpenMenu(ui, GameMenuKind_EnterUsername);
+            if (HasFlag(game_state->flags, StateFlag_HostingGame))
+            {
+                UI_OpenMenu(ui, GameMenuKind_EnterUsername);
+            }
         }
     }
     UI_MenuSectionEnd();
@@ -469,7 +474,6 @@ GameMenu(Game_State *game_state, f32 dt)
                 UI_OpenMenu(ui, GameMenuKind_UsernameConfirmation);
             }
         }
-        
     }
     UI_MenuSectionEnd();
     
@@ -497,14 +501,17 @@ GameMenu(Game_State *game_state, f32 dt)
         y += VerticalAdvanceFontHeight(ui);
         
         
-        if (HasFlag(game_state->flags, StateFlag_UsernameValid))
+        if (menu->is_active)
         {
-            UI_OpenMenu(ui, GameMenuKind_JoinedPlayers);
-        }
-        else if (HasFlag(game_state->flags, StateFlag_UsernameInvalid))
-        {
-            // TODO(fakhri): display an error 
-            NotImplemented;
+            if (HasFlag(game_state->flags, StateFlag_UsernameValid))
+            {
+                UI_OpenMenu(ui, GameMenuKind_JoinedPlayers);
+            }
+            else if (HasFlag(game_state->flags, StateFlag_UsernameInvalid))
+            {
+                // TODO(fakhri): display an error 
+                NotImplemented;
+            }
         }
     }
     UI_MenuSectionEnd();
@@ -555,12 +562,14 @@ GameMenu(Game_State *game_state, f32 dt)
             }
         }
         
-        if (menu->accept_input && game_state->players_joined_so_far == MAX_PLAYER_COUNT)
+        if (menu->is_active)
         {
-            // NOTE(fakhri): enough players have joined
-            StartGame(game_state);
-            ClearFlag(game_state->flags, StateFlag_JoinedGame);
-            UI_CloseMenu(ui);
+            if (game_state->players_joined_so_far == MAX_PLAYER_COUNT)
+            {
+                // NOTE(fakhri): enough players have joined
+                StartGame(game_state);
+                UI_CloseMenu(ui);
+            }
         }
     }
     UI_MenuSectionEnd();
@@ -605,26 +614,6 @@ APP_PermanantLoad(PermanentLoad)
     
     AddNullEntity(game_state);
     AddCursorEntity(game_state);
-    
-#if 0    
-#if TEST_NETWORKING
-    
-    // NOTE(fakhri): host the game
-    os->PushWorkQueueEntry(GameHostWork, 0);
-    // @DebugOnly
-    PushCreateConnectToServerMessage(Str8Lit(""));
-    PushUsernameNetworkMessage(Str8Lit("username"));
-    SetFlag(game_state->flags, StateFlag_TryingJoinGame);
-#else
-    
-    // @DebugOnly
-    //glDepthFunc(GL_LESS);
-    AssignResidencyToPlayers(game_state);
-    game_state->curr_player_id = ResidencyKind_Down - ResidencyKind_Left;
-    game_state->my_player_id      = ResidencyKind_Down - ResidencyKind_Left;
-    AddDebugEntites(game_state);
-#endif
-#endif
     
     game_state->declared_number = InvalidCardNumber;
 }
@@ -730,6 +719,8 @@ APP_UpdateAndRender(UpdateAndRender)
     v4 white = Vec4(1, 1, 1,1);
     v4 red = Vec4(1, 0, 0, 1);
     
+    GameMenu(game_state, dt);
+    
     // NOTE(fakhri): loop over all the entities and update them
     for (u32 entity_id = 1;
          entity_id < game_state->entity_count;
@@ -825,8 +816,6 @@ APP_UpdateAndRender(UpdateAndRender)
         }
     }
     
-    GameMenu(game_state, dt);
-    
     if(HasFlag(game_state->flags, StateFlag_WaitingForCards))
     {
         // NOTE(fakhri): we wait
@@ -836,9 +825,8 @@ APP_UpdateAndRender(UpdateAndRender)
         
         if(HasFlag(game_state->flags, StateFlag_ReceivedCards))
         {
-            ClearFlag(game_state->flags, StateFlag_WaitingForCards);
-            
-            
+            ClearFlag(game_state->flags, StateFlag_WaitingForCards | StateFlag_ReceivedCards);
+            SetFlag(game_state->flags, StateFlag_GameStarted);
             AddButtonEntity(game_state, ButtonEntityKind_QuestionCredibility, Vec3(MiliMeter(150), MiliMeter(0), 0), Vec2(MiliMeter(50), MiliMeter(30)));
             AddButtonEntity(game_state, ButtonEntityKind_PlaySelectedCards, Vec3(MiliMeter(150), -MiliMeter(40), 0), Vec2(MiliMeter(50), MiliMeter(30)));
             
@@ -852,7 +840,8 @@ APP_UpdateAndRender(UpdateAndRender)
             }
         }
     }
-    else
+    
+    if (HasFlag(game_state->flags, StateFlag_GameStarted))
     {
         if (HasFlag(game_state->flags, StateFlag_QuestionCredibility))
         {
@@ -978,14 +967,6 @@ APP_UpdateAndRender(UpdateAndRender)
 #endif
         
         // TODO(fakhri): AI stuff for debug?
-    }
-    
-    // @DebugOnly
-    {
-        if (controller->confirm.pressed)
-        {
-            AddDebugEntites(game_state);
-        }
     }
     
     // NOTE(fakhri): command buffer

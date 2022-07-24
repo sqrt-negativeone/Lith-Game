@@ -346,11 +346,6 @@ AddCardEntity(Game_State *game_state, Card_Type card_type, ResidencyKind card_re
     card->d_orientation.y = 4 * PI32;
     card->d_orientation.z = 4 * PI32;
     
-#if TEST_ONE_CARD
-    card->target_pos.xy = Vec2(0, 0);
-    card->residency_pos.xy = card->center_pos.xy;
-#endif
-    
     card->dDimension = 20.f;
     
     card->texture = TextureID_CardFrame;
@@ -637,91 +632,3 @@ UpdateArrowEntity(Game_State *game_state, Entity *entity, f32 dt)
     MoveEntity(game_state, entity, 100, 10, 0.5f, dt);
 }
 
-internal void
-AddDebugEntites(Game_State *game_state)
-{
-    for(ResidencyKind residency_kind = ResidencyKind_Nil;
-        residency_kind < ResidencyKind_Count;
-        ++residency_kind)
-    {
-        MemoryZeroArray(game_state->residencies[residency_kind].entity_ids);
-    }
-    
-    game_state->entity_count = 0;
-    for (u32 residency_index = 0;
-         residency_index < ArrayCount(game_state->residencies);
-         ++residency_index)
-    {
-        game_state->residencies[residency_index].entity_count = 0;
-    }
-    
-    AddNullEntity(game_state);
-    AddCursorEntity(game_state);
-    AddArrowEntity(game_state);
-    
-    SetFlag(game_state->flags, StateFlag_ReceivedCards);
-    
-#if TEST_ONE_CARD
-    AddCardEntity(game_state, MakeCardType(Category_Hearts, Card_Number_Jack), ResidencyKind_Down);
-#else
-    
-    for (u32 player_index = 0;
-         player_index < MAX_PLAYER_COUNT;
-         ++player_index)
-    {
-        Player *player = game_state->players + player_index;
-        player->joined = true;
-        player->assigned_residency_kind = ResidencyKind_Left + player_index;
-        player->username = PushStr8F(os->permanent_arena, "%c", 'a' + player_index);
-    }
-    
-    for (u32 card_index = 0;
-         card_index < 13;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Hearts, (Card_Number)card_index), ResidencyKind_Left);
-    }
-    
-    
-    for (u32 card_index = 0;
-         card_index < 13;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Tiles, (Card_Number)card_index), ResidencyKind_Right);
-    }
-    
-    for (u32 card_index = 0;
-         card_index < 13;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Clovers, (Card_Number)card_index), ResidencyKind_Up);
-    }
-    
-    for (u32 card_index = 0;
-         card_index < 13;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), ResidencyKind_Down);
-    }
-    
-#if 0    
-    for (u32 card_index = 0;
-         card_index < 13;
-         ++card_index)
-    {
-        AddCardEntity(game_state, MakeCardType(Category_Pikes, (Card_Number)card_index), ResidencyKind_DeclarationOptions);
-    }
-#endif
-    
-    for (Card_Number number = Card_Number_Ace;
-         number < Card_Number_Count;
-         ++number)
-    {
-        AddNumberEntity(game_state, number);
-    }
-    
-    AddButtonEntity(game_state, ButtonEntityKind_QuestionCredibility, Vec3(MiliMeter(150), MiliMeter(0), 0), Vec2(MiliMeter(50), MiliMeter(30)));
-    AddButtonEntity(game_state, ButtonEntityKind_PlaySelectedCards, Vec3(MiliMeter(150), -MiliMeter(40), 0), Vec2(MiliMeter(50), MiliMeter(30)));
-    
-#endif
-}
