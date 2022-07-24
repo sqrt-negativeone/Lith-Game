@@ -264,6 +264,14 @@ ResetGameState(Game_State *game_state)
     game_state->time_scale_factor = 1.f;
     game_state->selection_limit = 13;
     game_state->declared_number = InvalidCardNumber;
+    
+    for(u32 index = 0;
+        index < ArrayCount(game_state->players);
+        ++index)
+    {
+        game_state->players[index].joined = false;
+    }
+    
     UI_OpenMenu(&game_state->ui, GameMenuKind_Main);
     InitResidencies(game_state);
     AddNullEntity(game_state);
