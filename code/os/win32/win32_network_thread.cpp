@@ -62,12 +62,14 @@ ReceiveNextLobbyHeartbeat()
     }
 }
 
-internal void
+internal b32
 ConnectToHost(char *host_address)
 {
+    b32 result = false;
     network_io_context.host_socket = W32_ConnectToServer(host_address, HOST_PORT);
     if(network_io_context.host_socket != InvalidSocket)
     {
+        result = true;
         CreateIoCompletionPort((HANDLE)network_io_context.host_socket, network_thread_iocp_handle, NetworkMessageSource_Host, 1);
         ReceiveNextMessageType();
     }
@@ -75,6 +77,7 @@ ConnectToHost(char *host_address)
     {
         // NOTE(fakhri): probably the host is full?
     }
+    return result;
 }
 
 internal void
@@ -83,15 +86,28 @@ HandlePlayerMessage(Message *message)
     char *lobby_address = "127.0.0.1";
     switch(message->type)
     {
+        case PlayerMessage_CancelJoin:
+        {
+            os->CloseSocket(network_io_context.host_socket);
+        } break;
+        case PlayerMessage_CancelHost:
+        {
+            os->StopGameHost();
+            
+            Socket_Handle s = os->ConnectToServer("127.0.0.1", HOST_PORT);
+            if (s != InvalidSocket)
+            {
+                os->CloseSocket(s);
+            }
+        } break;
         case PlayerMessage_HostGameSession:
         {
             // NOTE(fakhri): start the host
-            b32 good = false;
+            b32 io_successed = true;
             Socket_Handle LobbySocket = W32_ConnectToServer(lobby_address, LOBBY_HOST_PORT);
             if (LobbySocket)
             {
                 String8 GameID;
-                b32 io_successed = true;
                 NetworkReceiveValue(LobbySocket, GameID.size, io_successed);
                 if (io_successed)
                 {
@@ -106,7 +122,7 @@ HandlePlayerMessage(Message *message)
                         MemoryCopy(message->buffer, GameID.str, GameID.size);
                         message->game_id = Str8(message->buffer, GameID.size);
                         W32_EndMessageQueueWrite(&network_message_queue);
-                        ConnectToHost("127.0.0.1");
+                        io_successed &= ConnectToHost("127.0.0.1");
                     }
                     ReleaseScratch(Scratch);
                 }
@@ -119,7 +135,7 @@ HandlePlayerMessage(Message *message)
                 }
             }
             
-            if (!good)
+            if (!io_successed)
             {
                 Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
                 message->type = NetworkMessage_FailedToHost;
@@ -141,13 +157,17 @@ HandlePlayerMessage(Message *message)
                 ip_addr.S_un.S_addr = host_address;
                 char *str_address = inet_ntoa(ip_addr);
                 Log("address as string is %s", str_address);
-                ConnectToHost(str_address);
+                io_successed &= ConnectToHost(str_address);
                 
-                Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
-                message->type = NetworkMessage_JoinedGame;
-                W32_EndMessageQueueWrite(&network_message_queue);
+                if (io_successed)
+                {
+                    Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
+                    message->type = NetworkMessage_JoinedGame;
+                    W32_EndMessageQueueWrite(&network_message_queue);
+                }
             }
-            else
+            
+            if (!io_successed)
             {
                 Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
                 message->type = NetworkMessage_FailedToJoin;

@@ -73,7 +73,6 @@ GameMenu(Game_State *game_state, f32 dt)
         
         if (UI_Button(ui, x, y, Str8Lit("Host Game"), dt, fade_in))
         {
-            
             os->StartGameHost();
             os->PushWorkQueueEntry(GameHostWork, 0);
             PushHostGameSessionNetworkMessage();
@@ -156,10 +155,12 @@ GameMenu(Game_State *game_state, f32 dt)
         {
             if (HasFlag(game_state->flags, StateFlag_JoinedGame))
             {
+                ClearFlag(game_state->flags, StateFlag_JoinedGame);
                 UI_OpenMenu(ui, GameMenuKind_EnterUsername);
             }
             else if (HasFlag(game_state->flags, StateFlag_FailedJoinGame))
             {
+                ClearFlag(game_state->flags, StateFlag_FailedJoinGame);
                 UI_OpenMenu(ui, GameMenuKind_NetworkError);
             }
         }
@@ -261,6 +262,19 @@ GameMenu(Game_State *game_state, f32 dt)
                 UI_OpenMenu(ui, GameMenuKind_UsernameConfirmation);
             }
         }
+        y += 1.0f * VerticalAdvanceFontHeight(ui);
+        
+        if (UI_Button(ui, x, y, Str8Lit("Cancel"), dt, fade_in))
+        {
+            PushCancelJoinNetworkMessage();
+            if (HasFlag(game_state->flags, StateFlag_HostingGame))
+            {
+                ClearFlag(game_state->flags, StateFlag_HostingGame);
+                PushCancelHostNetworkMessage();
+            }
+            UI_OpenMenu(ui, GameMenuKind_Main);
+        }
+        
     }
     UI_MenuSectionEnd();
     

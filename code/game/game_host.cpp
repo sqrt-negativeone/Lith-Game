@@ -198,24 +198,35 @@ GameHostWork(void *data)
                     Connected_Player *player = host_context.temporary_storage.players + tmp_player_index;
                     PlayerUsernameWorkInput *input = username_work_inputs + tmp_player_index;
                     player->socket = InvalidSocket;
-                    while(player->socket == InvalidSocket)
+                    while(os->IsGameHostRunning() && player->socket == InvalidSocket)
                     {
                         player->socket = os->AcceptSocket(host_socket, 0, 0);
                     }
-                    os->PushWorkQueueEntry(GameHost_GetPlayerUsernameWork, input);
+                    
+                    if (!os->IsGameHostRunning())
+                    {
+                        goto stop_host;
+                    }
+                    
+                    if (player->socket != InvalidSocket)
+                    {
+                        os->PushWorkQueueEntry(GameHost_GetPlayerUsernameWork, input);
+                    }
                 }
                 // NOTE(fakhri): make sure that all the players entered a valid username
-                while(os->IsGameHostRunning() && 
-                      host_context.completed_username_work < players_needed)
+                while(host_context.completed_username_work < players_needed)
                 {
+                    if (!os->IsGameHostRunning())
+                    {
+                        goto stop_host;
+                    }
+                    
                     // NOTE(fakhri): make this thread help the worker thread
                     // instead of just waiting
                     os->ProcessOneWorkQueueEntry();
                 }
             }
         }
-        
-        Log("Enough players");
         
         if (os->IsGameHostRunning())
         {
@@ -244,8 +255,13 @@ GameHostWork(void *data)
             Game_Step step = GameStep_ShuffleDeck;
             
             b32 game_ended = false;
-            while(os->IsGameHostRunning() && !game_ended)
+            while(!game_ended)
             {
+                if (!os->IsGameHostRunning())
+                {
+                    goto stop_host;
+                }
+                
                 switch(step)
                 {
                     case GameStep_ShuffleDeck:
@@ -293,7 +309,7 @@ GameHostWork(void *data)
                         {
                             // NOTE(fakhri): some player disconnected
                             BroadcastHostShuttingDown(&host_context, ClosingReason_PlayerDisconnected);
-                            os->StopGameHost();
+                            game_ended = 1;
                         }
                     } break;
                     case GameStep_ChangePlayerTurn:
@@ -309,7 +325,7 @@ GameHostWork(void *data)
                         {
                             // NOTE(fakhri): some player disconnected
                             BroadcastHostShuttingDown(&host_context, ClosingReason_PlayerDisconnected);
-                            os->StopGameHost();
+                            game_ended = 1;
                         }
                     } break;
                     case GameStep_WaitForPlayerMove:
@@ -460,7 +476,7 @@ GameHostWork(void *data)
                         {
                             // NOTE(fakhri): player disconnected
                             BroadcastHostShuttingDown(&host_context, ClosingReason_PlayerDisconnected);
-                            os->StopGameHost();
+                            game_ended = 1;
                         }
                     } break;
                     case GameStep_Finished:
@@ -475,24 +491,25 @@ GameHostWork(void *data)
                 }
                 skip:;
             }
-            
-            // NOTE(fakhri): close the players that are still connected
-            for (u32 player_index = 0;
-                 player_index < ArrayCount(host_context.players_storage.players);
-                 ++player_index)
-            {
-                Connected_Player *player = host_context.players_storage.players + player_index;
-                if (player->socket != InvalidSocket)
-                {
-                    os->CloseSocket(player->socket);
-                    player->socket = InvalidSocket;
-                }
-            }
-            host_context.players_storage.count = 0;
-            os->CloseSocket(host_socket);
         }
+        
+        stop_host:;
+        // NOTE(fakhri): close the players that are still connected
+        for (u32 player_index = 0;
+             player_index < ArrayCount(host_context.players_storage.players);
+             ++player_index)
+        {
+            Connected_Player *player = host_context.players_storage.players + player_index;
+            if (player->socket != InvalidSocket)
+            {
+                os->CloseSocket(player->socket);
+                player->socket = InvalidSocket;
+            }
+        }
+        host_context.players_storage.count = 0;
+        os->CloseSocket(host_socket);
     }
     
-    os->StopGameHost();
     DeleteTCTX(&WorkerThreadContext);
+    os->StopGameHost();
 }

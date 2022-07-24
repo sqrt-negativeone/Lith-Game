@@ -61,3 +61,19 @@ PushJoinGameSessionNetworkMessage(String game_id)
     message->game_id = Str8(message->buffer, game_id.size);
     os->EndPlayerMessageQueueWrite();
 }
+
+internal void
+PushCancelJoinNetworkMessage()
+{
+    Message *message = os->BeginPlayerMessageQueueWrite();
+    message->type = PlayerMessage_CancelJoin;
+    os->EndPlayerMessageQueueWrite();
+}
+
+internal void
+PushCancelHostNetworkMessage()
+{
+    Message *message = os->BeginPlayerMessageQueueWrite();
+    message->type = PlayerMessage_CancelHost;
+    os->EndPlayerMessageQueueWrite();
+}

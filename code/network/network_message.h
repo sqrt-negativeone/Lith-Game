@@ -50,6 +50,8 @@ enum
     PlayerMessage_Username,
     PlayerMessage_PlayCard,
     PlayerMessage_QuestionCredibility,
+    PlayerMessage_CancelJoin,
+    PlayerMessage_CancelHost,
     
     // NOTE(fakhri): Host messages here
     HostMessage_InvalidUsername,
