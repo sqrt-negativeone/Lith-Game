@@ -13,6 +13,8 @@ enum
     FontKind_MenuItem,
     FontKind_InputField,
     
+    FontKind_GameButton,
+    
     FontKind_Count,
 };
 

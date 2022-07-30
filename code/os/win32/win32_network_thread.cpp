@@ -112,6 +112,11 @@ HandlePlayerMessage(Message *message)
                     W32_CloseSocket(LobbySocket);
                 }
             }
+            else
+            {
+                io_successed = false;
+            }
+            
             
             if (!io_successed)
             {
@@ -246,6 +251,7 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                 case NetworkMessageSource_Host:
                 {
                     Log("From host");
+                    
                     Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
                     message->type = network_io_context.message_type;
                     // NOTE(fakhri): receive the actual message from the host
@@ -352,8 +358,20 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
                     {
                         ReceiveNextMessageType();
                     }
+                    
                 } break;
             }
+        }
+        else
+        {
+            if (network_io_context.host_socket != InvalidSocket)
+            {
+                W32_CloseSocket(network_io_context.host_socket);
+                Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
+                message->type = NetworkMessage_HostDown;
+                W32_EndMessageQueueWrite(&network_message_queue);
+            }
+            
         }
     }
 }

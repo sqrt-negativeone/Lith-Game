@@ -54,7 +54,6 @@ enum
 enum GameStateFlagsGroup
 {
     GameStateFlagsGroup_NoInput = (StateFlag_NoInput           | 
-                                   StateFlag_ShouldDeclareCard | 
                                    StateFlag_ShouldBurnCards   | 
                                    StateFlag_ShouldOpenDeclaringMenu),
     GameStateFlagsGroup_ValidOnlyForOneFrame = StateFlag_PlaySelectedCards | StateFlag_QuestionCredibility,

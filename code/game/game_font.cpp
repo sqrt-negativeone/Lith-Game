@@ -43,6 +43,11 @@ LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
             font_info.path = Str8LitComp("data/fonts/ariblk.ttf");
             font_info.scale = 50.f;
         } break;
+        case FontKind_GameButton:
+        {
+            font_info.path = Str8LitComp("data/fonts/BubbleboddyNeue.ttf");
+            font_info.scale = 30.f;
+        } break;
         default: NotImplemented; break;
     }
     

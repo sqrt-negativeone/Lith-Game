@@ -142,8 +142,9 @@ HandleAvailableMessages(Game_State *game_state)
                 if (HasFlag(game_state->flags, StateFlag_GameStarted))
                 {
                     ClearFlag(game_state->flags, StateFlag_GameStarted);
-                    SetFlag(game_state->flags, StateFlag_HostDown);
                 }
+                
+                SetFlag(game_state->flags, StateFlag_HostDown);
             } break;
             case HostMessage_HostShuttingDown:
             {
@@ -333,6 +334,8 @@ APP_UpdateAndRender(UpdateAndRender)
 {
     game_state->controller = {};
     Controller *controller = &game_state->controller;
+    v4 white = Vec4(1, 1, 1,1);
+    v4 red = Vec4(1, 0, 0, 1);
     
     HandleAvailableMessages(game_state);
     Render_Begin(&game_state->render_context, OS_FrameArena());
@@ -417,8 +420,6 @@ APP_UpdateAndRender(UpdateAndRender)
     }
     
     dt = game_state->time_scale_factor * dt;
-    v4 white = Vec4(1, 1, 1,1);
-    v4 red = Vec4(1, 0, 0, 1);
     
     GameMenu(game_state, dt);
     
@@ -438,8 +439,8 @@ APP_UpdateAndRender(UpdateAndRender)
         {
             ClearFlag(game_state->flags, StateFlag_WaitingForCards | StateFlag_ReceivedCards);
             SetFlag(game_state->flags, StateFlag_GameStarted);
-            AddButtonEntity(game_state, ButtonEntityKind_QuestionCredibility, Vec3(MiliMeter(150), MiliMeter(0), 0), Vec2(MiliMeter(50), MiliMeter(30)));
-            AddButtonEntity(game_state, ButtonEntityKind_PlaySelectedCards, Vec3(MiliMeter(150), -MiliMeter(40), 0), Vec2(MiliMeter(50), MiliMeter(30)));
+            AddButtonEntity(game_state, ButtonEntityKind_QuestionCredibility, Vec3(MiliMeter(250), MiliMeter(0), 0), Vec2(MiliMeter(200), MiliMeter(30)));
+            AddButtonEntity(game_state, ButtonEntityKind_PlaySelectedCards, Vec3(MiliMeter(250), -MiliMeter(40), 0), Vec2(MiliMeter(200), MiliMeter(30)));
             
             AddArrowEntity(game_state);
             
@@ -520,7 +521,26 @@ APP_UpdateAndRender(UpdateAndRender)
                     {
                         button_color.r = 0;
                     }
+                    
                     Render_PushQuad(&game_state->render_context, entity->center_pos, entity->curr_dimension, button_color, CoordinateType_World);
+                    
+                    f32 font_height = GetFontHeight(&game_state->render_context, FontKind_GameButton);
+                    font_height = PixelsToMeter(&game_state->render_context, font_height);
+                    v3 text_pos = entity->center_pos;
+                    text_pos.y = text_pos.y  - 0.25f * font_height;
+                    switch(entity->button_kind)
+                    {
+                        case ButtonEntityKind_PlaySelectedCards:
+                        {
+                            
+                            Render_PushText(&game_state->render_context, Str8Lit("Play Cards"), text_pos, Vec4(1,1,1,1), CoordinateType_World, FontKind_GameButton);
+                        } break;
+                        case ButtonEntityKind_QuestionCredibility:
+                        {
+                            Render_PushText(&game_state->render_context, Str8Lit("Question Credibility"), text_pos, Vec4(1,1,1,1), CoordinateType_World, FontKind_GameButton);
+                        } break;
+                        default: NotImplemented;
+                    }
                 }
                 else
                 {

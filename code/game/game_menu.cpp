@@ -158,9 +158,9 @@ GameMenu(Game_State *game_state, f32 dt)
                 ClearFlag(game_state->flags, StateFlag_JoinedGame);
                 UI_OpenMenu(ui, GameMenuKind_EnterUsername);
             }
-            else if (HasFlag(game_state->flags, StateFlag_FailedJoinGame))
+            else if (HasFlag(game_state->flags, StateFlag_FailedJoinGame | StateFlag_HostDown))
             {
-                ClearFlag(game_state->flags, StateFlag_FailedJoinGame);
+                ClearFlag(game_state->flags, StateFlag_FailedJoinGame | StateFlag_HostDown);
                 UI_OpenMenu(ui, GameMenuKind_NetworkError);
             }
         }
@@ -218,9 +218,9 @@ GameMenu(Game_State *game_state, f32 dt)
             {
                 UI_OpenMenu(ui, GameMenuKind_EnterUsername);
             }
-            else if (HasFlag(game_state->flags, StateFlag_CantHost))
+            else if (HasFlag(game_state->flags, StateFlag_CantHost | StateFlag_HostDown))
             {
-                ClearFlag(game_state->flags, StateFlag_CantHost);
+                ClearFlag(game_state->flags, StateFlag_CantHost | StateFlag_HostDown);
                 UI_OpenMenu(ui, GameMenuKind_NetworkError);
             }
         }
@@ -313,6 +313,12 @@ GameMenu(Game_State *game_state, f32 dt)
                 ClearFlag(game_state->flags, StateFlag_UsernameInvalid);
                 UI_OpenMenu(ui, GameMenuKind_InvalidUsername);
             }
+            else if (HasFlag(game_state->flags, StateFlag_HostDown))
+            {
+                ClearFlag(game_state->flags, StateFlag_HostDown);
+                UI_OpenMenu(ui, GameMenuKind_NetworkError);
+            }
+            
         }
     }
     UI_MenuSectionEnd();
@@ -395,7 +401,12 @@ GameMenu(Game_State *game_state, f32 dt)
         
         if (menu->is_active)
         {
-            if (game_state->players_joined_so_far == MAX_PLAYER_COUNT)
+            if (HasFlag(game_state->flags, StateFlag_HostDown))
+            {
+                ClearFlag(game_state->flags, StateFlag_HostDown);
+                UI_OpenMenu(ui, GameMenuKind_NetworkError);
+            }
+            else if (game_state->players_joined_so_far == MAX_PLAYER_COUNT)
             {
                 // NOTE(fakhri): enough players have joined
                 StartGame(game_state);

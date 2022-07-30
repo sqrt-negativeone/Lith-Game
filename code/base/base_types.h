@@ -329,7 +329,8 @@ read_only global f32 F32Pi = 3.14159265359f;
 //~ NOTE(fakhri): Assertions
 
 #undef Assert
-#define Assert(b) do { if(!(b)) { (*(volatile int *)0 = 0); } } while(0)
+#define AssertBreak (*(volatile int *)0 = 0)
+#define Assert(b) do { if(!(b)) { AssertBreak; } } while(0)
 #define StaticAssert(c,label) U8 static_assert_##label[(c)?(1):(-1)]
 #define NotImplemented Assert(!"Not Implemented")
 #define StopExecution Assert(!"Stopping Execution")
