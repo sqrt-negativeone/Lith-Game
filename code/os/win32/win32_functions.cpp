@@ -565,5 +565,10 @@ W32_IsGameHostRunning()
 internal void
 W32_StopGameHost()
 {
+    if (network_io_context.lobby_socket != InvalidSocket)
+    {
+        W32_CloseSocket(network_io_context.lobby_socket);
+        network_io_context.lobby_socket = InvalidSocket;
+    }
     w32_host_running = false;
 }

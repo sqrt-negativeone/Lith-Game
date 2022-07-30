@@ -99,7 +99,6 @@ struct Entity
     
     v2 velocity;
     
-    // TODO(fakhri): we can have flags here instead, then each type of entity can have its own flags
     EntityFlags flags;
     
     EntityID entity_id_to_follow;

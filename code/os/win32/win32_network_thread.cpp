@@ -2,18 +2,14 @@
 
 struct NetworkIOContext
 {
+    M_Arena *arena;
+    String8 game_id;
+    Socket_Handle lobby_socket;
     Socket_Handle host_socket;
     MessageType message_type;
     
-    Socket_Handle lobby_socket;
-    u8 lobby_heartbeat;
-    
     WSABUF message_type_wsa_buf;
     WSAOVERLAPPED message_type_overlapped;
-    
-    WSABUF lobby_heartbeat_wsa_buf;
-    WSAOVERLAPPED lobby_heartbeat_overlapped;
-    
 };
 
 global NetworkIOContext network_io_context;
@@ -28,28 +24,6 @@ ReceiveNextMessageType()
                 0,
                 &flags,
                 &network_io_context.message_type_overlapped,
-                0
-                ) == SOCKET_ERROR)
-    {
-        int error = WSAGetLastError();
-        if(error != WSA_IO_PENDING)
-        {
-            Log("Receive failed with error %d", error);
-            InvalidCodePath;
-        }
-    }
-}
-
-internal void
-ReceiveNextLobbyHeartbeat()
-{
-    DWORD flags = 0;
-    if (WSARecv(network_io_context.lobby_socket,
-                &network_io_context.lobby_heartbeat_wsa_buf,
-                1,
-                0,
-                &flags,
-                &network_io_context.lobby_heartbeat_overlapped,
                 0
                 ) == SOCKET_ERROR)
     {
@@ -105,33 +79,37 @@ HandlePlayerMessage(Message *message)
             // NOTE(fakhri): start the host
             b32 io_successed = true;
             Socket_Handle LobbySocket = W32_ConnectToServer(lobby_address, LOBBY_HOST_PORT);
-            if (LobbySocket)
+            if (LobbySocket != InvalidSocket)
             {
-                String8 GameID;
-                NetworkReceiveValue(LobbySocket, GameID.size, io_successed);
+                network_io_context.lobby_socket = LobbySocket;
+                u64 game_id_size;
+                NetworkReceiveValue(LobbySocket, game_id_size, io_successed);
                 if (io_successed)
                 {
-                    M_Temp Scratch = GetScratch(0, 0);
-                    GameID.str = PushArray(Scratch.arena, u8, GameID.size);
-                    io_successed &= os->ReceiveBuffer(LobbySocket, GameID.str, (i32)GameID.size);
+                    if (!network_io_context.game_id.str)
+                    {
+                        network_io_context.game_id.str = PushArrayZero(network_io_context.arena, u8, game_id_size);
+                        network_io_context.game_id.size = game_id_size;
+                    }
+                    
+                    Assert(game_id_size == network_io_context.game_id.size);
+                    
+                    io_successed &= os->ReceiveBuffer(LobbySocket, network_io_context.game_id.str, (u32)game_id_size);
                     if (io_successed)
                     {
                         Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
                         message->type = NetworkMessage_GameID;
-                        Assert(GameID.size <= ArrayCount(message->buffer));
-                        MemoryCopy(message->buffer, GameID.str, GameID.size);
-                        message->game_id = Str8(message->buffer, GameID.size);
+                        Assert(network_io_context.game_id.size <= ArrayCount(message->buffer));
+                        MemoryCopy(message->buffer, network_io_context.game_id.str, game_id_size);
+                        message->game_id = Str8(message->buffer, game_id_size);
                         W32_EndMessageQueueWrite(&network_message_queue);
                         io_successed &= ConnectToHost("127.0.0.1");
                     }
-                    ReleaseScratch(Scratch);
                 }
                 
-                if (io_successed)
+                if (!io_successed)
                 {
-                    network_io_context.lobby_socket = LobbySocket;
-                    CreateIoCompletionPort((HANDLE)LobbySocket, network_thread_iocp_handle, NetworkMessageSource_LobbyHeartbeat, 1);
-                    ReceiveNextLobbyHeartbeat();
+                    W32_CloseSocket(LobbySocket);
                 }
             }
             
@@ -141,6 +119,7 @@ HandlePlayerMessage(Message *message)
                 message->type = NetworkMessage_FailedToHost;
                 W32_EndMessageQueueWrite(&network_message_queue);
             }
+            
         } break;
         case PlayerMessage_JoinGameSession:
         {
@@ -237,9 +216,7 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
     network_io_context.message_type_wsa_buf.buf = (char *)&network_io_context.message_type;
     network_io_context.message_type_wsa_buf.len = sizeof(network_io_context.message_type);
     
-    network_io_context.lobby_heartbeat_wsa_buf.buf = (char *)&network_io_context.lobby_heartbeat;
-    network_io_context.lobby_heartbeat_wsa_buf.len = sizeof(network_io_context.lobby_heartbeat);
-    
+    network_io_context.arena = M_ArenaAlloc(Megabytes(1));
     for(;;)
     {
         DWORD bytes_transferred;
@@ -254,22 +231,6 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
             Log("Received network message");
             switch(completion_key)
             {
-                case NetworkMessageSource_LobbyHeartbeat:
-                {
-                    if (network_io_context.lobby_socket != InvalidSocket)
-                    {
-                        if (os->IsGameHostRunning())
-                        {
-                            // NOTE(fakhri): echo back whatever the lobby sent
-                            os->SendBuffer(network_io_context.lobby_socket, &network_io_context.lobby_heartbeat, sizeof(network_io_context.lobby_heartbeat));
-                        }
-                        else
-                        {
-                            os->CloseSocket(network_io_context.lobby_socket);
-                            network_io_context.lobby_socket = InvalidSocket;
-                        }
-                    }
-                } break;
                 case NetworkMessageSource_Player:
                 {
                     Log("From Player");

@@ -176,7 +176,14 @@ HandleAvailableMessages(Game_State *game_state)
             } break;
             case NetworkMessage_GameID:
             {
-                game_state->game_id = PushStr8Copy(os->permanent_arena, message->game_id);
+                if (!game_state->game_id.str)
+                {
+                    game_state->game_id.str = PushArray(os->permanent_arena, u8, message->game_id.size);
+                    game_state->game_id.size = message->game_id.size;
+                }
+                
+                Assert(message->game_id.size == game_state->game_id.size);
+                MemoryCopy(game_state->game_id.str, message->game_id.str, message->game_id.size);
                 SetFlag(game_state->flags, StateFlag_HostingGame);
             } break;
             case HostMessage_NewPlayerJoined:

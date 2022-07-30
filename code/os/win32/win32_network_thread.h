@@ -27,7 +27,6 @@ enum
 {
     NetworkMessageSource_Player,
     NetworkMessageSource_Host,
-    NetworkMessageSource_LobbyHeartbeat,
 };
 
 
