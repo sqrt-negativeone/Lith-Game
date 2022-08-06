@@ -20,7 +20,7 @@ M_ArenaAlloc(U64 cap)
     M_Arena *result = (M_Arena *)os->Reserve(cap);
     os->Commit(result, M_COMMIT_SIZE);
     
-    result->memory      = result + sizeof(M_Arena);
+    result->memory      = (u8*)result + sizeof(M_Arena);
     result->max         = cap;
     result->pos         = sizeof(M_Arena);
     result->commit_pos  = M_COMMIT_SIZE;

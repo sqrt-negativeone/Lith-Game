@@ -7,12 +7,12 @@ typedef u32 Font_Kind;
 enum
 {
     FontKind_None,
+    
     FontKind_Arial,
     FontKind_GameTitle,
     FontKind_MenuTitle,
     FontKind_MenuItem,
     FontKind_InputField,
-    
     FontKind_GameButton,
     
     FontKind_Count,

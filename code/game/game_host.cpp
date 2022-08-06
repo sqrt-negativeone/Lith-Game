@@ -39,7 +39,6 @@ internal void
 GameHost_BurnExtraCards(Host_Context *host_context, CardResidencyKind residency_kind)
 {
     CardResidency *residency = host_context->residencies + residency_kind;
-    CardResidency *burnt = host_context->residencies + CardResidencyKind_Burnt;
     
     // NOTE(fakhri): count the frequency of each card
     u32 card_number_freq[Card_Number_Count] = {};

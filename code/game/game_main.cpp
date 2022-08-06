@@ -1,6 +1,4 @@
 
-#define TEST_NETWORKING 1
-
 ////////////////////////////////
 //~ NOTE(fakhri): headers
 
@@ -307,12 +305,31 @@ APP_PermanantLoad(PermanentLoad)
     
     glEnable(GL_CULL_FACE); 
     
-    //glEnable(GL_DEPTH_TEST);
-    
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    InitRenderer(&game_state->render_context);
+    // NOTE(fakhri): load shaders
+    for (Shader_Kind shader_kind = ShaderKind_None;
+         shader_kind < ShaderKind_Count;
+         ++shader_kind)
+    {
+        LoadShader(&game_state->render_context, shader_kind);
+    }
+    
+    // NOTE(fakhri): load fonts
+    for (Font_Kind font_kind = FontKind_None;
+         font_kind < FontKind_Count;
+         ++font_kind)
+    {
+        LoadFont(&game_state->render_context, os->permanent_arena, font_kind);
+    }
+    
+    for (TextureID texture_id = TextureID_None;
+         texture_id < TextureID_Count;
+         ++texture_id)
+    {
+        LoadTexture(&game_state->render_context, texture_id);
+    }
     
     game_state->ui = UI_Init(&game_state->render_context, &game_state->controller);
     game_state->command_buffer.arena = os->permanent_arena;
@@ -332,6 +349,16 @@ APP_HotUnload(HotUnload)
 exported
 APP_UpdateAndRender(UpdateAndRender)
 {
+    
+#if 0
+    Render_Begin(&game_state->render_context, OS_FrameArena());
+    Render_PushClear(&game_state->render_context, Vec4(0.2f, 0.2f, 0.2f, 1.f));
+    
+    Render_PushText(&game_state->render_context, Str8Lit("a"), Vec3(0, 0, CentiMeter(60)), Vec4(0,0,0,1), CoordinateType_World, FontKind_Arial);
+    
+    Render_End(&game_state->render_context);
+    
+#else
     game_state->controller = {};
     Controller *controller = &game_state->controller;
     v4 white = Vec4(1, 1, 1,1);
@@ -421,7 +448,9 @@ APP_UpdateAndRender(UpdateAndRender)
     
     dt = game_state->time_scale_factor * dt;
     
+#if 1
     GameMenu(game_state, dt);
+#endif
     
     if (game_state->controller.right_mouse.pressed)
     {
@@ -671,7 +700,6 @@ APP_UpdateAndRender(UpdateAndRender)
         // NOTE(fakhri): declaring a card if the table was empty
         if (HasFlag(game_state->flags, StateFlag_ShouldDeclareCard))
         {
-            b32 did_choose_card = false;
             
             Render_PushQuad(&game_state->render_context, Vec3(0,0, Meter(1)), Vec2(CentiMeter(80), CentiMeter(50)),Vec4(0.1f, 0.1f, 0.1f, 0.5f), CoordinateType_World);
             
@@ -773,4 +801,6 @@ APP_UpdateAndRender(UpdateAndRender)
         os->fullscreen ^= 1;
     }
     ClearFlag(game_state->flags, GameStateFlagsGroup_ValidOnlyForOneFrame);
+#endif
+    
 }

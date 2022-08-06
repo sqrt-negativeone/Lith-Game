@@ -1,6 +1,7 @@
 
 #define MAX_Z Meter(10.0f)
 
+#if 0
 internal void
 InitRenderer(Render_Context *render_context)
 {
@@ -13,11 +14,11 @@ InitRenderer(Render_Context *render_context)
     }
     
     // NOTE(fakhri): load fonts
-    for (Font_Kind font_kind = FontKind_None;
+    for (Font_Kind font_kind = FontKind_None + 1;
          font_kind < FontKind_Count;
          ++font_kind)
     {
-        LoadFont(render_context, os->permanent_arena, font_kind);
+        render_context->fonts[font_kind] = LoadFont(os->permanent_arena, font_kind);
     }
     
     for (TextureID texture_id = TextureID_None;
@@ -28,6 +29,7 @@ InitRenderer(Render_Context *render_context)
     }
     
 }
+#endif
 
 internal v3
 ScreenCoordsFromWorldCoords(Render_Context *render_context, v3 world_coords)
@@ -168,6 +170,7 @@ Render_PushText(Render_Context *render_context, String text, v3 pos, v4 color, C
     pos.x -= 0.5f * GetFontWidth(render_context, font_to_use, text);
     
     Font *font = render_context->fonts + font_to_use;
+    Assert(font);
     
     v2 curr_point = pos.xy;
     // NOTE(fakhri): render each character
@@ -178,16 +181,20 @@ Render_PushText(Render_Context *render_context, String text, v3 pos, v4 color, C
         {
             u8 ch = text.str[ch_index];
             Assert(font->map_first <= ch && ch < font->map_opl);
-            Glyph glyph = font->map[ch - font->map_first];
+            u32 glyph_index = ch - font->map_first;
+            Glyph *glyph = font->map + glyph_index;
+            Log("src: (%f %f):(%f %f)", glyph->src.x0, glyph->src.y0, glyph->src.x1, glyph->src.y1);
+            Log("offset: (%f %f)", glyph->offset.x, glyph->offset.y);
+            Log("size: (%f %f)", glyph->size.x, glyph->size.y);
+            Log("advance: (%f %f)", glyph->advance);
             
-            v2 glyph_pos = curr_point + 0.5f * glyph.size + glyph.offset;
-            pos.xy = glyph_pos;
+            v3 glyph_pos = Vec3(curr_point + 0.5f * glyph->size + glyph->offset, pos.z);
             Render_PushImage(render_context, font->texture, 
-                             pos, glyph.size, 
+                             glyph_pos, glyph->size, 
                              CoordinateType_Screen, 0,
-                             Vec3(0, 0, 0), 0, color, glyph.src.compact_rect);
+                             Vec3(0, 0, 0), 0, color, glyph->src.compact_rect);
             
-            curr_point.x += glyph.advance;
+            curr_point.x += glyph->advance;
         }
     }
     
@@ -201,10 +208,11 @@ Render_PushText(Render_Context *render_context, String text, v3 pos, v4 color, C
 internal Push_Buffer *
 AllocatePushBuffer(M_Arena *arena)
 {
-    Push_Buffer *push_buffer = (Push_Buffer *)M_ArenaPushZero(arena, Megabytes(1));
+#define PUSH_BUFFER_SIZE Megabytes(1)
+    Push_Buffer *push_buffer = (Push_Buffer *)M_ArenaPushZero(arena, PUSH_BUFFER_SIZE);
     
-    push_buffer->memory = push_buffer + sizeof(Push_Buffer);
-    push_buffer->capacity = Megabytes(1) - sizeof(Push_Buffer);
+    push_buffer->memory = (u8 *)push_buffer + sizeof(Push_Buffer);
+    push_buffer->capacity = PUSH_BUFFER_SIZE - sizeof(Push_Buffer);
     push_buffer->size = 0;
     
     return push_buffer;
@@ -235,6 +243,7 @@ Render_Begin(Render_Context *render_context, M_Arena *frame_arena)
     render_context->camera_position = Vec2(camera_center.x - camera_offset.x, camera_center.y + camera_offset.y);
     
     render_context->push_buffer = AllocatePushBuffer(frame_arena);
+    Assert(render_context->push_buffer);
 }
 
 internal RenderSortBuffer

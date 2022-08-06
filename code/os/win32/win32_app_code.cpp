@@ -29,7 +29,7 @@ W32_AppCodeLoad(W32_AppCode *app_code)
     if (!CopyFile(w32_app_dll_path, w32_temp_app_dll_path, FALSE))
     {
         result = 0;
-        DWORD err = GetLastError();
+        GetLastError();
         goto end;
     }
     app_code->dll = LoadLibraryA(w32_temp_app_dll_path);

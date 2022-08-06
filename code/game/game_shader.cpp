@@ -110,9 +110,6 @@ SetupShader(Render_Context *render_context, Shader_Kind kind)
         +0.5f, -0.5f,
     };
     
-    f32 min_x = 0.0f, min_y = 0.0f;
-    f32 max_x = 1.0f, max_y = 1.0f;
-    
     local_persist f32 texture_vertices[] = {
         // position         texture
         -0.5f, -0.5f, 	 0.0f, 0.0f,

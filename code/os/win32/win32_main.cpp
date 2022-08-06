@@ -4,7 +4,7 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 ////////////////////////////////
 //~ NOTE(fakhri): headers
 
@@ -122,7 +122,7 @@ W32_WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param)
         }fallthrough;
         case WM_KEYDOWN: case WM_KEYUP:
         {
-            B32 was_down = !!(l_param & (1 << 30));
+            //B32 was_down = !!(l_param & (1 << 30));
             B32 is_down =   !(l_param & (1 << 31));
             OS_EventKind kind = is_down ? OS_EventKind_Press : OS_EventKind_Release;
             
@@ -225,7 +225,7 @@ W32_WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param)
         
         case WM_DPICHANGED:
         {
-            F32 new_dpi = (F32)w_param;
+            //F32 new_dpi = (F32)w_param;
             result = DefWindowProcW(hwnd, message, w_param, l_param);
         }break;
         
@@ -254,7 +254,7 @@ W32_WorkerThreadMain(LPVOID param)
         if (!did_work)
         {
             // NOTE(fakhri): queue is empty
-            WaitForSingleObject(w32_work_queue.waiting_worker_threads_semaphore, INFINITE);
+            WaitForSingleObject(work_queue->waiting_worker_threads_semaphore, INFINITE);
         }
     }
 }
@@ -470,9 +470,9 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
     W32_AppCode w32_game_code = {};
     //- NOTE(fakhri): Load and init app code
     {
-        game_state = PushStructZero(w32_os.permanent_arena, Game_State);
+        game_state = (Game_State *)M_ArenaPushAligned(w32_os.permanent_arena, sizeof(Game_State), 16);
         W32_AppCodeLoad(&w32_game_code);
-        w32_game_code.PermanentLoad(&w32_os, game_state);
+        w32_game_code.PermanentLoad(os, game_state);
     }
     
     // NOTE(fakhri): init directory watcher for shader files hotreload

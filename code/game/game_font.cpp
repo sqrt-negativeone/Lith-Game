@@ -62,6 +62,7 @@ LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
     String8 font_data = os->LoadEntireFile(scratch.arena, font_info.path);
     
     U8 *pixels = PushArrayZero(arena, U8, atlas_size.x * atlas_size.y);
+    Assert(pixels && font_data.str);
     
     // NOTE(fakhri): calculate basic metrics
     F32 ascent = 0;
@@ -74,6 +75,7 @@ LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
     stbtt_PackBegin(&ctx, pixels, atlas_size.x, atlas_size.y, 0, 1, 0);
     stbtt_PackSetOversampling(&ctx, (u32)oversample.x, (u32)oversample.y);
     stbtt_packedchar *chardata_for_range = PushArrayZero(scratch.arena, stbtt_packedchar, direct_map_opl-direct_map_first);
+    Assert(chardata_for_range);
     stbtt_pack_range rng =
     {
         font_info.scale,
@@ -88,6 +90,8 @@ LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
     // NOTE(fakhri): build direct map
     v2 atlas_f32 = Vec2f32FromVec2i32(atlas_size);
     Glyph *direct_map = PushArrayZero(arena, Glyph, direct_map_opl-direct_map_first);
+    Log("map size: %d", direct_map_opl-direct_map_first);
+    Assert(direct_map);
     for(U32 codepoint = direct_map_first; codepoint < direct_map_opl; codepoint += 1)
     {
         U32 index = codepoint - direct_map_first;
@@ -122,7 +126,6 @@ LoadFont(Render_Context *render_context, M_Arena *arena, Font_Kind font_kind)
     font->ascent = ascent;
     font->descent = descent;
     FillTexture2D(font->texture, Vec2i32(0, 0), atlas_size, Str8(pixels, atlas_size.x*atlas_size.y));
-    
     ReleaseScratch(scratch);
 }
 

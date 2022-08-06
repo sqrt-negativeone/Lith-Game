@@ -340,8 +340,6 @@ MoveAllFromResidency(Game_State *game_state, ResidencyKind from, ResidencyKind t
 internal void
 AssignResidencyToPlayers(Game_State *game_state)
 {
-    u32 residency = ResidencyKind_Left;
-    
     PlayerID player_id = game_state->my_player_id;
     game_state->players[player_id].assigned_residency_kind = ResidencyKind_Down;
     game_state->residencies[ResidencyKind_Down].controlling_player_id = player_id;

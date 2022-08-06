@@ -592,7 +592,6 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
             } break;
             case ButtonEntityKind_QuestionCredibility:
             {
-                Residency *residency = game_state->residencies + ResidencyKind_Table;
                 if (game_state->prev_played_cards_count)
                 {
                     // NOTE(fakhri): defer handling the button click

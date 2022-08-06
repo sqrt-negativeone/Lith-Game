@@ -71,7 +71,6 @@ struct Render_Context
     Shaders_Hash shaders_hash;
     Shader_Program shaders[ShaderKind_Count];
     Texture2D textures[TextureID_Count];
-    
     Font fonts[FontKind_Count];
     Font_Kind active_font;
     

@@ -97,11 +97,11 @@ HandlePlayerMessage(Message *message)
                     io_successed &= os->ReceiveBuffer(LobbySocket, network_io_context.game_id.str, (u32)game_id_size);
                     if (io_successed)
                     {
-                        Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
-                        message->type = NetworkMessage_GameID;
-                        Assert(network_io_context.game_id.size <= ArrayCount(message->buffer));
-                        MemoryCopy(message->buffer, network_io_context.game_id.str, game_id_size);
-                        message->game_id = Str8(message->buffer, game_id_size);
+                        Message *network_message = W32_BeginMessageQueueWrite(&network_message_queue);
+                        network_message->type = NetworkMessage_GameID;
+                        Assert(network_io_context.game_id.size <= ArrayCount(network_message->buffer));
+                        MemoryCopy(network_message->buffer, network_io_context.game_id.str, game_id_size);
+                        network_message->game_id = Str8(network_message->buffer, game_id_size);
                         W32_EndMessageQueueWrite(&network_message_queue);
                         io_successed &= ConnectToHost("127.0.0.1");
                     }
@@ -120,8 +120,8 @@ HandlePlayerMessage(Message *message)
             
             if (!io_successed)
             {
-                Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
-                message->type = NetworkMessage_FailedToHost;
+                Message *network_message = W32_BeginMessageQueueWrite(&network_message_queue);
+                network_message->type = NetworkMessage_FailedToHost;
                 W32_EndMessageQueueWrite(&network_message_queue);
             }
             
@@ -145,16 +145,16 @@ HandlePlayerMessage(Message *message)
                 
                 if (io_successed)
                 {
-                    Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
-                    message->type = NetworkMessage_JoinedGame;
+                    Message *network_message = W32_BeginMessageQueueWrite(&network_message_queue);
+                    network_message->type = NetworkMessage_JoinedGame;
                     W32_EndMessageQueueWrite(&network_message_queue);
                 }
             }
             
             if (!io_successed)
             {
-                Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
-                message->type = NetworkMessage_FailedToJoin;
+                Message *network_message = W32_BeginMessageQueueWrite(&network_message_queue);
+                network_message->type = NetworkMessage_FailedToJoin;
                 W32_EndMessageQueueWrite(&network_message_queue);
             }
             
@@ -170,8 +170,8 @@ HandlePlayerMessage(Message *message)
             NetworkSendString(network_io_context.host_socket, message->username, io_successed);
             if (!io_successed)
             {
-                Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
-                message->type = NetworkMessage_HostDown;
+                Message *network_message = W32_BeginMessageQueueWrite(&network_message_queue);
+                network_message->type = NetworkMessage_HostDown;
                 W32_EndMessageQueueWrite(&network_message_queue);
             }
         } break;
@@ -187,8 +187,8 @@ HandlePlayerMessage(Message *message)
             NetworkSendValue(network_io_context.host_socket, message->player_move.declared_number, io_successed);
             if (!io_successed)
             {
-                Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
-                message->type = NetworkMessage_HostDown;
+                Message *network_message = W32_BeginMessageQueueWrite(&network_message_queue);
+                network_message->type = NetworkMessage_HostDown;
                 W32_EndMessageQueueWrite(&network_message_queue);}
         } break;
         case PlayerMessage_QuestionCredibility:
@@ -198,8 +198,8 @@ HandlePlayerMessage(Message *message)
             NetworkSendValue(network_io_context.host_socket, move_kind, io_successed);
             if (!io_successed)
             {
-                Message *message = W32_BeginMessageQueueWrite(&network_message_queue);
-                message->type = NetworkMessage_HostDown;
+                Message *network_message = W32_BeginMessageQueueWrite(&network_message_queue);
+                network_message->type = NetworkMessage_HostDown;
                 W32_EndMessageQueueWrite(&network_message_queue);
             }
             
