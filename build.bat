@@ -4,7 +4,7 @@ set code=%cd%
 set application_name=Lith
 set build_options= -DBUILD_WIN32=1
 set warnings= /W4 /WX /wd4201 /wd4100 /wd4127 /wd4505 /wd4533
-set compile_flags= /O1 /Ob0 /Zo -FC -GR- -EHa- -nologo -Zi %warnings% /I "%code%/code/"
+set compile_flags= -FC -GR- -EHa- -nologo -Zi %warnings% /I "%code%/code/"
 set common_link_flags= opengl32.lib -incremental:no
 set platform_link_flags= Ws2_32.lib gdi32.lib user32.lib Kernel32.lib winmm.lib %common_link_flags%
 set app_link_flags= /LIBPATH:"%code%/code/third_party" %common_link_flags%

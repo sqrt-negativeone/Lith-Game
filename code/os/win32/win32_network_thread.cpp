@@ -1,4 +1,3 @@
-//#include "network_message.cpp"
 
 struct NetworkIOContext
 {
@@ -57,7 +56,6 @@ ConnectToHost(char *host_address)
 internal void
 HandlePlayerMessage(Message *message)
 {
-    char *lobby_address = "127.0.0.1";
     switch(message->type)
     {
         case PlayerMessage_CancelJoin:
@@ -67,7 +65,6 @@ HandlePlayerMessage(Message *message)
         case PlayerMessage_CancelHost:
         {
             os->StopGameHost();
-            
             Socket_Handle s = os->ConnectToServer("127.0.0.1", HOST_PORT);
             if (s != InvalidSocket)
             {
@@ -78,7 +75,13 @@ HandlePlayerMessage(Message *message)
         {
             // NOTE(fakhri): start the host
             b32 io_successed = true;
-            Socket_Handle LobbySocket = W32_ConnectToServer(lobby_address, LOBBY_HOST_PORT);
+            Socket_Handle LobbySocket = InvalidSocket;
+            for (String8Node *string_node = os->config.lobby_addresses.first;
+                 string_node && (LobbySocket == InvalidSocket);
+                 string_node = string_node->next)
+            {
+                LobbySocket = os->ConnectToServer(string_node->string.cstr, LOBBY_HOST_PORT);
+            }
             if (LobbySocket != InvalidSocket)
             {
                 network_io_context.lobby_socket = LobbySocket;
@@ -129,26 +132,40 @@ HandlePlayerMessage(Message *message)
         case PlayerMessage_JoinGameSession:
         {
             b32 io_successed = true;
-            Socket_Handle LobbySocket = W32_ConnectToServer(lobby_address, LOBBY_PLAYER_PORT);
-            NetworkSendString(LobbySocket, message->game_id, io_successed);
-            
-            u32 host_address;
-            NetworkReceiveValue(LobbySocket, host_address, io_successed);
-            if (io_successed)
+            Socket_Handle LobbySocket = InvalidSocket;
+            for (String8Node *string_node = os->config.lobby_addresses.first;
+                 string_node && (LobbySocket == InvalidSocket);
+                 string_node = string_node->next)
             {
-                Log("Received address is %d", host_address);
-                struct in_addr ip_addr;
-                ip_addr.S_un.S_addr = host_address;
-                char *str_address = inet_ntoa(ip_addr);
-                Log("address as string is %s", str_address);
-                io_successed &= ConnectToHost(str_address);
+                LobbySocket = os->ConnectToServer(string_node->string.cstr, LOBBY_PLAYER_PORT);
+            }
+            
+            if (LobbySocket != InvalidSocket)
+            {
+                NetworkSendString(LobbySocket, message->game_id, io_successed);
                 
+                u32 host_address;
+                NetworkReceiveValue(LobbySocket, host_address, io_successed);
                 if (io_successed)
                 {
-                    Message *network_message = W32_BeginMessageQueueWrite(&network_message_queue);
-                    network_message->type = NetworkMessage_JoinedGame;
-                    W32_EndMessageQueueWrite(&network_message_queue);
+                    Log("Received address is %d", host_address);
+                    struct in_addr ip_addr;
+                    ip_addr.S_un.S_addr = host_address;
+                    char *str_address = inet_ntoa(ip_addr);
+                    Log("address as string is %s", str_address);
+                    io_successed &= ConnectToHost(str_address);
+                    
+                    if (io_successed)
+                    {
+                        Message *network_message = W32_BeginMessageQueueWrite(&network_message_queue);
+                        network_message->type = NetworkMessage_JoinedGame;
+                        W32_EndMessageQueueWrite(&network_message_queue);
+                    }
                 }
+            }
+            else
+            {
+                io_successed = false;
             }
             
             if (!io_successed)
@@ -220,7 +237,6 @@ DWORD WINAPI NetworkMain(LPVOID lpParameter)
     
     network_io_context.message_type_wsa_buf.buf = (char *)&network_io_context.message_type;
     network_io_context.message_type_wsa_buf.len = sizeof(network_io_context.message_type);
-    
     network_io_context.arena = M_ArenaAlloc(Megabytes(1));
     for(;;)
     {

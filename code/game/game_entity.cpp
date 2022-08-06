@@ -553,7 +553,7 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
             if (game_state->controller.left_mouse.pressed)
             {
                 SetFlag(entity->flags, EntityFlag_Pressed);
-                entity->target_dimension = 1.2f * Vec2(MiliMeter(50), MiliMeter(30));
+                entity->target_dimension = 1.02f * Vec2(MiliMeter(200), MiliMeter(30));
                 clicked = true;
             }
         }
@@ -562,7 +562,7 @@ UpdateButtonEntity(Game_State *game_state, Entity *entity, f32 dt)
         {
             if (game_state->controller.left_mouse.released)
             {
-                entity->target_dimension = Vec2(MiliMeter(50), MiliMeter(30));
+                entity->target_dimension = Vec2(MiliMeter(200), MiliMeter(30));
                 ClearFlag(entity->flags, EntityFlag_Pressed);
             }
         }

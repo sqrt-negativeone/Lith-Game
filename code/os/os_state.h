@@ -11,6 +11,11 @@ struct OS_Time
     f32 wall_dt_for_frame;
 };
 
+struct Config_File
+{
+    String8List lobby_addresses;
+};
+
 struct OS_State
 {
     // NOTE(fakhri): Memory
@@ -35,6 +40,8 @@ struct OS_State
     f32 *sample_out;
     u32 sample_count_to_output;
     u32 samples_per_second;
+    
+    Config_File config;
     
     // NOTE(fakhri): Platform exposed API
     OS_Release_Fucntion                      *Release;

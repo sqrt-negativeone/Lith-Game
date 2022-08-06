@@ -3,7 +3,6 @@
 #ifndef WIN32_NETWORK_THREAD_H
 #define WIN32_NETWORK_THREAD_H
 
-
 #define LOBBY_ADDRESS "127.0.0.1"
 #define SERVER_PORT "42069"
 

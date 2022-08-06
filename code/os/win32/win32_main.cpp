@@ -259,6 +259,7 @@ W32_WorkerThreadMain(LPVOID param)
     }
 }
 
+
 int
 WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_show_cmd)
 {
@@ -474,6 +475,8 @@ WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR lp_cmd_line, int n_sh
         W32_AppCodeLoad(&w32_game_code);
         w32_game_code.PermanentLoad(os, game_state);
     }
+    
+    os->config = OS_LoadConfigFile(w32_os.permanent_arena);
     
     // NOTE(fakhri): init directory watcher for shader files hotreload
     Directory_Watcher shaders_watcher = {};
