@@ -23,7 +23,7 @@ this will generate a build folder, inside it you find the game executable `Lith.
 
 
 # TODOs:
-- [ ] Add config file to load lobby ip address and such
+- [x] Add config file to load lobby ip address and such
 - [ ] Add Audio
 - [ ] Port to other platforms
 - [ ] Host the lobby somewhere
