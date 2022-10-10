@@ -21,6 +21,12 @@ the first player who empty their hands wins.
 to build on windows make sure you have cl.exe accessible from your terminal, then run build.bat
 this will generate a build folder, inside it you find the game executable `Lith.exe`
 
+# Screens
+
+
+https://user-images.githubusercontent.com/37900094/194888301-b5228f76-95f5-4fa7-bb95-e4e0b0db1c58.mp4
+
+
 
 # TODOs:
 - [x] Add config file to load lobby ip address and such
